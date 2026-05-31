@@ -100,8 +100,9 @@ function HealthCell(props: {
   const tokens = Number(props.cell?.success_tokens) || 0
   const { color } = getRateLevel(rate)
 
-  const borderColor = isFilled ? `${color}44` : color
-  const backgroundColor = isFilled ? 'transparent' : `${color}08`
+  const borderColor = color
+  const backgroundColor = 'transparent'
+  const opacity = isFilled ? 0.75 : 0.95
 
   return (
     <Tooltip>
@@ -112,9 +113,9 @@ function HealthCell(props: {
             style={{
               border: '2px solid',
               borderColor,
-              borderStyle: isFilled ? 'dashed' : 'solid',
+              borderStyle: 'solid',
               backgroundColor,
-              opacity: isFilled ? 0.45 : 0.95,
+              opacity,
             }}
           />
         }
@@ -667,7 +668,7 @@ export function ModelHealthPublicPage() {
                 return (
                   <div
                     key={item.model_name}
-                    className='bg-card rounded-[20px] border border-gray-200/70 px-5 py-4 transition-all duration-300 hover:border-gray-200 hover:shadow-md dark:border-gray-800 dark:hover:border-gray-700'
+                    className='bg-white dark:bg-slate-900 rounded-[20px] border border-gray-200/40 px-5 py-4 transition-all duration-300 hover:border-gray-300/80 hover:shadow-md dark:border-gray-800 dark:hover:border-gray-700'
                   >
                     <div className='flex items-center gap-4'>
                       <div className='w-[180px] flex-shrink-0 sm:w-[240px]'>

@@ -266,6 +266,14 @@ export function ModelHealthHourlyPage() {
     }
   }, [rows])
 
+  const detailRows = useMemo(
+    () =>
+      [...rows].sort(
+        (a, b) => Number(b.hour_start_ts) - Number(a.hour_start_ts)
+      ),
+    [rows]
+  )
+
   const chartSpec = useMemo(() => {
     const values = (rows || []).map((row) => ({
       ts: row.hour_start_ts,
@@ -752,8 +760,8 @@ export function ModelHealthHourlyPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rows.length > 0 ? (
-                      rows.map((row, idx) => {
+                    {detailRows.length > 0 ? (
+                      detailRows.map((row, idx) => {
                         const rate = Number(row.success_rate) || 0
                         const { color, bg, text } = getRateLevel(rate)
                         return (
