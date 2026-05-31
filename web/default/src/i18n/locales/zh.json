@@ -2367,6 +2367,7 @@
     "Model Group": "模型分组",
     "Model health": "模型健康度",
     "Model health analysis": "模型健康度分析",
+    "Model health overview for the last 24 hours": "最近 24 小时各模型运行状态一览",
     "Model health status for the last 24 hours, monitoring all requests (including errors caused by malformed requests)": "最近 24 小时模型健康状态，监控所有请求（包括请求格式错误导致的错误）",
     "Model Limits": "模型限制",
     "Model Mapping": "模型映射",

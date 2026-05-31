@@ -2367,6 +2367,7 @@
     "Model Group": "Model Group",
     "Model health": "Model health",
     "Model health analysis": "Model health analysis",
+    "Model health overview for the last 24 hours": "Model health overview for the last 24 hours",
     "Model health status for the last 24 hours, monitoring all requests (including errors caused by malformed requests)": "Model health status for the last 24 hours, monitoring all requests (including errors caused by malformed requests)",
     "Model Limits": "Model Limits",
     "Model Mapping": "Model Mapping",

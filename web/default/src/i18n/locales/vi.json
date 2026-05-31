@@ -2367,6 +2367,7 @@
     "Model Group": "Nhóm Mô hình",
     "Model health": "Sức khỏe mô hình",
     "Model health analysis": "Phân tích sức khỏe mô hình",
+    "Model health overview for the last 24 hours": "Tổng quan tình trạng các mô hình trong 24 giờ qua",
     "Model health status for the last 24 hours, monitoring all requests (including errors caused by malformed requests)": "Trạng thái sức khỏe mô hình trong 24 giờ qua, giám sát mọi yêu cầu (bao gồm lỗi do yêu cầu sai định dạng)",
     "Model Limits": "Giới hạn Mô hình",
     "Model Mapping": "Ánh xạ mô hình",

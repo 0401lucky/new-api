@@ -2367,6 +2367,7 @@
     "Model Group": "モデルグループ",
     "Model health": "モデル健全性",
     "Model health analysis": "モデル健全性分析",
+    "Model health overview for the last 24 hours": "直近 24 時間の各モデルの稼働状況概要",
     "Model health status for the last 24 hours, monitoring all requests (including errors caused by malformed requests)": "直近 24 時間のモデル健全性です。不正な形式のリクエストによるエラーを含むすべてのリクエストを監視します",
     "Model Limits": "モデル制限",
     "Model Mapping": "モデルマッピング",
