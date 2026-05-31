@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import {
   Activity,
+  Ban,
   Box,
   CreditCard,
   FileText,
@@ -136,6 +137,11 @@ export function useSidebarData(): SidebarData {
             title: t('Users'),
             url: '/users',
             icon: Users,
+          },
+          {
+            title: t('Blackroom'),
+            url: '/blackroom',
+            icon: Ban,
           },
           {
             title: t('Redemption Codes'),

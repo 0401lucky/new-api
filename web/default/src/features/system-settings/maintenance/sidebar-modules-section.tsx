@@ -138,6 +138,10 @@ export function SidebarModulesSection({
         title: t('Model health'),
         description: t('Analyze hourly model health and request outcomes.'),
       },
+      blackroom: {
+        title: t('Blackroom'),
+        description: t('Review and release users blocked by risk rules.'),
+      },
       redemption: {
         title: t('Redeem codes'),
         description: t('Create and review invite or credit codes.'),

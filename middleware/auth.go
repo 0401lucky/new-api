@@ -14,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 
@@ -29,6 +30,41 @@ func validUserInfo(username string, role int) bool {
 	}
 	if !common.IsValidateRole(role) {
 		return false
+	}
+	return true
+}
+
+func abortIfBlackroomBanned(c *gin.Context, userId int, role int, openaiResponse bool) bool {
+	if userId <= 0 || role >= common.RoleAdminUser || model.DB == nil || !operation_setting.GetBlackroomSetting().Enabled {
+		return false
+	}
+	ban, err := model.GetActiveBlackroomBanCached(userId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false
+		}
+		common.SysLog(fmt.Sprintf("GetActiveBlackroomBanCached error for user %d: %v", userId, err))
+		if openaiResponse {
+			abortWithOpenAiMessage(c, http.StatusInternalServerError, common.TranslateMessage(c, i18n.MsgDatabaseError))
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"message": common.TranslateMessage(c, i18n.MsgDatabaseError),
+			})
+			c.Abort()
+		}
+		return true
+	}
+	message := ban.BlockMessage()
+	if openaiResponse {
+		abortWithOpenAiMessage(c, http.StatusForbidden, message, types.ErrorCodeAccessDenied)
+	} else {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"message": message,
+			"data":    ban,
+		})
+		c.Abort()
 	}
 	return true
 }
@@ -136,6 +172,9 @@ func authHelper(c *gin.Context, minRole int) {
 		c.Abort()
 		return
 	}
+	if abortIfBlackroomBanned(c, id.(int), role.(int), false) {
+		return
+	}
 	if !validUserInfo(username.(string), role.(int)) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -196,8 +235,17 @@ func TokenOrUserAuth() func(c *gin.Context) {
 		// Try session auth first (dashboard users)
 		session := sessions.Default(c)
 		if id := session.Get("id"); id != nil {
+			role, roleOk := session.Get("role").(int)
+			if !roleOk {
+				role = common.RoleCommonUser
+			}
 			if status, ok := session.Get("status").(int); ok && status == common.UserStatusEnabled {
+				userID, idOk := id.(int)
+				if idOk && abortIfBlackroomBanned(c, userID, role, false) {
+					return
+				}
 				c.Set("id", id)
+				c.Set("role", role)
 				c.Next()
 				return
 			}
@@ -263,6 +311,9 @@ func TokenAuthReadOnly() func(c *gin.Context) {
 				"message": common.TranslateMessage(c, i18n.MsgAuthUserBanned),
 			})
 			c.Abort()
+			return
+		}
+		if abortIfBlackroomBanned(c, token.UserId, userCache.Role, false) {
 			return
 		}
 
@@ -374,6 +425,9 @@ func TokenAuth() func(c *gin.Context) {
 		userEnabled := userCache.Status == common.UserStatusEnabled
 		if !userEnabled {
 			abortWithOpenAiMessage(c, http.StatusForbidden, common.TranslateMessage(c, i18n.MsgAuthUserBanned))
+			return
+		}
+		if abortIfBlackroomBanned(c, token.UserId, userCache.Role, true) {
 			return
 		}
 

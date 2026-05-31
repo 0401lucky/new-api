@@ -332,6 +332,18 @@ func SetApiRouter(router *gin.Engine) {
 			groupRoute.GET("/", controller.GetGroups)
 		}
 
+		blackroomRoute := apiRouter.Group("/blackroom")
+		blackroomRoute.Use(middleware.AdminAuth())
+		{
+			blackroomRoute.GET("", controller.GetBlackroomBans)
+			blackroomRoute.GET("/", controller.GetBlackroomBans)
+			blackroomRoute.GET("/setting", controller.GetBlackroomSetting)
+			blackroomRoute.PUT("/setting", controller.UpdateBlackroomSetting)
+			blackroomRoute.POST("/manual-ban", controller.ManualBanBlackroomUser)
+			blackroomRoute.POST("/scan", controller.RunBlackroomScan)
+			blackroomRoute.POST("/:id/release", controller.ReleaseBlackroomBan)
+		}
+
 		prefillGroupRoute := apiRouter.Group("/prefill_group")
 		prefillGroupRoute.Use(middleware.AdminAuth())
 		{

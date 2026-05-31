@@ -35,11 +35,29 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { useMediaQuery } from '@/hooks'
-import { Copy, Pencil, Plus, Trash2 } from 'lucide-react'
+import {
+  Copy,
+  Download,
+  Loader2,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Table,
   TableBody,
@@ -55,6 +73,7 @@ import {
   DataTablePagination,
 } from '@/components/data-table'
 import { StatusBadge } from '@/components/status-badge'
+import { getEnabledModels } from '@/features/channels/api'
 import {
   combineBillingExpr,
   splitBillingExprAndRequestRules,
@@ -97,7 +116,15 @@ type ModelRow = {
   hasConflict: boolean
 }
 
+type ChannelModelsImportDialogProps = {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  configuredModelNames: Set<string>
+  onImport: (models: string[]) => void
+}
+
 const STORAGE_KEY = 'model-ratio-column-visibility'
+const PLACEHOLDER_BILLING_MODE = 'ratio'
 
 const hasValue = (value?: string) => value !== undefined && value !== ''
 
@@ -192,6 +219,11 @@ const getPriceDetail = (row: ModelRow, t: (key: string) => string) => {
   return details.length > 0 ? details.join(' · ') : t('Base input price only')
 }
 
+const normalizeModelList = (models: readonly string[]) =>
+  Array.from(
+    new Set(models.map((model) => model.trim()).filter((model) => model !== ''))
+  ).sort((a, b) => a.localeCompare(b))
+
 export const ModelRatioVisualEditor = memo(
   function ModelRatioVisualEditor({
     modelPrice,
@@ -209,6 +241,7 @@ export const ModelRatioVisualEditor = memo(
     const { t } = useTranslation()
     const isMobile = useMediaQuery('(max-width: 767px)')
     const [sheetOpen, setSheetOpen] = useState(false)
+    const [importDialogOpen, setImportDialogOpen] = useState(false)
     const [editorOpen, setEditorOpen] = useState(false)
     const [editData, setEditData] = useState<ModelRatioData | null>(null)
     const [sorting, setSorting] = useState<SortingState>([])
@@ -444,6 +477,11 @@ export const ModelRatioVisualEditor = memo(
       setEditorOpen(true)
       if (isMobile) setSheetOpen(true)
     }, [isMobile])
+
+    const configuredModelNames = useMemo(
+      () => new Set(models.map((model) => model.name)),
+      [models]
+    )
 
     const handleCancel = useCallback(() => {
       setEditData(null)
@@ -836,6 +874,42 @@ export const ModelRatioVisualEditor = memo(
       ]
     )
 
+    const handleImportChannelModels = useCallback(
+      (modelNames: string[]) => {
+        const nextNames = normalizeModelList(modelNames).filter(
+          (name) => !configuredModelNames.has(name)
+        )
+
+        if (nextNames.length === 0) {
+          toast.error(t('No new channel models selected'))
+          return
+        }
+
+        const billingModeMap = safeJsonParse<Record<string, string>>(
+          billingMode,
+          { fallback: {}, silent: true }
+        )
+
+        nextNames.forEach((name) => {
+          billingModeMap[name] = PLACEHOLDER_BILLING_MODE
+        })
+
+        onChange(
+          'billing_setting.billing_mode',
+          JSON.stringify(billingModeMap, null, 2)
+        )
+        setImportDialogOpen(false)
+        setGlobalFilter('')
+        setRowSelection({})
+        toast.success(
+          t('Added {{count}} channel models to pricing draft', {
+            count: nextNames.length,
+          })
+        )
+      },
+      [billingMode, configuredModelNames, onChange, t]
+    )
+
     const handleSave = useCallback(
       (data: ModelRatioData) => {
         persistPricingData(data)
@@ -908,10 +982,19 @@ export const ModelRatioVisualEditor = memo(
                 },
               ]}
               preActions={
-                <Button onClick={handleAdd}>
-                  <Plus data-icon='inline-start' />
-                  {t('Add model')}
-                </Button>
+                <div className='flex flex-wrap items-center gap-2'>
+                  <Button
+                    variant='outline'
+                    onClick={() => setImportDialogOpen(true)}
+                  >
+                    <Download data-icon='inline-start' />
+                    {t('Import from channels')}
+                  </Button>
+                  <Button onClick={handleAdd}>
+                    <Plus data-icon='inline-start' />
+                    {t('Add model')}
+                  </Button>
+                </div>
               }
             />
 
@@ -1026,6 +1109,13 @@ export const ModelRatioVisualEditor = memo(
             selectedTargetCount={selectedTargetCount}
           />
         )}
+
+        <ChannelModelsImportDialog
+          open={importDialogOpen}
+          onOpenChange={setImportDialogOpen}
+          configuredModelNames={configuredModelNames}
+          onImport={handleImportChannelModels}
+        />
       </div>
     )
   },
@@ -1046,3 +1136,221 @@ export const ModelRatioVisualEditor = memo(
     )
   }
 )
+
+function ChannelModelsImportDialog({
+  open,
+  onOpenChange,
+  configuredModelNames,
+  onImport,
+}: ChannelModelsImportDialogProps) {
+  const { t } = useTranslation()
+  const [loading, setLoading] = useState(false)
+  const [channelModels, setChannelModels] = useState<string[]>([])
+  const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set())
+  const [search, setSearch] = useState('')
+
+  const availableModels = useMemo(
+    () => channelModels.filter((model) => !configuredModelNames.has(model)),
+    [channelModels, configuredModelNames]
+  )
+
+  const filteredModels = useMemo(() => {
+    const keyword = search.trim().toLowerCase()
+    if (!keyword) return availableModels
+    return availableModels.filter((model) =>
+      model.toLowerCase().includes(keyword)
+    )
+  }, [availableModels, search])
+
+  useEffect(() => {
+    if (!open) {
+      setSearch('')
+      return
+    }
+
+    let cancelled = false
+    const loadModels = async () => {
+      setLoading(true)
+      try {
+        const response = await getEnabledModels()
+        if (cancelled) return
+
+        if (!response.success || !Array.isArray(response.data)) {
+          toast.error(response.message || t('Failed to load channel models'))
+          setChannelModels([])
+          setSelectedModels(new Set())
+          return
+        }
+
+        const normalizedModels = normalizeModelList(response.data)
+        const selectableModels = normalizedModels.filter(
+          (model) => !configuredModelNames.has(model)
+        )
+        setChannelModels(normalizedModels)
+        setSelectedModels(new Set(selectableModels))
+      } catch (error: unknown) {
+        if (cancelled) return
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : t('Failed to load channel models')
+        )
+        setChannelModels([])
+        setSelectedModels(new Set())
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    loadModels()
+
+    return () => {
+      cancelled = true
+    }
+  }, [configuredModelNames, open, t])
+
+  const selectedVisibleCount = filteredModels.filter((model) =>
+    selectedModels.has(model)
+  ).length
+  const allVisibleSelected =
+    filteredModels.length > 0 && selectedVisibleCount === filteredModels.length
+  const someVisibleSelected =
+    selectedVisibleCount > 0 && selectedVisibleCount < filteredModels.length
+
+  const toggleModel = (model: string) => {
+    setSelectedModels((previous) => {
+      const next = new Set(previous)
+      if (next.has(model)) {
+        next.delete(model)
+      } else {
+        next.add(model)
+      }
+      return next
+    })
+  }
+
+  const toggleAllVisible = () => {
+    setSelectedModels((previous) => {
+      const next = new Set(previous)
+      if (allVisibleSelected) {
+        filteredModels.forEach((model) => next.delete(model))
+      } else {
+        filteredModels.forEach((model) => next.add(model))
+      }
+      return next
+    })
+  }
+
+  const handleClose = () => {
+    onOpenChange(false)
+  }
+
+  const handleImport = () => {
+    onImport(Array.from(selectedModels))
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className='flex max-h-[90vh] flex-col sm:max-w-2xl'>
+        <DialogHeader>
+          <DialogTitle>{t('Import channel models')}</DialogTitle>
+          <DialogDescription>
+            {t(
+              'Select enabled channel models that are not yet in pricing. Imported models are added to the current draft without changing prices.'
+            )}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className='flex min-h-0 flex-1 flex-col gap-3'>
+          <div className='grid gap-2 sm:grid-cols-3'>
+            <div className='rounded-md border px-3 py-2'>
+              <div className='text-muted-foreground text-xs'>
+                {t('Enabled channel models')}
+              </div>
+              <div className='text-lg font-medium'>{channelModels.length}</div>
+            </div>
+            <div className='rounded-md border px-3 py-2'>
+              <div className='text-muted-foreground text-xs'>
+                {t('Not in pricing')}
+              </div>
+              <div className='text-lg font-medium'>
+                {availableModels.length}
+              </div>
+            </div>
+            <div className='rounded-md border px-3 py-2'>
+              <div className='text-muted-foreground text-xs'>
+                {t('Selected')}
+              </div>
+              <div className='text-lg font-medium'>{selectedModels.size}</div>
+            </div>
+          </div>
+
+          <div className='relative'>
+            <Search className='text-muted-foreground absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2' />
+            <Input
+              placeholder={t('Search models...')}
+              className='pl-8'
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
+
+          {filteredModels.length > 0 && (
+            <label className='flex cursor-pointer items-center gap-2 text-sm'>
+              <Checkbox
+                checked={allVisibleSelected}
+                indeterminate={someVisibleSelected}
+                onCheckedChange={toggleAllVisible}
+              />
+              <span className='text-muted-foreground'>
+                {t('Select All Visible')}
+              </span>
+            </label>
+          )}
+
+          <ScrollArea className='h-[320px] rounded-md border p-2'>
+            {loading ? (
+              <div className='text-muted-foreground flex h-full items-center justify-center gap-2 text-sm'>
+                <Loader2 className='h-4 w-4 animate-spin' />
+                {t('Loading channel models...')}
+              </div>
+            ) : filteredModels.length > 0 ? (
+              <div className='space-y-1'>
+                {filteredModels.map((model) => (
+                  <label
+                    key={model}
+                    className='hover:bg-accent flex cursor-pointer items-center gap-2 rounded px-2 py-1.5'
+                  >
+                    <Checkbox
+                      checked={selectedModels.has(model)}
+                      onCheckedChange={() => toggleModel(model)}
+                    />
+                    <span className='min-w-0 truncate text-sm'>{model}</span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <div className='text-muted-foreground flex h-full items-center justify-center text-center text-sm'>
+                {availableModels.length === 0
+                  ? t('All enabled channel models are already in pricing')
+                  : t('No matching results')}
+              </div>
+            )}
+          </ScrollArea>
+        </div>
+
+        <DialogFooter>
+          <Button variant='outline' onClick={handleClose}>
+            {t('Cancel')}
+          </Button>
+          <Button
+            onClick={handleImport}
+            disabled={loading || selectedModels.size === 0}
+          >
+            {t('Add {{count}} models', { count: selectedModels.size })}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}

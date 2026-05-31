@@ -96,6 +96,7 @@ export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
     channel: true,
     models: true,
     model_health: true,
+    blackroom: true,
     redemption: true,
     user: true,
     setting: true,
