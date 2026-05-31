@@ -98,10 +98,10 @@ function HealthCell(props: {
   const rate = Number(props.cell?.success_rate) || 0
   const isFilled = props.cell?.is_filled
   const tokens = Number(props.cell?.success_tokens) || 0
-  const { color } = getRateLevel(rate)
+  const { color, bg } = getRateLevel(rate)
 
   const borderColor = color
-  const backgroundColor = 'transparent'
+  const backgroundColor = bg
   const opacity = isFilled ? 0.75 : 0.95
 
   return (
