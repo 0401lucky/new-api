@@ -38,6 +38,7 @@ import { useMediaQuery } from '@/hooks'
 import {
   Copy,
   Download,
+  ListFilter,
   Loader2,
   Pencil,
   Plus,
@@ -113,6 +114,8 @@ type ModelRow = {
   billingMode?: string
   billingExpr?: string
   requestRuleExpr?: string
+  isConfigured?: boolean
+  isChannelModel?: boolean
   hasConflict: boolean
 }
 
@@ -195,6 +198,9 @@ const getPriceSummary = (row: ModelRow, t: (key: string) => string) => {
 }
 
 const getPriceDetail = (row: ModelRow, t: (key: string) => string) => {
+  if (row.isConfigured === false) {
+    return t('Click to configure pricing')
+  }
   if (row.billingMode === 'tiered_expr') {
     return row.requestRuleExpr
       ? t('Includes request rules')
@@ -242,6 +248,10 @@ export const ModelRatioVisualEditor = memo(
     const isMobile = useMediaQuery('(max-width: 767px)')
     const [sheetOpen, setSheetOpen] = useState(false)
     const [importDialogOpen, setImportDialogOpen] = useState(false)
+    const [channelModelView, setChannelModelView] = useState(false)
+    const [channelModelsLoading, setChannelModelsLoading] = useState(false)
+    const [channelModelsLoaded, setChannelModelsLoaded] = useState(false)
+    const [channelModelNames, setChannelModelNames] = useState<string[]>([])
     const [editorOpen, setEditorOpen] = useState(false)
     const [editData, setEditData] = useState<ModelRatioData | null>(null)
     const [sorting, setSorting] = useState<SortingState>([])
@@ -383,6 +393,7 @@ export const ModelRatioVisualEditor = memo(
             imageRatio: image,
             audioRatio: audio,
             audioCompletionRatio: audioCompletion,
+            isConfigured: true,
             hasConflict: false,
           }
         }
@@ -397,6 +408,7 @@ export const ModelRatioVisualEditor = memo(
           imageRatio: image,
           audioRatio: audio,
           audioCompletionRatio: audioCompletion,
+          isConfigured: true,
           billingMode: price !== '' ? 'per-request' : 'per-token',
           hasConflict:
             price !== '' &&
@@ -424,9 +436,67 @@ export const ModelRatioVisualEditor = memo(
       billingExpr,
     ])
 
+    const loadChannelModels = useCallback(async () => {
+      setChannelModelsLoading(true)
+      try {
+        const response = await getEnabledModels()
+        if (!response.success || !Array.isArray(response.data)) {
+          toast.error(response.message || t('Failed to load channel models'))
+          setChannelModelNames([])
+          return
+        }
+        setChannelModelNames(normalizeModelList(response.data))
+      } catch (error: unknown) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : t('Failed to load channel models')
+        )
+        setChannelModelNames([])
+      } finally {
+        setChannelModelsLoaded(true)
+        setChannelModelsLoading(false)
+      }
+    }, [t])
+
+    useEffect(() => {
+      if (channelModelView && !channelModelsLoaded && !channelModelsLoading) {
+        void loadChannelModels()
+      }
+    }, [
+      channelModelView,
+      channelModelsLoaded,
+      channelModelsLoading,
+      loadChannelModels,
+    ])
+
+    const tableModels = useMemo(() => {
+      if (!channelModelView) return models
+
+      const modelMap = new Map(models.map((model) => [model.name, model]))
+      return channelModelNames.map((name) => {
+        const configuredModel = modelMap.get(name)
+        if (configuredModel) {
+          return {
+            ...configuredModel,
+            isChannelModel: true,
+            isConfigured: true,
+          }
+        }
+
+        return {
+          name,
+          billingMode: 'per-token',
+          isChannelModel: true,
+          isConfigured: false,
+          hasConflict: false,
+        } satisfies ModelRow
+      })
+    }, [channelModelNames, channelModelView, models])
+
     const modeCounts = useMemo(
       () =>
-        models.reduce(
+        tableModels.reduce(
           (acc, model) => {
             const mode =
               model.billingMode === 'per-request' ||
@@ -442,7 +512,7 @@ export const ModelRatioVisualEditor = memo(
             tiered_expr: 0,
           } as Record<'per-token' | 'per-request' | 'tiered_expr', number>
         ),
-      [models]
+      [tableModels]
     )
 
     const handleEdit = useCallback(
@@ -482,6 +552,17 @@ export const ModelRatioVisualEditor = memo(
       () => new Set(models.map((model) => model.name)),
       [models]
     )
+
+    const handleToggleChannelModelView = useCallback(() => {
+      const next = !channelModelView
+      setChannelModelView(next)
+      setRowSelection({})
+      setPagination((previous) => ({ ...previous, pageIndex: 0 }))
+      setGlobalFilter('')
+      if (next && !channelModelsLoaded) {
+        void loadChannelModels()
+      }
+    }, [channelModelView, channelModelsLoaded, loadChannelModels])
 
     const handleCancel = useCallback(() => {
       setEditData(null)
@@ -636,6 +717,13 @@ export const ModelRatioVisualEditor = memo(
                   copyable={false}
                 />
               )}
+              {row.original.isConfigured === false && (
+                <StatusBadge
+                  label={t('Unpriced')}
+                  variant='warning'
+                  copyable={false}
+                />
+              )}
               {row.original.hasConflict && (
                 <StatusBadge
                   label={t('Conflict')}
@@ -695,13 +783,15 @@ export const ModelRatioVisualEditor = memo(
               >
                 <Pencil />
               </Button>
-              <Button
-                variant='ghost'
-                size='sm'
-                onClick={() => handleDelete(row.original.name)}
-              >
-                <Trash2 />
-              </Button>
+              {row.original.isConfigured !== false && (
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  onClick={() => handleDelete(row.original.name)}
+                >
+                  <Trash2 />
+                </Button>
+              )}
             </div>
           ),
           enableHiding: false,
@@ -710,7 +800,7 @@ export const ModelRatioVisualEditor = memo(
     }, [handleEdit, handleDelete, t])
 
     const table = useReactTable({
-      data: models,
+      data: tableModels,
       columns,
       state: {
         sorting,
@@ -728,6 +818,7 @@ export const ModelRatioVisualEditor = memo(
       onPaginationChange: setPagination,
       onRowSelectionChange: setRowSelection,
       autoResetPageIndex: false,
+      getRowId: (row) => row.name,
       getCoreRowModel: getCoreRowModel(),
       getFilteredRowModel: getFilteredRowModel(),
       getSortedRowModel: getSortedRowModel(),
@@ -950,6 +1041,14 @@ export const ModelRatioVisualEditor = memo(
     }, [editData, persistPricingData, t, table])
 
     const selectedTargetCount = table.getFilteredSelectedRowModel().rows.length
+    const emptyTableMessage = channelModelsLoading
+      ? t('Loading channel models...')
+      : table.getState().globalFilter ||
+          table.getState().columnFilters.length > 0
+        ? t('No models match your search')
+        : channelModelView && channelModelNames.length === 0
+          ? t('No enabled channel models found')
+          : t('No models configured. Use Add model to get started.')
 
     return (
       <div className='flex flex-col gap-4'>
@@ -985,6 +1084,23 @@ export const ModelRatioVisualEditor = memo(
                 <div className='flex flex-wrap items-center gap-2'>
                   <Button
                     variant='outline'
+                    onClick={handleToggleChannelModelView}
+                    disabled={channelModelsLoading}
+                  >
+                    {channelModelsLoading ? (
+                      <Loader2
+                        data-icon='inline-start'
+                        className='animate-spin'
+                      />
+                    ) : (
+                      <ListFilter data-icon='inline-start' />
+                    )}
+                    {channelModelView
+                      ? t('Showing channel models')
+                      : t('Show channel models')}
+                  </Button>
+                  <Button
+                    variant='outline'
                     onClick={() => setImportDialogOpen(true)}
                   >
                     <Download data-icon='inline-start' />
@@ -1000,9 +1116,7 @@ export const ModelRatioVisualEditor = memo(
 
             {table.getRowModel().rows.length === 0 ? (
               <div className='text-muted-foreground rounded-lg border border-dashed p-8 text-center'>
-                {table.getState().globalFilter
-                  ? t('No models match your search')
-                  : t('No models configured. Use Add model to get started.')}
+                {emptyTableMessage}
               </div>
             ) : (
               <div className='overflow-hidden rounded-md border'>
