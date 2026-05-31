@@ -39,8 +39,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getEnabledModelNames, getModelHealthHourly } from './api'
-import type { ModelHealthHourlyStat } from './types'
+import {
+  getEnabledModelNames,
+  getModelHealthHourly,
+  getPublicModelHealthLast24h,
+} from './api'
+import type {
+  ModelHealthHourlyStat,
+  PublicModelHealthHourlyStat,
+} from './types'
 import {
   dateTimeLocalValueToHour,
   formatRate,
@@ -152,6 +159,24 @@ function normalizeModelList(data: unknown): string[] {
     return unique
   }
   return []
+}
+
+function pickActiveModel(rows: PublicModelHealthHourlyStat[]) {
+  const byModel = new Map<string, number>()
+  for (const row of rows || []) {
+    const modelName = row?.model_name || ''
+    if (!modelName) continue
+    const activity =
+      (Number(row.success_tokens) || 0) +
+      (Number(row.total_requests) || 0) +
+      (Number(row.success_requests) || 0) +
+      (Number(row.error_requests) || 0)
+    byModel.set(modelName, (byModel.get(modelName) || 0) + activity)
+  }
+
+  return Array.from(byModel.entries())
+    .filter(([, activity]) => activity > 0)
+    .sort((a, b) => b[1] - a[1])[0]?.[0]
 }
 
 function ModelHealthTrendChart(props: { spec: VChartSpec; ready: boolean }) {
@@ -370,8 +395,22 @@ export function ModelHealthHourlyPage() {
 
       const modelList = normalizeModelList(data)
       setModelOptions(modelList)
-      if (!inputs.model_name && modelList.length > 0) {
-        setInputs((prev) => ({ ...prev, model_name: modelList[0] }))
+      if (!inputs.model_name) {
+        let defaultModel = modelList[0] || ''
+        try {
+          const healthRes = await getPublicModelHealthLast24h()
+          const activeModel = pickActiveModel(
+            Array.isArray(healthRes?.data?.rows) ? healthRes.data.rows : []
+          )
+          if (activeModel) {
+            defaultModel = activeModel
+          }
+        } catch {
+          // 模型列表加载成功即可，健康度预选失败时回退到第一个可用模型。
+        }
+        if (defaultModel) {
+          setInputs((prev) => ({ ...prev, model_name: defaultModel }))
+        }
       }
     } catch (error) {
       const errMsg =
