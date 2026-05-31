@@ -363,14 +363,23 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		})
 	}
 
-	if constant.ErrorLogEnabled && types.IsRecordErrorLog(err) {
+	userId := c.GetInt("id")
+	tokenName := c.GetString("token_name")
+	modelName := c.GetString("original_model")
+	tokenId := c.GetInt("token_id")
+	userGroup := c.GetString("group")
+	channelId := c.GetInt("channel_id")
+	shouldRecordErrorLog := constant.ErrorLogEnabled && types.IsRecordErrorLog(err)
+	if !shouldRecordErrorLog && modelName != "" {
+		model.RecordModelHealthEventAsync(&model.ModelHealthEvent{
+			ModelName: modelName,
+			CreatedAt: common.GetTimestamp(),
+			IsError:   true,
+		})
+	}
+
+	if shouldRecordErrorLog {
 		// 保存错误日志到mysql中
-		userId := c.GetInt("id")
-		tokenName := c.GetString("token_name")
-		modelName := c.GetString("original_model")
-		tokenId := c.GetInt("token_id")
-		userGroup := c.GetString("group")
-		channelId := c.GetInt("channel_id")
 		other := make(map[string]interface{})
 		if c.Request != nil && c.Request.URL != nil {
 			other["request_path"] = c.Request.URL.Path

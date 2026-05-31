@@ -21,14 +21,28 @@ export type HeaderNavAccessConfig = {
   requireAuth: boolean
 }
 
+export type HeaderNavCustomLinkConfig = {
+  id?: string
+  title: string
+  href: string
+  enabled: boolean
+  requireAuth: boolean
+  openInNewTab: boolean
+}
+
 export type HeaderNavModulesConfig = {
   home: boolean
   console: boolean
   pricing: HeaderNavAccessConfig
   rankings: HeaderNavAccessConfig
+  model_health: HeaderNavAccessConfig
+  custom_links: HeaderNavCustomLinkConfig[]
   docs: boolean
   about: boolean
-  [key: string]: boolean | HeaderNavAccessConfig
+  [key: string]:
+    | boolean
+    | HeaderNavAccessConfig
+    | HeaderNavCustomLinkConfig[]
 }
 
 export type SidebarSectionConfig = {
@@ -49,6 +63,11 @@ export const HEADER_NAV_DEFAULT: HeaderNavModulesConfig = {
     enabled: true,
     requireAuth: false,
   },
+  model_health: {
+    enabled: true,
+    requireAuth: false,
+  },
+  custom_links: [],
   docs: true,
   about: true,
 }
@@ -76,6 +95,7 @@ export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
     enabled: true,
     channel: true,
     models: true,
+    model_health: true,
     redemption: true,
     user: true,
     setting: true,
@@ -98,7 +118,22 @@ const cloneHeaderNavDefault = (): HeaderNavModulesConfig => ({
   ...HEADER_NAV_DEFAULT,
   pricing: { ...HEADER_NAV_DEFAULT.pricing },
   rankings: { ...HEADER_NAV_DEFAULT.rankings },
+  model_health: { ...HEADER_NAV_DEFAULT.model_health },
+  custom_links: [],
 })
+
+export function isAllowedHeaderNavHref(value: string): boolean {
+  const href = value.trim()
+  if (!href) return false
+  if (href.startsWith('/') && !href.startsWith('//')) return true
+  if (!/^https?:\/\//i.test(href)) return false
+  try {
+    const url = new URL(href)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
 
 const parseAccessModule = (
   raw: unknown,
@@ -124,6 +159,31 @@ const parseAccessModule = (
   return { ...fallback }
 }
 
+function parseCustomLinks(raw: unknown): HeaderNavCustomLinkConfig[] {
+  if (!Array.isArray(raw)) return []
+
+  return raw
+    .map<HeaderNavCustomLinkConfig | null>((item, index) => {
+      if (!item || typeof item !== 'object') return null
+
+      const record = item as Record<string, unknown>
+      const title = String(record.title ?? '').trim()
+      const href = String(record.href ?? '').trim()
+      if (!title || !isAllowedHeaderNavHref(href)) return null
+
+      return {
+        id: String(record.id ?? `custom-${index}`),
+        title: title.slice(0, 32),
+        href: href.slice(0, 512),
+        enabled: toBoolean(record.enabled, true),
+        requireAuth: toBoolean(record.requireAuth, false),
+        openInNewTab: toBoolean(record.openInNewTab, true),
+      }
+    })
+    .filter((item): item is HeaderNavCustomLinkConfig => item !== null)
+    .slice(0, 8)
+}
+
 const cloneSidebarDefault = (): SidebarModulesAdminConfig =>
   Object.entries(SIDEBAR_MODULES_DEFAULT).reduce<SidebarModulesAdminConfig>(
     (acc, [section, config]) => {
@@ -146,6 +206,7 @@ export function parseHeaderNavModules(
       ...base,
       pricing: { ...base.pricing },
       rankings: { ...base.rankings },
+      model_health: { ...base.model_health },
     }
 
     Object.entries(parsed).forEach(([key, raw]) => {
@@ -155,6 +216,14 @@ export function parseHeaderNavModules(
       }
       if (key === 'rankings') {
         result.rankings = parseAccessModule(raw, base.rankings)
+        return
+      }
+      if (key === 'model_health') {
+        result.model_health = parseAccessModule(raw, base.model_health)
+        return
+      }
+      if (key === 'custom_links') {
+        result.custom_links = parseCustomLinks(raw)
         return
       }
 

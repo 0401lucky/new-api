@@ -37,11 +37,12 @@ export function NavLinkItem({ link, className }: NavLinkItemProps) {
   )
 
   if (link.external) {
+    const target = link.openInNewTab === false ? undefined : '_blank'
     return (
       <a
         href={link.href}
-        target='_blank'
-        rel='noopener noreferrer'
+        target={target}
+        rel={target ? 'noopener noreferrer' : undefined}
         className={linkClassName}
         aria-disabled={link.disabled}
       >

@@ -202,6 +202,13 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 	if err != nil {
 		logger.LogError(c, "failed to record log: "+err.Error())
 	}
+	if modelName != "" {
+		RecordModelHealthEventAsync(&ModelHealthEvent{
+			ModelName: modelName,
+			CreatedAt: log.CreatedAt,
+			IsError:   true,
+		})
+	}
 }
 
 type RecordConsumeLogParams struct {
@@ -221,6 +228,7 @@ type RecordConsumeLogParams struct {
 
 func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams) {
 	if !common.LogConsumeEnabled {
+		recordModelHealthSuccessEvent(c, params, common.GetTimestamp())
 		return
 	}
 	logger.LogInfo(c, fmt.Sprintf("record consume log: userId=%d, params=%s", userId, common.GetJsonString(params)))
@@ -270,6 +278,28 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 			LogQuotaData(userId, username, params.ModelName, params.Quota, common.GetTimestamp(), params.PromptTokens+params.CompletionTokens)
 		})
 	}
+	recordModelHealthSuccessEvent(c, params, log.CreatedAt)
+}
+
+func recordModelHealthSuccessEvent(c *gin.Context, params RecordConsumeLogParams, createdAt int64) {
+	if params.ModelName == "" {
+		return
+	}
+	responseBytes := 0
+	assistantChars := 0
+	if c != nil {
+		responseBytes = c.GetInt("response_bytes")
+		assistantChars = c.GetInt("assistant_content_chars")
+	}
+	RecordModelHealthEventAsync(&ModelHealthEvent{
+		ModelName:        params.ModelName,
+		CreatedAt:        createdAt,
+		IsError:          false,
+		ResponseBytes:    responseBytes,
+		CompletionTokens: params.CompletionTokens,
+		SuccessTokens:    params.PromptTokens + params.CompletionTokens,
+		AssistantChars:   assistantChars,
+	})
 }
 
 type RecordTaskBillingLogParams struct {

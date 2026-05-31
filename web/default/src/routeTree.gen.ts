@@ -17,9 +17,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SetupIndexRouteImport } from './routes/setup/index'
 import { Route as RankingsIndexRouteImport } from './routes/rankings/index'
 import { Route as PricingIndexRouteImport } from './routes/pricing/index'
+import { Route as ModelHealthIndexRouteImport } from './routes/model-health/index'
 import { Route as AboutIndexRouteImport } from './routes/about/index'
 import { Route as OauthProviderRouteImport } from './routes/oauth/$provider'
 import { Route as ConsoleTopupRouteImport } from './routes/console/topup'
+import { Route as ConsoleModelHealthHourlyRouteImport } from './routes/console/model-health-hourly'
 import { Route as ConsoleLogRouteImport } from './routes/console/log'
 import { Route as AuthenticatedChat2linkRouteImport } from './routes/_authenticated/chat2link'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
@@ -45,6 +47,7 @@ import { Route as AuthenticatedRedemptionCodesIndexRouteImport } from './routes/
 import { Route as AuthenticatedProfileIndexRouteImport } from './routes/_authenticated/profile/index'
 import { Route as AuthenticatedPlaygroundIndexRouteImport } from './routes/_authenticated/playground/index'
 import { Route as AuthenticatedModelsIndexRouteImport } from './routes/_authenticated/models/index'
+import { Route as AuthenticatedModelHealthHourlyIndexRouteImport } from './routes/_authenticated/model-health-hourly/index'
 import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authenticated/keys/index'
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard/index'
 import { Route as AuthenticatedChannelsIndexRouteImport } from './routes/_authenticated/channels/index'
@@ -107,6 +110,11 @@ const PricingIndexRoute = PricingIndexRouteImport.update({
   path: '/pricing/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ModelHealthIndexRoute = ModelHealthIndexRouteImport.update({
+  id: '/model-health/',
+  path: '/model-health/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AboutIndexRoute = AboutIndexRouteImport.update({
   id: '/about/',
   path: '/about/',
@@ -122,6 +130,12 @@ const ConsoleTopupRoute = ConsoleTopupRouteImport.update({
   path: '/console/topup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConsoleModelHealthHourlyRoute =
+  ConsoleModelHealthHourlyRouteImport.update({
+    id: '/console/model-health-hourly',
+    path: '/console/model-health-hourly',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ConsoleLogRoute = ConsoleLogRouteImport.update({
   id: '/console/log',
   path: '/console/log',
@@ -254,6 +268,12 @@ const AuthenticatedModelsIndexRoute =
   AuthenticatedModelsIndexRouteImport.update({
     id: '/models/',
     path: '/models/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedModelHealthHourlyIndexRoute =
+  AuthenticatedModelHealthHourlyIndexRouteImport.update({
+    id: '/model-health-hourly/',
+    path: '/model-health-hourly/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedKeysIndexRoute = AuthenticatedKeysIndexRouteImport.update({
@@ -411,9 +431,11 @@ export interface FileRoutesByFullPath {
   '/503': typeof errors503Route
   '/chat2link': typeof AuthenticatedChat2linkRoute
   '/console/log': typeof ConsoleLogRoute
+  '/console/model-health-hourly': typeof ConsoleModelHealthHourlyRoute
   '/console/topup': typeof ConsoleTopupRoute
   '/oauth/$provider': typeof OauthProviderRoute
   '/about/': typeof AboutIndexRoute
+  '/model-health/': typeof ModelHealthIndexRoute
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
   '/setup/': typeof SetupIndexRoute
@@ -426,6 +448,7 @@ export interface FileRoutesByFullPath {
   '/channels/': typeof AuthenticatedChannelsIndexRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/keys/': typeof AuthenticatedKeysIndexRoute
+  '/model-health-hourly/': typeof AuthenticatedModelHealthHourlyIndexRoute
   '/models/': typeof AuthenticatedModelsIndexRoute
   '/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/profile/': typeof AuthenticatedProfileIndexRoute
@@ -469,9 +492,11 @@ export interface FileRoutesByTo {
   '/503': typeof errors503Route
   '/chat2link': typeof AuthenticatedChat2linkRoute
   '/console/log': typeof ConsoleLogRoute
+  '/console/model-health-hourly': typeof ConsoleModelHealthHourlyRoute
   '/console/topup': typeof ConsoleTopupRoute
   '/oauth/$provider': typeof OauthProviderRoute
   '/about': typeof AboutIndexRoute
+  '/model-health': typeof ModelHealthIndexRoute
   '/pricing': typeof PricingIndexRoute
   '/rankings': typeof RankingsIndexRoute
   '/setup': typeof SetupIndexRoute
@@ -484,6 +509,7 @@ export interface FileRoutesByTo {
   '/channels': typeof AuthenticatedChannelsIndexRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/keys': typeof AuthenticatedKeysIndexRoute
+  '/model-health-hourly': typeof AuthenticatedModelHealthHourlyIndexRoute
   '/models': typeof AuthenticatedModelsIndexRoute
   '/playground': typeof AuthenticatedPlaygroundIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
@@ -531,9 +557,11 @@ export interface FileRoutesById {
   '/(errors)/503': typeof errors503Route
   '/_authenticated/chat2link': typeof AuthenticatedChat2linkRoute
   '/console/log': typeof ConsoleLogRoute
+  '/console/model-health-hourly': typeof ConsoleModelHealthHourlyRoute
   '/console/topup': typeof ConsoleTopupRoute
   '/oauth/$provider': typeof OauthProviderRoute
   '/about/': typeof AboutIndexRoute
+  '/model-health/': typeof ModelHealthIndexRoute
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
   '/setup/': typeof SetupIndexRoute
@@ -546,6 +574,7 @@ export interface FileRoutesById {
   '/_authenticated/channels/': typeof AuthenticatedChannelsIndexRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/_authenticated/keys/': typeof AuthenticatedKeysIndexRoute
+  '/_authenticated/model-health-hourly/': typeof AuthenticatedModelHealthHourlyIndexRoute
   '/_authenticated/models/': typeof AuthenticatedModelsIndexRoute
   '/_authenticated/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/_authenticated/profile/': typeof AuthenticatedProfileIndexRoute
@@ -592,9 +621,11 @@ export interface FileRouteTypes {
     | '/503'
     | '/chat2link'
     | '/console/log'
+    | '/console/model-health-hourly'
     | '/console/topup'
     | '/oauth/$provider'
     | '/about/'
+    | '/model-health/'
     | '/pricing/'
     | '/rankings/'
     | '/setup/'
@@ -607,6 +638,7 @@ export interface FileRouteTypes {
     | '/channels/'
     | '/dashboard/'
     | '/keys/'
+    | '/model-health-hourly/'
     | '/models/'
     | '/playground/'
     | '/profile/'
@@ -650,9 +682,11 @@ export interface FileRouteTypes {
     | '/503'
     | '/chat2link'
     | '/console/log'
+    | '/console/model-health-hourly'
     | '/console/topup'
     | '/oauth/$provider'
     | '/about'
+    | '/model-health'
     | '/pricing'
     | '/rankings'
     | '/setup'
@@ -665,6 +699,7 @@ export interface FileRouteTypes {
     | '/channels'
     | '/dashboard'
     | '/keys'
+    | '/model-health-hourly'
     | '/models'
     | '/playground'
     | '/profile'
@@ -711,9 +746,11 @@ export interface FileRouteTypes {
     | '/(errors)/503'
     | '/_authenticated/chat2link'
     | '/console/log'
+    | '/console/model-health-hourly'
     | '/console/topup'
     | '/oauth/$provider'
     | '/about/'
+    | '/model-health/'
     | '/pricing/'
     | '/rankings/'
     | '/setup/'
@@ -726,6 +763,7 @@ export interface FileRouteTypes {
     | '/_authenticated/channels/'
     | '/_authenticated/dashboard/'
     | '/_authenticated/keys/'
+    | '/_authenticated/model-health-hourly/'
     | '/_authenticated/models/'
     | '/_authenticated/playground/'
     | '/_authenticated/profile/'
@@ -764,9 +802,11 @@ export interface RootRouteChildren {
   errors500Route: typeof errors500Route
   errors503Route: typeof errors503Route
   ConsoleLogRoute: typeof ConsoleLogRoute
+  ConsoleModelHealthHourlyRoute: typeof ConsoleModelHealthHourlyRoute
   ConsoleTopupRoute: typeof ConsoleTopupRoute
   OauthProviderRoute: typeof OauthProviderRoute
   AboutIndexRoute: typeof AboutIndexRoute
+  ModelHealthIndexRoute: typeof ModelHealthIndexRoute
   PricingIndexRoute: typeof PricingIndexRoute
   RankingsIndexRoute: typeof RankingsIndexRoute
   SetupIndexRoute: typeof SetupIndexRoute
@@ -831,6 +871,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PricingIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/model-health/': {
+      id: '/model-health/'
+      path: '/model-health'
+      fullPath: '/model-health/'
+      preLoaderRoute: typeof ModelHealthIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/about/': {
       id: '/about/'
       path: '/about'
@@ -850,6 +897,13 @@ declare module '@tanstack/react-router' {
       path: '/console/topup'
       fullPath: '/console/topup'
       preLoaderRoute: typeof ConsoleTopupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/console/model-health-hourly': {
+      id: '/console/model-health-hourly'
+      path: '/console/model-health-hourly'
+      fullPath: '/console/model-health-hourly'
+      preLoaderRoute: typeof ConsoleModelHealthHourlyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/console/log': {
@@ -1025,6 +1079,13 @@ declare module '@tanstack/react-router' {
       path: '/models'
       fullPath: '/models/'
       preLoaderRoute: typeof AuthenticatedModelsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/model-health-hourly/': {
+      id: '/_authenticated/model-health-hourly/'
+      path: '/model-health-hourly'
+      fullPath: '/model-health-hourly/'
+      preLoaderRoute: typeof AuthenticatedModelHealthHourlyIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/keys/': {
@@ -1285,6 +1346,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedChannelsIndexRoute: typeof AuthenticatedChannelsIndexRoute
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
   AuthenticatedKeysIndexRoute: typeof AuthenticatedKeysIndexRoute
+  AuthenticatedModelHealthHourlyIndexRoute: typeof AuthenticatedModelHealthHourlyIndexRoute
   AuthenticatedModelsIndexRoute: typeof AuthenticatedModelsIndexRoute
   AuthenticatedPlaygroundIndexRoute: typeof AuthenticatedPlaygroundIndexRoute
   AuthenticatedProfileIndexRoute: typeof AuthenticatedProfileIndexRoute
@@ -1307,6 +1369,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedChannelsIndexRoute: AuthenticatedChannelsIndexRoute,
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
   AuthenticatedKeysIndexRoute: AuthenticatedKeysIndexRoute,
+  AuthenticatedModelHealthHourlyIndexRoute:
+    AuthenticatedModelHealthHourlyIndexRoute,
   AuthenticatedModelsIndexRoute: AuthenticatedModelsIndexRoute,
   AuthenticatedPlaygroundIndexRoute: AuthenticatedPlaygroundIndexRoute,
   AuthenticatedProfileIndexRoute: AuthenticatedProfileIndexRoute,
@@ -1333,9 +1397,11 @@ const rootRouteChildren: RootRouteChildren = {
   errors500Route: errors500Route,
   errors503Route: errors503Route,
   ConsoleLogRoute: ConsoleLogRoute,
+  ConsoleModelHealthHourlyRoute: ConsoleModelHealthHourlyRoute,
   ConsoleTopupRoute: ConsoleTopupRoute,
   OauthProviderRoute: OauthProviderRoute,
   AboutIndexRoute: AboutIndexRoute,
+  ModelHealthIndexRoute: ModelHealthIndexRoute,
   PricingIndexRoute: PricingIndexRoute,
   RankingsIndexRoute: RankingsIndexRoute,
   SetupIndexRoute: SetupIndexRoute,

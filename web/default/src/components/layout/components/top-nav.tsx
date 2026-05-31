@@ -62,15 +62,26 @@ export function TopNav({ className, links, ...props }: TopNavProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent side='bottom' align='start'>
             {normalizedLinks.map(
-              ({ title, href, isActive, disabled, external }) => (
+              ({
+                title,
+                href,
+                isActive,
+                disabled,
+                external,
+                openInNewTab,
+              }) => (
                 <DropdownMenuItem
                   key={`${title}-${href}`}
                   render={
                     external ? (
                       <a
                         href={href}
-                        target='_blank'
-                        rel='noopener noreferrer'
+                        target={openInNewTab === false ? undefined : '_blank'}
+                        rel={
+                          openInNewTab === false
+                            ? undefined
+                            : 'noopener noreferrer'
+                        }
                         className={!isActive ? 'text-muted-foreground' : ''}
                       >
                         {title}
@@ -100,28 +111,29 @@ export function TopNav({ className, links, ...props }: TopNavProps) {
         )}
         {...props}
       >
-        {normalizedLinks.map(({ title, href, isActive, disabled, external }) =>
-          external ? (
+        {normalizedLinks.map((link) => {
+          const target = link.openInNewTab === false ? undefined : '_blank'
+          return link.external ? (
             <a
-              key={`${title}-${href}`}
-              href={href}
-              target='_blank'
-              rel='noopener noreferrer'
-              className={`hover:text-primary text-sm font-medium transition-colors ${isActive ? '' : 'text-muted-foreground'}`}
+              key={`${link.title}-${link.href}`}
+              href={link.href}
+              target={target}
+              rel={target ? 'noopener noreferrer' : undefined}
+              className={`hover:text-primary text-sm font-medium transition-colors ${link.isActive ? '' : 'text-muted-foreground'}`}
             >
-              {title}
+              {link.title}
             </a>
           ) : (
             <Link
-              key={`${title}-${href}`}
-              to={href}
-              disabled={disabled}
-              className={`hover:text-primary text-sm font-medium transition-colors ${isActive ? '' : 'text-muted-foreground'}`}
+              key={`${link.title}-${link.href}`}
+              to={link.href}
+              disabled={link.disabled}
+              className={`hover:text-primary text-sm font-medium transition-colors ${link.isActive ? '' : 'text-muted-foreground'}`}
             >
-              {title}
+              {link.title}
             </Link>
           )
-        )}
+        })}
       </nav>
     </>
   )

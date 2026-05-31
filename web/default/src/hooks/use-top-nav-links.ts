@@ -28,6 +28,12 @@ export type TopNavLink = {
   disabled?: boolean
   requiresAuth?: boolean
   external?: boolean
+  openInNewTab?: boolean
+  literalTitle?: boolean
+}
+
+function isExternalHref(href: string) {
+  return /^https?:\/\//i.test(href)
 }
 
 /**
@@ -38,6 +44,7 @@ export type TopNavLink = {
  *   console: true,
  *   pricing: { enabled: true, requireAuth: false },
  *   rankings: { enabled: true, requireAuth: false },
+ *   model_health: { enabled: true, requireAuth: false },
  *   docs: true,
  *   about: true
  * }
@@ -83,6 +90,31 @@ export function useTopNavLinks(): TopNavLink[] {
   if (rankings && typeof rankings === 'object' && rankings.enabled) {
     const requiresAuth = rankings.requireAuth && !isAuthed
     links.push({ title: t('Rankings'), href: '/rankings', requiresAuth })
+  }
+
+  // Model health
+  const modelHealth = modules?.model_health
+  if (modelHealth && typeof modelHealth === 'object' && modelHealth.enabled) {
+    const requiresAuth = modelHealth.requireAuth && !isAuthed
+    links.push({
+      title: t('Model health'),
+      href: '/model-health',
+      requiresAuth,
+    })
+  }
+
+  // Custom links
+  for (const customLink of modules?.custom_links ?? []) {
+    if (!customLink.enabled) continue
+    const requiresAuth = customLink.requireAuth && !isAuthed
+    links.push({
+      title: customLink.title,
+      href: customLink.href,
+      requiresAuth,
+      external: isExternalHref(customLink.href),
+      openInNewTab: customLink.openInNewTab,
+      literalTitle: true,
+    })
   }
 
   // Docs (supports external links)

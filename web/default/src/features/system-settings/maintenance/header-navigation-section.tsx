@@ -18,17 +18,21 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect, useMemo } from 'react'
 import * as z from 'zod'
-import { useForm } from 'react-hook-form'
+import { useFieldArray, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { ExternalLink, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Button } from '@/components/ui/button'
 import {
   Form,
   FormControl,
   FormDescription,
   FormField,
+  FormItem,
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import {
   SettingsControlChildren,
@@ -43,8 +47,25 @@ import { useUpdateOption } from '../hooks/use-update-option'
 import {
   HEADER_NAV_DEFAULT,
   type HeaderNavModulesConfig,
+  isAllowedHeaderNavHref,
   serializeHeaderNavModules,
 } from './config'
+
+const customLinkSchema = z.object({
+  id: z.string().optional(),
+  title: z.string().trim().min(1).max(32),
+  href: z
+    .string()
+    .trim()
+    .min(1)
+    .max(512)
+    .refine(isAllowedHeaderNavHref, {
+      message: 'Use an http(s) URL or an internal path starting with /',
+    }),
+  enabled: z.boolean(),
+  requireAuth: z.boolean(),
+  openInNewTab: z.boolean(),
+})
 
 const headerNavSchema = z.object({
   home: z.boolean(),
@@ -53,8 +74,11 @@ const headerNavSchema = z.object({
   pricingRequireAuth: z.boolean(),
   rankingsEnabled: z.boolean(),
   rankingsRequireAuth: z.boolean(),
+  modelHealthEnabled: z.boolean(),
+  modelHealthRequireAuth: z.boolean(),
   docs: z.boolean(),
   about: z.boolean(),
+  custom_links: z.array(customLinkSchema).max(8),
 })
 
 type HeaderNavFormValues = z.infer<typeof headerNavSchema>
@@ -87,12 +111,28 @@ const toFormValues = (config: HeaderNavModulesConfig): HeaderNavFormValues => ({
     config.rankings?.requireAuth === undefined
       ? HEADER_NAV_DEFAULT.rankings.requireAuth
       : Boolean(config.rankings.requireAuth),
+  modelHealthEnabled:
+    config.model_health?.enabled === undefined
+      ? HEADER_NAV_DEFAULT.model_health.enabled
+      : Boolean(config.model_health.enabled),
+  modelHealthRequireAuth:
+    config.model_health?.requireAuth === undefined
+      ? HEADER_NAV_DEFAULT.model_health.requireAuth
+      : Boolean(config.model_health.requireAuth),
   docs:
     config.docs === undefined ? HEADER_NAV_DEFAULT.docs : Boolean(config.docs),
   about:
     config.about === undefined
       ? HEADER_NAV_DEFAULT.about
       : Boolean(config.about),
+  custom_links: (config.custom_links ?? []).map((link, index) => ({
+    id: link.id || `custom-${index}`,
+    title: link.title,
+    href: link.href,
+    enabled: link.enabled,
+    requireAuth: link.requireAuth,
+    openInNewTab: link.openInNewTab,
+  })),
 })
 
 export function HeaderNavigationSection({
@@ -106,6 +146,11 @@ export function HeaderNavigationSection({
   const form = useForm<HeaderNavFormValues>({
     resolver: zodResolver(headerNavSchema),
     defaultValues: formDefaults,
+  })
+  const customLinks = useFieldArray({
+    control: form.control,
+    name: 'custom_links',
+    keyName: 'fieldKey',
   })
 
   useEffect(() => {
@@ -129,6 +174,19 @@ export function HeaderNavigationSection({
         enabled: values.rankingsEnabled,
         requireAuth: values.rankingsRequireAuth,
       },
+      model_health: {
+        ...(config.model_health ?? HEADER_NAV_DEFAULT.model_health),
+        enabled: values.modelHealthEnabled,
+        requireAuth: values.modelHealthRequireAuth,
+      },
+      custom_links: values.custom_links.map((link, index) => ({
+        id: link.id || `custom-${index}-${Date.now()}`,
+        title: link.title.trim(),
+        href: link.href.trim(),
+        enabled: link.enabled,
+        requireAuth: link.requireAuth,
+        openInNewTab: link.openInNewTab,
+      })),
     }
 
     const serialized = serializeHeaderNavModules(payload)
@@ -144,6 +202,17 @@ export function HeaderNavigationSection({
 
   const resetToDefault = () => {
     form.reset(toFormValues(HEADER_NAV_DEFAULT))
+  }
+
+  const addCustomLink = () => {
+    customLinks.append({
+      id: `custom-${Date.now()}`,
+      title: '',
+      href: 'https://',
+      enabled: true,
+      requireAuth: false,
+      openInNewTab: true,
+    })
   }
 
   const simpleModules: Array<{
@@ -176,7 +245,10 @@ export function HeaderNavigationSection({
   const accessModules: Array<{
     enabledKey: keyof HeaderNavFormValues
     requireAuthKey: keyof HeaderNavFormValues
-    requireAuthDependsOn: 'pricingEnabled' | 'rankingsEnabled'
+    requireAuthDependsOn:
+      | 'pricingEnabled'
+      | 'rankingsEnabled'
+      | 'modelHealthEnabled'
     title: string
     description: string
     requireAuthTitle: string
@@ -202,6 +274,17 @@ export function HeaderNavigationSection({
       requireAuthTitle: t('Require login to view rankings'),
       requireAuthDescription: t(
         'Visitors must authenticate before accessing the rankings page.'
+      ),
+    },
+    {
+      enabledKey: 'modelHealthEnabled',
+      requireAuthKey: 'modelHealthRequireAuth',
+      requireAuthDependsOn: 'modelHealthEnabled',
+      title: t('Model health'),
+      description: t('Public model health status and trend overview.'),
+      requireAuthTitle: t('Require login to view model health'),
+      requireAuthDescription: t(
+        'Visitors must authenticate before accessing the model health page.'
       ),
     },
   ]
@@ -231,7 +314,7 @@ export function HeaderNavigationSection({
                     </SettingsSwitchContent>
                     <FormControl>
                       <Switch
-                        checked={field.value}
+                        checked={Boolean(field.value)}
                         onCheckedChange={field.onChange}
                       />
                     </FormControl>
@@ -256,7 +339,7 @@ export function HeaderNavigationSection({
                       </SettingsSwitchContent>
                       <FormControl>
                         <Switch
-                          checked={field.value}
+                          checked={Boolean(field.value)}
                           onCheckedChange={field.onChange}
                         />
                       </FormControl>
@@ -279,9 +362,11 @@ export function HeaderNavigationSection({
                         </SettingsSwitchContent>
                         <FormControl>
                           <Switch
-                            checked={field.value}
+                            checked={Boolean(field.value)}
                             onCheckedChange={field.onChange}
-                            disabled={!form.watch(module.requireAuthDependsOn)}
+                            disabled={
+                              !Boolean(form.watch(module.requireAuthDependsOn))
+                            }
                           />
                         </FormControl>
                         <FormMessage />
@@ -292,6 +377,161 @@ export function HeaderNavigationSection({
               </SettingsControlGroup>
             ))}
           </div>
+
+          <SettingsControlGroup>
+            <div className='flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+              <SettingsSwitchContent>
+                <div className='text-sm font-medium'>
+                  {t('Custom navigation links')}
+                </div>
+                <p className='text-muted-foreground text-sm'>
+                  {t('Add external or internal links to the public header.')}
+                </p>
+              </SettingsSwitchContent>
+              <Button
+                type='button'
+                variant='outline'
+                size='sm'
+                onClick={addCustomLink}
+                disabled={customLinks.fields.length >= 8}
+              >
+                <Plus data-icon='inline-start' />
+                <span>{t('Add link')}</span>
+              </Button>
+            </div>
+
+            {customLinks.fields.length === 0 ? (
+              <div className='text-muted-foreground rounded-lg border border-dashed px-3 py-4 text-sm'>
+                {t('No custom navigation links configured.')}
+              </div>
+            ) : (
+              <div className='space-y-3'>
+                {customLinks.fields.map((field, index) => (
+                  <div
+                    key={field.fieldKey}
+                    className='bg-background rounded-lg border px-3 py-3'
+                  >
+                    <div className='mb-3 flex items-center justify-between gap-2'>
+                      <div className='text-sm font-medium'>
+                        {t('Custom link')} {index + 1}
+                      </div>
+                      <Button
+                        type='button'
+                        variant='ghost'
+                        size='icon-sm'
+                        onClick={() => customLinks.remove(index)}
+                        aria-label={t('Remove link')}
+                      >
+                        <Trash2 />
+                      </Button>
+                    </div>
+
+                    <div className='grid gap-3 md:grid-cols-2'>
+                      <FormField
+                        control={form.control}
+                        name={`custom_links.${index}.title`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('Link title')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder={t('My store')}
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name={`custom_links.${index}.href`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('Link URL')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder='https://shop.example.com'
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <SettingsControlChildren className='mt-3 grid gap-3 md:grid-cols-3'>
+                      <FormField
+                        control={form.control}
+                        name={`custom_links.${index}.enabled`}
+                        render={({ field }) => (
+                          <SettingsSwitchItem className='border-b-0 py-2'>
+                            <SettingsSwitchContent>
+                              <FormLabel>{t('Enabled')}</FormLabel>
+                              <FormDescription>
+                                {t('Show this link in the header.')}
+                              </FormDescription>
+                            </SettingsSwitchContent>
+                            <FormControl>
+                              <Switch
+                                checked={Boolean(field.value)}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </SettingsSwitchItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`custom_links.${index}.requireAuth`}
+                        render={({ field }) => (
+                          <SettingsSwitchItem className='border-b-0 py-2'>
+                            <SettingsSwitchContent>
+                              <FormLabel>{t('Require login')}</FormLabel>
+                              <FormDescription>
+                                {t('Visitors must sign in before opening it.')}
+                              </FormDescription>
+                            </SettingsSwitchContent>
+                            <FormControl>
+                              <Switch
+                                checked={Boolean(field.value)}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </SettingsSwitchItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`custom_links.${index}.openInNewTab`}
+                        render={({ field }) => (
+                          <SettingsSwitchItem className='border-b-0 py-2'>
+                            <SettingsSwitchContent>
+                              <FormLabel className='inline-flex items-center gap-1.5'>
+                                <ExternalLink className='size-3.5' />
+                                {t('New tab')}
+                              </FormLabel>
+                              <FormDescription>
+                                {t('Open external links in a new tab.')}
+                              </FormDescription>
+                            </SettingsSwitchContent>
+                            <FormControl>
+                              <Switch
+                                checked={Boolean(field.value)}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </SettingsSwitchItem>
+                        )}
+                      />
+                    </SettingsControlChildren>
+                  </div>
+                ))}
+              </div>
+            )}
+          </SettingsControlGroup>
         </SettingsForm>
       </Form>
     </SettingsSection>

@@ -37,6 +37,11 @@ func SetApiRouter(router *gin.Engine) {
 			perfMetricsRoute.GET("/summary", controller.GetPerfMetricsSummary)
 			perfMetricsRoute.GET("", controller.GetPerfMetrics)
 		}
+		publicModelHealthRoute := apiRouter.Group("/public/model_health")
+		publicModelHealthRoute.Use(middleware.HeaderNavModuleAuth("model_health"))
+		{
+			publicModelHealthRoute.GET("/hourly_last24h", controller.GetPublicModelsHealthHourlyLast24hAPI)
+		}
 		apiRouter.GET("/rankings", middleware.HeaderNavModuleAuth("rankings"), controller.GetRankings)
 		apiRouter.GET("/verification", middleware.EmailVerificationRateLimit(), middleware.TurnstileCheck(), controller.SendEmailVerification)
 		apiRouter.GET("/reset_password", middleware.CriticalRateLimit(), middleware.TurnstileCheck(), controller.SendPasswordResetEmail)
@@ -369,6 +374,12 @@ func SetApiRouter(router *gin.Engine) {
 			modelsRoute.POST("/", controller.CreateModelMeta)
 			modelsRoute.PUT("/", controller.UpdateModelMeta)
 			modelsRoute.DELETE("/:id", controller.DeleteModelMeta)
+		}
+
+		modelHealthRoute := apiRouter.Group("/model_health")
+		modelHealthRoute.Use(middleware.AdminAuth())
+		{
+			modelHealthRoute.GET("/hourly", controller.GetModelHealthHourlyStatsAPI)
 		}
 
 		// Deployments (model deployment management)

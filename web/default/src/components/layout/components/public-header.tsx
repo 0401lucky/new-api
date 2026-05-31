@@ -147,6 +147,11 @@ export function PublicHeader(props: PublicHeaderProps) {
     navigate({ to: '/sign-in', search: { redirect } })
   }, [authPromptTarget?.href, navigate])
 
+  const getLinkTitle = useCallback(
+    (link: TopNavLink) => (link.literalTitle ? link.title : t(link.title)),
+    [t]
+  )
+
   const handleNavLinkClick = useCallback(
     (
       event: React.MouseEvent<HTMLAnchorElement>,
@@ -165,7 +170,7 @@ export function PublicHeader(props: PublicHeaderProps) {
         }
         setAuthPromptSecondsLeft(AUTH_PROMPT_SECONDS)
         setAuthPromptTarget({
-          title: t(link.title),
+          title: getLinkTitle(link),
           href: link.href,
         })
         return
@@ -175,7 +180,7 @@ export function PublicHeader(props: PublicHeaderProps) {
         setMobileOpen(false)
       }
     },
-    [t]
+    [getLinkTitle]
   )
 
   return (
@@ -223,13 +228,14 @@ export function PublicHeader(props: PublicHeaderProps) {
             <div className='hidden items-center gap-0.5 sm:flex'>
               {links.map((link, i) => {
                 const isActive = pathname === link.href
+                const externalTarget = link.openInNewTab === false ? undefined : '_blank'
                 if (link.external) {
                   return (
                     <a
                       key={i}
                       href={link.href}
-                      target='_blank'
-                      rel='noopener noreferrer'
+                      target={externalTarget}
+                      rel={externalTarget ? 'noopener noreferrer' : undefined}
                       aria-disabled={link.disabled}
                       tabIndex={link.disabled ? -1 : undefined}
                       onClick={(event) => handleNavLinkClick(event, link)}
@@ -238,7 +244,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                         link.disabled && 'pointer-events-none opacity-50'
                       )}
                     >
-                      {t(link.title)}
+                      {getLinkTitle(link)}
                     </a>
                   )
                 }
@@ -256,7 +262,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                       link.disabled && 'pointer-events-none opacity-50'
                     )}
                   >
-                    {t(link.title)}
+                    {getLinkTitle(link)}
                   </Link>
                 )
               })}
@@ -366,20 +372,22 @@ export function PublicHeader(props: PublicHeaderProps) {
               const transitionStyle = {
                 transitionDelay: mobileOpen ? `${100 + i * 50}ms` : '0ms',
               }
+              const externalTarget =
+                link.openInNewTab === false ? undefined : '_blank'
               if (link.external) {
                 return (
                   <a
                     key={i}
                     href={link.href}
-                    target='_blank'
-                    rel='noopener noreferrer'
+                    target={externalTarget}
+                    rel={externalTarget ? 'noopener noreferrer' : undefined}
                     aria-disabled={link.disabled}
                     tabIndex={link.disabled ? -1 : undefined}
                     onClick={(event) => handleNavLinkClick(event, link, true)}
                     className={linkClassName}
                     style={transitionStyle}
                   >
-                    {t(link.title)}
+                    {getLinkTitle(link)}
                   </a>
                 )
               }
@@ -392,7 +400,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                   className={linkClassName}
                   style={transitionStyle}
                 >
-                  {t(link.title)}
+                  {getLinkTitle(link)}
                 </Link>
               )
             })}

@@ -20,16 +20,27 @@ import { getStatus } from '@/lib/api'
 
 export type ModuleAccess = { enabled: boolean; requireAuth: boolean }
 
-export type HeaderNavModule = 'rankings' | 'pricing'
+export type HeaderNavModule = 'rankings' | 'pricing' | 'model_health'
+
+export type HeaderNavCustomLink = {
+  id?: string
+  title: string
+  href: string
+  enabled: boolean
+  requireAuth: boolean
+  openInNewTab: boolean
+}
 
 export type HeaderNavModules = {
   home: boolean
   console: boolean
   pricing: ModuleAccess
   rankings: ModuleAccess
+  model_health: ModuleAccess
+  custom_links: HeaderNavCustomLink[]
   docs: boolean
   about: boolean
-  [key: string]: boolean | ModuleAccess
+  [key: string]: boolean | ModuleAccess | HeaderNavCustomLink[]
 }
 
 const DEFAULT_HEADER_NAV_MODULES: HeaderNavModules = {
@@ -37,6 +48,8 @@ const DEFAULT_HEADER_NAV_MODULES: HeaderNavModules = {
   console: true,
   pricing: { enabled: true, requireAuth: false },
   rankings: { enabled: true, requireAuth: false },
+  model_health: { enabled: true, requireAuth: false },
+  custom_links: [],
   docs: true,
   about: true,
 }
@@ -44,6 +57,7 @@ const DEFAULT_HEADER_NAV_MODULES: HeaderNavModules = {
 const DEFAULTS: Record<HeaderNavModule, ModuleAccess> = {
   pricing: DEFAULT_HEADER_NAV_MODULES.pricing,
   rankings: DEFAULT_HEADER_NAV_MODULES.rankings,
+  model_health: DEFAULT_HEADER_NAV_MODULES.model_health,
 }
 
 function cloneHeaderNavDefaults(): HeaderNavModules {
@@ -51,6 +65,8 @@ function cloneHeaderNavDefaults(): HeaderNavModules {
     ...DEFAULT_HEADER_NAV_MODULES,
     pricing: { ...DEFAULT_HEADER_NAV_MODULES.pricing },
     rankings: { ...DEFAULT_HEADER_NAV_MODULES.rankings },
+    model_health: { ...DEFAULT_HEADER_NAV_MODULES.model_health },
+    custom_links: [],
   }
 }
 
@@ -93,6 +109,43 @@ function parseAccess(raw: unknown, fallback: ModuleAccess): ModuleAccess {
   return { ...fallback }
 }
 
+function isAllowedHeaderNavHref(value: string): boolean {
+  const href = value.trim()
+  if (!href) return false
+  if (href.startsWith('/') && !href.startsWith('//')) return true
+  if (!/^https?:\/\//i.test(href)) return false
+  try {
+    const url = new URL(href)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function parseCustomLinks(raw: unknown): HeaderNavCustomLink[] {
+  if (!Array.isArray(raw)) return []
+
+  return raw
+    .map<HeaderNavCustomLink | null>((item, index) => {
+      if (!item || typeof item !== 'object') return null
+      const record = item as Record<string, unknown>
+      const title = String(record.title ?? '').trim()
+      const href = String(record.href ?? '').trim()
+      if (!title || !isAllowedHeaderNavHref(href)) return null
+
+      return {
+        id: String(record.id ?? `custom-${index}`),
+        title: title.slice(0, 32),
+        href: href.slice(0, 512),
+        enabled: parseHeaderNavBoolean(record.enabled, true),
+        requireAuth: parseHeaderNavBoolean(record.requireAuth, false),
+        openInNewTab: parseHeaderNavBoolean(record.openInNewTab, true),
+      }
+    })
+    .filter((item): item is HeaderNavCustomLink => item !== null)
+    .slice(0, 8)
+}
+
 function parseHeaderNavRecord(raw: unknown): Record<string, unknown> | null {
   if (!raw || String(raw).trim() === '') return null
   if (raw && typeof raw === 'object') return raw as Record<string, unknown>
@@ -116,6 +169,14 @@ export function parseHeaderNavModules(raw: unknown): HeaderNavModules {
     }
     if (key === 'rankings') {
       result.rankings = parseAccess(value, result.rankings)
+      return
+    }
+    if (key === 'model_health') {
+      result.model_health = parseAccess(value, result.model_health)
+      return
+    }
+    if (key === 'custom_links') {
+      result.custom_links = parseCustomLinks(value)
       return
     }
 
