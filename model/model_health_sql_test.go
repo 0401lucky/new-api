@@ -126,3 +126,64 @@ func TestModelHealthSuccessTokensAggregated(t *testing.T) {
 		t.Fatalf("unexpected request counters: total=%d error=%d", rows[0].TotalRequests, rows[0].ErrorRequests)
 	}
 }
+
+func TestBackfillModelHealthSlicesFromLogs(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("failed to open sqlite db: %v", err)
+	}
+	if err := db.AutoMigrate(&ModelHealthSlice5m{}, &Log{}); err != nil {
+		t.Fatalf("failed to migrate tables: %v", err)
+	}
+
+	logs := []Log{
+		{
+			CreatedAt:        3601,
+			Type:             LogTypeConsume,
+			ModelName:        "gpt-backfill",
+			PromptTokens:     10,
+			CompletionTokens: 3,
+		},
+		{
+			CreatedAt:        3610,
+			Type:             LogTypeError,
+			ModelName:        "gpt-backfill",
+			PromptTokens:     9,
+			CompletionTokens: 0,
+		},
+	}
+	if err := db.Create(&logs).Error; err != nil {
+		t.Fatalf("failed to create logs: %v", err)
+	}
+
+	if err := BackfillModelHealthSlicesFromLogs(context.Background(), db, db, 3600, 3900); err != nil {
+		t.Fatalf("failed to backfill health slices: %v", err)
+	}
+	if err := BackfillModelHealthSlicesFromLogs(context.Background(), db, db, 3600, 3900); err != nil {
+		t.Fatalf("failed to backfill health slices again: %v", err)
+	}
+
+	var count int64
+	if err := db.Model(&ModelHealthSlice5m{}).Count(&count).Error; err != nil {
+		t.Fatalf("failed to count health slices: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected one health slice after repeated backfill, got %d", count)
+	}
+
+	var slice ModelHealthSlice5m
+	if err := db.First(&slice, "model_name = ? AND slice_start_ts = ?", "gpt-backfill", int64(3600)).Error; err != nil {
+		t.Fatalf("failed to query health slice: %v", err)
+	}
+	if slice.TotalRequests != 2 || slice.ErrorRequests != 1 || slice.SuccessQualifiedRequests != 1 {
+		t.Fatalf(
+			"unexpected request counters: total=%d error=%d qualified=%d",
+			slice.TotalRequests,
+			slice.ErrorRequests,
+			slice.SuccessQualifiedRequests,
+		)
+	}
+	if slice.SuccessTokens != 13 || slice.MaxCompletionTokens != 3 {
+		t.Fatalf("unexpected token metrics: success_tokens=%d max_completion_tokens=%d", slice.SuccessTokens, slice.MaxCompletionTokens)
+	}
+}

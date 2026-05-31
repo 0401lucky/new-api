@@ -52,12 +52,21 @@ export function hourLabel(tsSec?: number) {
 }
 
 export function formatTokens(value: number) {
-  const n = Number(value) || 0
+  const raw = Number(value) || 0
+  const n = Math.abs(raw)
   if (!Number.isFinite(n) || n === 0) return '0'
 
-  return new Intl.NumberFormat(undefined, {
-    maximumFractionDigits: 0,
-  }).format(Math.trunc(n))
+  const sign = raw < 0 ? '-' : ''
+  const units = [
+    { value: 1_000_000_000, suffix: 'B' },
+    { value: 1_000_000, suffix: 'M' },
+    { value: 1_000, suffix: 'K' },
+  ]
+  const unit = units.find((item) => n >= item.value)
+  if (!unit) return `${sign}${Math.trunc(n)}`
+
+  const compact = Math.floor((n / unit.value) * 10) / 10
+  return `${sign}${compact.toFixed(1).replace(/\.0$/, '')}${unit.suffix}`
 }
 
 export function percentileNearestRank(values: number[], p: number) {

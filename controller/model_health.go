@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"context"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,8 +16,8 @@ import (
 )
 
 const (
-	publicModelHealthCacheKey = "public_model_health:hourly_last24h"
-	publicModelHealthCacheTTL = 5 * time.Minute
+	publicModelHealthCacheKey = "public_model_health:hourly_last24h:v3"
+	publicModelHealthCacheTTL = 30 * time.Second
 )
 
 var (
@@ -95,6 +97,10 @@ func GetModelHealthHourlyStatsAPI(c *gin.Context) {
 		}
 	}
 
+	if err := model.BackfillModelHealthSlicesFromLogs(context.Background(), model.DB, model.LOG_DB, startHourTs, endHourTs); err != nil {
+		common.SysLog("model health log backfill failed: " + err.Error())
+	}
+
 	rows, err := model.GetModelHealthHourlyStats(model.DB, modelName, startHourTs, endHourTs)
 	if err != nil {
 		common.ApiError(c, err)
@@ -158,6 +164,10 @@ func GetPublicModelsHealthHourlyLast24hAPI(c *gin.Context) {
 	endHourTs := now - (now % 3600) + 3600
 	startHourTs := endHourTs - 24*3600
 
+	if err := model.BackfillModelHealthSlicesFromLogs(context.Background(), model.DB, model.LOG_DB, startHourTs, endHourTs); err != nil {
+		common.SysLog("model health log backfill failed: " + err.Error())
+	}
+
 	rows, err := model.GetAllModelsHealthHourlyStats(model.DB, startHourTs, endHourTs)
 	if err != nil {
 		common.ApiError(c, err)
@@ -165,13 +175,14 @@ func GetPublicModelsHealthHourlyLast24hAPI(c *gin.Context) {
 	}
 
 	type quotaAggRow struct {
-		ModelName     string `gorm:"column:model_name"`
-		HourStartTs   int64  `gorm:"column:hour_start_ts"`
-		SuccessTokens int64  `gorm:"column:success_tokens"`
+		ModelName       string `gorm:"column:model_name"`
+		HourStartTs     int64  `gorm:"column:hour_start_ts"`
+		SuccessRequests int64  `gorm:"column:success_requests"`
+		SuccessTokens   int64  `gorm:"column:success_tokens"`
 	}
 	var quotaRows []quotaAggRow
 	_ = model.DB.Table("quota_data").
-		Select("model_name, created_at as hour_start_ts, SUM(token_used) as success_tokens").
+		Select("model_name, created_at as hour_start_ts, SUM(count) as success_requests, SUM(token_used) as success_tokens").
 		Where("created_at >= ? AND created_at < ?", startHourTs, endHourTs).
 		Group("model_name, created_at").
 		Scan(&quotaRows).Error
@@ -202,6 +213,17 @@ func GetPublicModelsHealthHourlyLast24hAPI(c *gin.Context) {
 		grouped[r.ModelName][r.HourStartTs] = r
 	}
 
+	quotaOnlyModels := make([]string, 0)
+	for modelName := range quotaMap {
+		if _, ok := grouped[modelName]; ok {
+			continue
+		}
+		grouped[modelName] = make(map[int64]model.ModelHealthHourlyStat)
+		quotaOnlyModels = append(quotaOnlyModels, modelName)
+	}
+	sort.Strings(quotaOnlyModels)
+	modelOrder = append(modelOrder, quotaOnlyModels...)
+
 	resp := make([]publicModelsHealthHourlyLast24hRespItem, 0, len(modelOrder)*len(wantHours))
 	for _, modelName := range modelOrder {
 		hourMap := grouped[modelName]
@@ -211,6 +233,24 @@ func GetPublicModelsHealthHourlyLast24hAPI(c *gin.Context) {
 			if modelQuota != nil {
 				if q, ok := modelQuota[h]; ok {
 					fallbackSuccessTokens = q.SuccessTokens
+					if _, hasHealthStat := hourMap[h]; !hasHealthStat && (q.SuccessRequests > 0 || q.SuccessTokens > 0) {
+						successRequests := q.SuccessRequests
+						if successRequests <= 0 {
+							successRequests = 1
+						}
+						resp = append(resp, publicModelsHealthHourlyLast24hRespItem{
+							ModelName:       modelName,
+							HourStartTs:     h,
+							SuccessSlices:   1,
+							TotalSlices:     1,
+							SuccessRate:     1,
+							TotalRequests:   successRequests,
+							ErrorRequests:   0,
+							SuccessRequests: successRequests,
+							SuccessTokens:   q.SuccessTokens,
+						})
+						continue
+					}
 				}
 			}
 

@@ -100,25 +100,27 @@ function HealthCell(props: {
   const tokens = Number(props.cell?.success_tokens) || 0
   const { color, bg } = getRateLevel(rate)
 
+  const backgroundColor = isFilled ? bg : color
+  const borderColor = isFilled ? `${color}99` : `${color}cc`
   const boxShadow = isFilled
     ? props.isLatest
-      ? `0 0 0 2px ${color}`
-      : 'none'
+      ? `0 0 0 2px var(--background), 0 0 0 4px ${color}55`
+      : `inset 0 0 0 1px ${color}55`
     : props.isLatest
-      ? `inset 0 0 0 2.5px ${color}, 0 0 0 2px ${color}`
-      : `inset 0 0 0 2.5px ${color}`
+      ? `inset 0 -6px 10px rgba(15, 23, 42, 0.12), 0 0 0 2px var(--background), 0 0 0 4px ${color}55`
+      : 'inset 0 -6px 10px rgba(15, 23, 42, 0.12)'
 
   return (
     <Tooltip>
       <TooltipTrigger
         render={
           <div
-            className='h-7 w-7 cursor-pointer rounded-lg transition-all duration-200 hover:scale-110 hover:shadow-lg sm:h-8 sm:w-8'
+            className='h-5 w-5 cursor-pointer rounded-[5px] border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:h-6 sm:w-6'
             style={{
-              backgroundColor: bg,
-              borderColor: color,
+              backgroundColor,
+              borderColor,
               boxShadow,
-              opacity: isFilled ? 0.5 : 1,
+              opacity: isFilled ? 0.5 : 0.95,
             }}
           />
         }
@@ -138,6 +140,22 @@ function HealthCell(props: {
             {t('Total tokens')}:{' '}
             <span className='font-medium'>{formatTokens(tokens)}</span>
           </div>
+          {!isFilled && (
+            <>
+              <div>
+                {t('Successful requests')}:{' '}
+                <span className='font-medium'>
+                  {Number(props.cell?.success_requests) || 0}
+                </span>
+              </div>
+              <div>
+                {t('Error')}:{' '}
+                <span className='font-medium'>
+                  {Number(props.cell?.error_requests) || 0}
+                </span>
+              </div>
+            </>
+          )}
           {isFilled && (
             <div className='text-muted-foreground italic'>
               {t('No data, using average value')}
@@ -158,27 +176,19 @@ function StatCard(props: {
 }) {
   return (
     <div
-      className='relative flex min-h-[140px] flex-col justify-between overflow-hidden rounded-2xl p-5 shadow-lg transition-shadow duration-300 hover:shadow-xl sm:p-6'
+      className='relative flex min-h-[112px] flex-col justify-between overflow-hidden rounded-lg border border-white/20 p-4 shadow-sm transition-shadow duration-300 hover:shadow-md sm:min-h-[124px] sm:p-5'
       style={{ background: props.bgGradient }}
     >
-      <div
-        className='absolute -top-8 -right-8 h-32 w-32 rounded-full opacity-20'
-        style={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
-      />
-      <div
-        className='absolute -right-4 -bottom-4 h-24 w-24 rounded-full opacity-15'
-        style={{ backgroundColor: 'rgba(255,255,255,0.4)' }}
-      />
       <div className='relative z-10 flex items-center justify-between'>
         <div className='text-sm font-medium tracking-wide text-white/90'>
           {props.title}
         </div>
-        <div className='flex h-10 w-10 items-center justify-center rounded-xl bg-white/25'>
+        <div className='flex h-9 w-9 items-center justify-center rounded-md bg-white/20'>
           {props.icon}
         </div>
       </div>
       <div className='relative z-10 mt-3'>
-        <div className='text-3xl font-bold tracking-tight text-white sm:text-4xl'>
+        <div className='text-2xl font-bold tracking-tight text-white sm:text-3xl'>
           {props.value}
         </div>
         {props.subtitle && (
@@ -199,22 +209,14 @@ function StatCardSkeleton(props: {
 }) {
   return (
     <div
-      className='relative flex min-h-[140px] flex-col justify-between overflow-hidden rounded-2xl p-5 shadow-lg sm:p-6'
+      className='relative flex min-h-[112px] flex-col justify-between overflow-hidden rounded-lg border border-white/20 p-4 shadow-sm sm:min-h-[124px] sm:p-5'
       style={{ background: props.bgGradient }}
     >
-      <div
-        className='absolute -top-8 -right-8 h-32 w-32 rounded-full opacity-20'
-        style={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
-      />
-      <div
-        className='absolute -right-4 -bottom-4 h-24 w-24 rounded-full opacity-15'
-        style={{ backgroundColor: 'rgba(255,255,255,0.4)' }}
-      />
       <div className='relative z-10 flex items-center justify-between'>
         <div className='text-sm font-medium tracking-wide text-white/90'>
           {props.title}
         </div>
-        <div className='flex h-10 w-10 items-center justify-center rounded-xl bg-white/25'>
+        <div className='flex h-9 w-9 items-center justify-center rounded-md bg-white/20'>
           {props.icon}
         </div>
       </div>
@@ -245,7 +247,7 @@ function LegendItem(props: { color: string; label: string }) {
 
 function LegendSkeleton() {
   return (
-    <div className='bg-card mb-6 rounded-2xl border px-5 py-4 shadow-sm'>
+    <div className='bg-card mb-6 rounded-lg border px-5 py-4 shadow-sm'>
       <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
         <div className='flex flex-wrap items-center gap-3'>
           <Skeleton className='h-3.5 w-[72px] rounded-lg' />
@@ -272,7 +274,7 @@ function TimeLabelsSkeleton() {
     <div className='mb-3 overflow-x-auto pl-[200px] sm:pl-[260px]'>
       <div className='flex min-w-max gap-1'>
         {Array.from({ length: 24 }).map((_, idx) => (
-          <div key={idx} className='w-7 text-center sm:w-8'>
+          <div key={idx} className='w-5 text-center sm:w-6'>
             {idx % 3 === 0 && <Skeleton className='h-3 w-[26px] rounded-md' />}
           </div>
         ))}
@@ -287,13 +289,13 @@ function ModelListSkeleton() {
       {Array.from({ length: 6 }).map((_, idx) => (
         <div
           key={idx}
-          className='bg-card rounded-xl border border-l-4 px-[18px] py-3.5 shadow-sm'
+          className='bg-card rounded-lg border border-l-4 px-4 py-3 shadow-sm'
           style={{ borderLeftColor: 'rgba(148, 163, 184, 0.7)' }}
         >
           <div className='flex items-center gap-4'>
             <div className='w-[180px] flex-shrink-0 sm:w-[240px]'>
               <div className='flex items-center gap-3'>
-                <Skeleton className='h-10 w-3 rounded-full' />
+                <Skeleton className='h-8 w-2 rounded-full' />
                 <div className='min-w-0 flex-1'>
                   <Skeleton className='mb-2.5 h-4 w-40 rounded-lg' />
                   <div className='flex flex-wrap items-center gap-3'>
@@ -308,7 +310,7 @@ function ModelListSkeleton() {
                 {Array.from({ length: 24 }).map((__, jdx) => (
                   <div
                     key={jdx}
-                    className='h-7 w-7 animate-pulse rounded-lg bg-gray-200 sm:h-8 sm:w-8'
+                    className='h-5 w-5 animate-pulse rounded-[5px] bg-gray-200 sm:h-6 sm:w-6'
                   />
                 ))}
               </div>
@@ -337,36 +339,49 @@ export function ModelHealthPublicPage() {
   const [payload, setPayload] = useState<PublicModelHealthPayload | null>(null)
   const [searchText, setSearchText] = useState('')
 
-  async function load() {
-    setLoading(true)
-    setErrorText('')
+  async function load(options: { silent?: boolean } = {}) {
+    const silent = Boolean(options.silent)
+    if (!silent) {
+      setLoading(true)
+      setErrorText('')
+    }
     try {
       const res = await getPublicModelHealthLast24h()
       const { success, message, data } = res || {}
       if (!success) {
         const errMsg = message || t('Load failed')
-        setErrorText(errMsg)
-        toast.error(errMsg)
+        if (!silent) {
+          setErrorText(errMsg)
+          toast.error(errMsg)
+        }
         return
       }
       if (!data || typeof data !== 'object') {
         const errMsg = t('Unexpected API response')
-        setErrorText(errMsg)
-        toast.error(errMsg)
+        if (!silent) {
+          setErrorText(errMsg)
+          toast.error(errMsg)
+        }
         return
       }
       setPayload(data)
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : t('Load failed')
-      setErrorText(t('Load failed'))
-      toast.error(errMsg)
+      if (!silent) {
+        setErrorText(t('Load failed'))
+        toast.error(errMsg)
+      }
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
   useEffect(() => {
     load().catch(() => undefined)
+    const timer = window.setInterval(() => {
+      load({ silent: true }).catch(() => undefined)
+    }, 30_000)
+    return () => window.clearInterval(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -522,31 +537,31 @@ export function ModelHealthPublicPage() {
 
           {showSpin && <LoadingOverlay />}
 
-          <div className='mb-8 grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4'>
+          <div className='mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4'>
             {isInitialLoading ? (
               <>
                 <StatCardSkeleton
                   icon={<CheckCircle className='size-5 text-white' />}
                   title={t('Monitored models')}
-                  bgGradient='linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                  bgGradient='#2563eb'
                   valueWidth={72}
                 />
                 <StatCardSkeleton
                   icon={<CheckCircle className='size-5 text-white' />}
                   title={t('Overall success rate')}
-                  bgGradient='linear-gradient(135deg, #22c55e 0%, #15803d 100%)'
+                  bgGradient='#16a34a'
                   valueWidth={96}
                 />
                 <StatCardSkeleton
                   icon={<CheckCircle className='size-5 text-white' />}
                   title={t('Total tokens')}
-                  bgGradient='linear-gradient(135deg, #60a5fa 0%, #2563eb 100%)'
+                  bgGradient='#0284c7'
                   valueWidth={120}
                 />
                 <StatCardSkeleton
                   icon={<CheckCircle className='size-5 text-white' />}
                   title={t('Healthy models')}
-                  bgGradient='linear-gradient(135deg, #10b981 0%, #047857 100%)'
+                  bgGradient='#0f766e'
                   valueWidth={72}
                 />
               </>
@@ -559,28 +574,28 @@ export function ModelHealthPublicPage() {
                   subtitle={t('{{count}} healthy', {
                     count: stats.healthyModels,
                   })}
-                  bgGradient='linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                  bgGradient='#2563eb'
                 />
                 <StatCard
                   icon={<CheckCircle className='size-5 text-white' />}
                   title={t('Overall success rate')}
                   value={formatRate(stats.overallRate)}
                   subtitle={t('Past 24 hours')}
-                  bgGradient='linear-gradient(135deg, #22c55e 0%, #15803d 100%)'
+                  bgGradient='#16a34a'
                 />
                 <StatCard
                   icon={<CheckCircle className='size-5 text-white' />}
                   title={t('Total tokens')}
                   value={formatTokens(stats.totalSuccessTokens)}
                   subtitle={t('Past 24 hours')}
-                  bgGradient='linear-gradient(135deg, #60a5fa 0%, #2563eb 100%)'
+                  bgGradient='#0284c7'
                 />
                 <StatCard
                   icon={<CheckCircle className='size-5 text-white' />}
                   title={t('Healthy models')}
                   value={stats.healthyModels}
                   subtitle={t('Success rate >= 80%')}
-                  bgGradient='linear-gradient(135deg, #10b981 0%, #047857 100%)'
+                  bgGradient='#0f766e'
                 />
               </>
             )}
@@ -589,7 +604,7 @@ export function ModelHealthPublicPage() {
           {isInitialLoading ? (
             <LegendSkeleton />
           ) : (
-            <div className='bg-card mb-6 rounded-2xl border px-5 py-4 shadow-sm'>
+            <div className='bg-card mb-6 rounded-lg border px-5 py-4 shadow-sm'>
               <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
                 <div className='flex flex-wrap items-center gap-3'>
                   <span className='mr-2 text-sm font-semibold text-gray-700 dark:text-gray-200'>
@@ -636,7 +651,7 @@ export function ModelHealthPublicPage() {
               <div className='mb-3 overflow-x-auto pl-[200px] sm:pl-[260px]'>
                 <div className='flex min-w-max gap-1'>
                   {[...hourStarts].reverse().map((ts, idx) => (
-                    <div key={ts} className='w-7 text-center sm:w-8'>
+                    <div key={ts} className='w-5 text-center sm:w-6'>
                       {idx % 3 === 0 && (
                         <div className='text-[11px] font-medium text-gray-400'>
                           {hourLabel(ts)}
@@ -652,20 +667,20 @@ export function ModelHealthPublicPage() {
           {isInitialLoading ? (
             <ModelListSkeleton />
           ) : (
-            <div className='space-y-3'>
+            <div className='space-y-2.5'>
               {filteredModelData.map((item) => {
                 const { color, bg } = getRateLevel(item.avg_rate)
                 return (
                   <div
                     key={item.model_name}
-                    className='bg-card rounded-xl border border-l-4 px-[18px] py-3.5 transition-all duration-300 hover:shadow-lg'
+                    className='bg-card rounded-lg border border-l-4 px-4 py-3 transition-all duration-300 hover:shadow-md'
                     style={{ borderLeftColor: color }}
                   >
                     <div className='flex items-center gap-4'>
                       <div className='w-[180px] flex-shrink-0 sm:w-[240px]'>
                         <div className='flex items-center gap-3'>
                           <div
-                            className='h-10 w-3 flex-shrink-0 rounded-full shadow-sm'
+                            className='h-8 w-2 flex-shrink-0 rounded-full shadow-sm'
                             style={{ backgroundColor: color }}
                           />
                           <div className='min-w-0 flex-1'>
@@ -711,7 +726,7 @@ export function ModelHealthPublicPage() {
           )}
 
           {!loading && !isInitialLoading && filteredModelData.length === 0 && (
-            <div className='bg-card rounded-2xl border shadow-sm'>
+            <div className='bg-card rounded-lg border shadow-sm'>
               <div className='py-16 text-center'>
                 <div className='mb-6 text-7xl'>📊</div>
                 <h4 className='text-muted-foreground text-lg font-semibold'>
