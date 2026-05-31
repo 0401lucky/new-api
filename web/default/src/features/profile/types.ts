@@ -221,6 +221,14 @@ export interface CheckinStats {
 export interface CheckinStatusResponse {
   /** Whether check-in feature is enabled */
   enabled: boolean
+  /** Random reward minimum quota */
+  min_quota?: number
+  /** Random reward maximum quota */
+  max_quota?: number
+  /** Fixed reward quota */
+  fixed_quota?: number
+  /** Whether check-in uses random reward mode */
+  random_mode?: boolean
   /** Check-in statistics */
   stats: CheckinStats
 }

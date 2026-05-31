@@ -188,6 +188,11 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	relayInfo.LastError = nil
 
 	for ; retryParam.GetRetry() <= common.RetryTimes; retryParam.IncreaseRetry() {
+		if disconnectErr := newClientDisconnectedAPIError(c); disconnectErr != nil {
+			newAPIError = disconnectErr
+			break
+		}
+
 		relayInfo.RetryIndex = retryParam.GetRetry()
 		channel, channelErr := getChannel(c, relayInfo, retryParam)
 		if channelErr != nil {
@@ -223,6 +228,12 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		if newAPIError == nil {
 			relayInfo.LastError = nil
 			return
+		}
+
+		if disconnectErr := newClientDisconnectedAPIError(c); disconnectErr != nil {
+			newAPIError = disconnectErr
+			relayInfo.LastError = newAPIError
+			break
 		}
 
 		newAPIError = service.NormalizeViolationFeeError(newAPIError)
@@ -319,6 +330,27 @@ func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service
 		return nil, newAPIError
 	}
 	return channel, nil
+}
+
+func shouldStopRetryForClientDisconnect(c *gin.Context) bool {
+	if c == nil || c.Request == nil || c.Request.Context().Err() == nil {
+		return false
+	}
+	return true
+}
+
+func newClientDisconnectedAPIError(c *gin.Context) *types.NewAPIError {
+	if !shouldStopRetryForClientDisconnect(c) {
+		return nil
+	}
+	logger.LogInfo(c, "client disconnected, stop relay retry")
+	return types.NewErrorWithStatusCode(
+		fmt.Errorf("client disconnected: %w", c.Request.Context().Err()),
+		types.ErrorCodeClientDisconnected,
+		499,
+		types.ErrOptionWithSkipRetry(),
+		types.ErrOptionWithNoRecordErrorLog(),
+	)
 }
 
 func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) bool {
@@ -523,6 +555,11 @@ func RelayTask(c *gin.Context) {
 	}
 
 	for ; retryParam.GetRetry() <= common.RetryTimes; retryParam.IncreaseRetry() {
+		if disconnectErr := newClientDisconnectedAPIError(c); disconnectErr != nil {
+			taskErr = service.TaskErrorWrapperLocal(disconnectErr.Err, string(disconnectErr.GetErrorCode()), disconnectErr.StatusCode)
+			break
+		}
+
 		var channel *model.Channel
 
 		if lockedCh, ok := relayInfo.LockedChannel.(*model.Channel); ok && lockedCh != nil {
@@ -557,6 +594,11 @@ func RelayTask(c *gin.Context) {
 
 		result, taskErr = relay.RelayTaskSubmit(c, relayInfo)
 		if taskErr == nil {
+			break
+		}
+
+		if disconnectErr := newClientDisconnectedAPIError(c); disconnectErr != nil {
+			taskErr = service.TaskErrorWrapperLocal(disconnectErr.Err, string(disconnectErr.GetErrorCode()), disconnectErr.StatusCode)
 			break
 		}
 

@@ -172,6 +172,13 @@ func ModelRequestRateLimit() func(c *gin.Context) {
 			return
 		}
 
+		userID := c.GetInt("id")
+		if shouldBypassModelRequestRateLimit(c, userID) {
+			c.Header("X-RateLimit-Bypass", "ModelRequestRateLimit")
+			c.Next()
+			return
+		}
+
 		// 计算限流参数
 		duration := int64(setting.ModelRequestRateLimitDurationMinutes * 60)
 		totalMaxCount := setting.ModelRequestRateLimitCount
@@ -197,4 +204,11 @@ func ModelRequestRateLimit() func(c *gin.Context) {
 			memoryRateLimitHandler(duration, totalMaxCount, successMaxCount)(c)
 		}
 	}
+}
+
+func shouldBypassModelRequestRateLimit(c *gin.Context, userID int) bool {
+	if c.GetInt("role") >= common.RoleAdminUser {
+		return true
+	}
+	return setting.IsModelRequestRateLimitExemptUser(userID)
 }

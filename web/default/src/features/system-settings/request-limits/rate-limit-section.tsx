@@ -64,6 +64,14 @@ const isValidJSON = (value: string | undefined) => {
   }
 }
 
+const isValidExemptUserIDs = (value: string | undefined) => {
+  if (!value || value.trim() === '') return true
+  return value
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .every((part) => /^\d+$/.test(part) && Number(part) > 0)
+}
+
 const createRateLimitSchema = (t: (key: string) => string) =>
   z.object({
     ModelRequestRateLimitEnabled: z.boolean(),
@@ -75,6 +83,12 @@ const createRateLimitSchema = (t: (key: string) => string) =>
       .optional()
       .refine(isValidJSON, {
         message: t('Invalid JSON format or values out of allowed range'),
+      }),
+    ModelRequestRateLimitExemptUserIDs: z
+      .string()
+      .optional()
+      .refine(isValidExemptUserIDs, {
+        message: t('Only positive user IDs are allowed'),
       }),
   })
 
@@ -306,6 +320,30 @@ export function RateLimitSection({ defaultValues }: RateLimitSectionProps) {
                     </div>
                   </FormDescription>
                 )}
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='ModelRequestRateLimitExemptUserIDs'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('Rate limit exempt users')}</FormLabel>
+                <FormControl>
+                  <Textarea
+                    rows={4}
+                    placeholder={'1, 2, 1001'}
+                    className='font-mono text-sm'
+                    {...field}
+                  />
+                </FormControl>
+                <FormDescription>
+                  {t(
+                    'Comma, space, or newline separated user IDs. These users bypass model request RPM limits.'
+                  )}
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}

@@ -67,9 +67,11 @@ func UserCheckin(userId int) (*Checkin, error) {
 		return nil, errors.New("今日已签到")
 	}
 
-	// 计算随机额度奖励
-	quotaAwarded := setting.MinQuota
-	if setting.MaxQuota > setting.MinQuota {
+	quotaAwarded := setting.FixedQuota
+	if setting.RandomMode {
+		quotaAwarded = setting.MinQuota
+	}
+	if setting.RandomMode && setting.MaxQuota > setting.MinQuota {
 		quotaAwarded = setting.MinQuota + rand.Intn(setting.MaxQuota-setting.MinQuota+1)
 	}
 

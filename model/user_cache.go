@@ -19,6 +19,7 @@ type UserBase struct {
 	Group    string `json:"group"`
 	Email    string `json:"email"`
 	Quota    int    `json:"quota"`
+	Role     int    `json:"role"`
 	Status   int    `json:"status"`
 	Username string `json:"username"`
 	Setting  string `json:"setting"`
@@ -31,6 +32,9 @@ func (user *UserBase) WriteContext(c *gin.Context) {
 	common.SetContextKey(c, constant.ContextKeyUserEmail, user.Email)
 	common.SetContextKey(c, constant.ContextKeyUserName, user.Username)
 	common.SetContextKey(c, constant.ContextKeyUserSetting, user.GetSetting())
+	if user.Role > 0 {
+		c.Set("role", user.Role)
+	}
 }
 
 func (user *UserBase) GetSetting() dto.UserSetting {
@@ -93,7 +97,7 @@ func GetUserCache(userId int) (userCache *UserBase, err error) {
 
 	// Try getting from Redis first
 	userCache, err = cacheGetUserBase(userId)
-	if err == nil {
+	if err == nil && userCache.Role > 0 {
 		return userCache, nil
 	}
 
@@ -109,6 +113,7 @@ func GetUserCache(userId int) (userCache *UserBase, err error) {
 		Id:       user.Id,
 		Group:    user.Group,
 		Quota:    user.Quota,
+		Role:     user.Role,
 		Status:   user.Status,
 		Username: user.Username,
 		Setting:  user.Setting,

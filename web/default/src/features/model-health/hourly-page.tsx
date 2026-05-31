@@ -30,6 +30,7 @@ import { toast } from 'sonner'
 import { useChartTheme } from '@/lib/use-chart-theme'
 import { VCHART_OPTION } from '@/lib/vchart'
 import { Button } from '@/components/ui/button'
+import { Combobox } from '@/components/ui/combobox'
 import { Spinner } from '@/components/ui/spinner'
 import {
   Table,
@@ -219,6 +220,11 @@ export function ModelHealthHourlyPage() {
     start_hour: defaultRange.startHour,
     end_hour: defaultRange.endHour,
   })
+
+  const modelComboboxOptions = useMemo(
+    () => modelOptions.map((model) => ({ value: model, label: model })),
+    [modelOptions]
+  )
 
   const stats = useMemo(() => {
     if (!Array.isArray(rows) || rows.length === 0) {
@@ -535,23 +541,21 @@ export function ModelHealthHourlyPage() {
               <label className='mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200'>
                 {t('Select model')}
               </label>
-              <input
-                list='model-health-model-options'
-                className='bg-background focus:border-ring focus:ring-ring/30 h-11 w-full rounded-[10px] border px-3 text-sm transition-colors outline-none focus:ring-3'
+              <Combobox
+                options={modelComboboxOptions}
+                className='h-11 w-full rounded-[10px]'
                 placeholder={t('Select or enter model name')}
+                searchPlaceholder={t('Select or enter model name')}
+                emptyText={t('No results found.')}
                 value={inputs.model_name}
-                onChange={(event) =>
+                onValueChange={(value) =>
                   setInputs((prev) => ({
                     ...prev,
-                    model_name: event.target.value,
+                    model_name: value || '',
                   }))
                 }
+                allowCustomValue
               />
-              <datalist id='model-health-model-options'>
-                {modelOptions.map((model) => (
-                  <option key={model} value={model} />
-                ))}
-              </datalist>
               {modelsLoading && (
                 <div className='text-muted-foreground mt-2 flex items-center gap-2 text-xs'>
                   <Spinner className='size-3' />

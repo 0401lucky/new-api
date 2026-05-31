@@ -1,8 +1,11 @@
 package controller
 
 import (
+	"crypto/rand"
+	"math/big"
 	"net/http"
 	"strconv"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
@@ -12,6 +15,34 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+const (
+	redemptionKeyMaxLength       = 32
+	redemptionMinRandomKeyLength = 8
+	redemptionBulkCreateMaxCount = 100000
+)
+
+type createRedemptionRequest struct {
+	Name               string `json:"name"`
+	Quota              int    `json:"quota"`
+	ExpiredTime        int64  `json:"expired_time"`
+	Count              int    `json:"count"`
+	KeyPrefix          string `json:"key_prefix"`
+	RandomQuotaEnabled bool   `json:"random_quota_enabled"`
+	QuotaMin           *int   `json:"quota_min"`
+	QuotaMax           *int   `json:"quota_max"`
+}
+
+func (r createRedemptionRequest) effectiveCount() int {
+	if r.Count <= 0 {
+		return 1
+	}
+	return r.Count
+}
+
+func (r createRedemptionRequest) randomQuotaMode() bool {
+	return r.RandomQuotaEnabled || (r.QuotaMin != nil && r.QuotaMax != nil)
+}
 
 func GetAllRedemptions(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
@@ -65,38 +96,80 @@ func AddRedemption(c *gin.Context) {
 		return
 	}
 
-	redemption := model.Redemption{}
-	err := c.ShouldBindJSON(&redemption)
+	req := createRedemptionRequest{}
+	err := c.ShouldBindJSON(&req)
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
-	if utf8.RuneCountInString(redemption.Name) == 0 || utf8.RuneCountInString(redemption.Name) > 20 {
+	if utf8.RuneCountInString(req.Name) == 0 || utf8.RuneCountInString(req.Name) > 20 {
 		common.ApiErrorI18n(c, i18n.MsgRedemptionNameLength)
 		return
 	}
-	if redemption.Count <= 0 {
+	count := req.effectiveCount()
+	if count <= 0 {
 		common.ApiErrorI18n(c, i18n.MsgRedemptionCountPositive)
 		return
 	}
-	if redemption.Count > 100 {
+	if count > redemptionBulkCreateMaxCount {
 		common.ApiErrorI18n(c, i18n.MsgRedemptionCountMax)
 		return
 	}
-	if valid, msg := validateExpiredTime(c, redemption.ExpiredTime); !valid {
+	if valid, msg := validateExpiredTime(c, req.ExpiredTime); !valid {
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": msg})
 		return
 	}
+	if !req.randomQuotaMode() && req.Quota <= 0 {
+		common.ApiErrorMsg(c, "额度必须大于 0")
+		return
+	}
+
+	randomQuotaMode := req.randomQuotaMode()
+	if randomQuotaMode {
+		if req.QuotaMin == nil || req.QuotaMax == nil {
+			common.ApiErrorMsg(c, "随机额度模式需要填写最小额度和最大额度")
+			return
+		}
+		if *req.QuotaMin <= 0 || *req.QuotaMax <= 0 {
+			common.ApiErrorMsg(c, "随机额度范围必须大于 0")
+			return
+		}
+		if *req.QuotaMin > *req.QuotaMax {
+			common.ApiErrorMsg(c, "随机额度最小值不能大于最大值")
+			return
+		}
+	}
+
+	keyPrefix := strings.TrimSpace(req.KeyPrefix)
+	prefixLen := utf8.RuneCountInString(keyPrefix)
+	if prefixLen > redemptionKeyMaxLength-redemptionMinRandomKeyLength {
+		common.ApiErrorMsg(c, "兑换码前缀过长")
+		return
+	}
+	randomKeyLength := redemptionKeyMaxLength - prefixLen
 	var keys []string
-	for i := 0; i < redemption.Count; i++ {
-		key := common.GetUUID()
+	for i := 0; i < count; i++ {
+		randomPart, err := common.GenerateRandomCharsKey(randomKeyLength)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		key := keyPrefix + randomPart
+		quota := req.Quota
+		if randomQuotaMode {
+			quota, err = cryptoRandIntInclusive(*req.QuotaMin, *req.QuotaMax)
+			if err != nil {
+				common.ApiError(c, err)
+				return
+			}
+		}
 		cleanRedemption := model.Redemption{
 			UserId:      c.GetInt("id"),
-			Name:        redemption.Name,
+			Name:        req.Name,
 			Key:         key,
 			CreatedTime: common.GetTimestamp(),
-			Quota:       redemption.Quota,
-			ExpiredTime: redemption.ExpiredTime,
+			Quota:       quota,
+			ExpiredTime: req.ExpiredTime,
 		}
 		err = cleanRedemption.Insert()
 		if err != nil {
@@ -114,8 +187,20 @@ func AddRedemption(c *gin.Context) {
 		"success": true,
 		"message": "",
 		"data":    keys,
+		"keys":    keys,
 	})
 	return
+}
+
+func cryptoRandIntInclusive(min int, max int) (int, error) {
+	if min > max {
+		return 0, strconv.ErrSyntax
+	}
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(max-min+1)))
+	if err != nil {
+		return 0, err
+	}
+	return min + int(n.Int64()), nil
 }
 
 func DeleteRedemption(c *gin.Context) {

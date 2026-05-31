@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Download } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { getCurrencyDisplay, getCurrencyLabel } from '@/lib/currency'
@@ -43,6 +44,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { Switch } from '@/components/ui/switch'
 import { DateTimePicker } from '@/components/datetime-picker'
 import {
   SideDrawerSection,
@@ -84,6 +86,20 @@ export function RedemptionsMutateDrawer({
     defaultValues: REDEMPTION_FORM_DEFAULT_VALUES,
   })
 
+  const randomQuotaEnabled = form.watch('random_quota_enabled')
+
+  const downloadTextAsFile = (text: string, filename: string) => {
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   // Load existing data when updating
   useEffect(() => {
     if (open && isUpdate && currentRow) {
@@ -118,7 +134,8 @@ export function RedemptionsMutateDrawer({
         // Create mode
         const result = await createRedemption(basePayload)
         if (result.success) {
-          const count = result.data?.length || 0
+          const keys = result.keys || result.data || []
+          const count = keys.length
           toast.success(
             count > 1
               ? t('Successfully created {{count}} redemption codes', {
@@ -126,6 +143,9 @@ export function RedemptionsMutateDrawer({
                 })
               : t(SUCCESS_MESSAGES.REDEMPTION_CREATED)
           )
+          if (keys.length > 0) {
+            downloadTextAsFile(keys.join('\n'), `${data.name}.txt`)
+          }
           onOpenChange(false)
           triggerRefresh()
         }
@@ -209,6 +229,7 @@ export function RedemptionsMutateDrawer({
                         {...field}
                         type='number'
                         step={tokensOnly ? 1 : 0.01}
+                        disabled={!isUpdate && randomQuotaEnabled}
                         placeholder={quotaPlaceholder}
                         onChange={(e) =>
                           field.onChange(parseFloat(e.target.value) || 0)
@@ -216,11 +237,15 @@ export function RedemptionsMutateDrawer({
                       />
                     </FormControl>
                     <FormDescription>
-                      {tokensOnly
-                        ? t('Enter the quota amount in tokens')
-                        : t('Enter the quota amount in {{currency}}', {
-                            currency: currencyLabel,
-                          })}
+                      {!isUpdate && randomQuotaEnabled
+                        ? t(
+                            'Fixed quota is ignored when random quota is enabled'
+                          )
+                        : tokensOnly
+                          ? t('Enter the quota amount in tokens')
+                          : t('Enter the quota amount in {{currency}}', {
+                              currency: currencyLabel,
+                            })}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -285,31 +310,138 @@ export function RedemptionsMutateDrawer({
               />
 
               {!isUpdate && (
-                <FormField
-                  control={form.control}
-                  name='count'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('Quantity')}</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type='number'
-                          min='1'
-                          max='100'
-                          placeholder={t('Number of codes to create')}
-                          onChange={(e) =>
-                            field.onChange(parseInt(e.target.value, 10) || 1)
-                          }
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        {t('Create multiple redemption codes at once (1-100)')}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
+                <>
+                  <FormField
+                    control={form.control}
+                    name='count'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Quantity')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type='number'
+                            min='1'
+                            max='100000'
+                            placeholder={t('Number of codes to create')}
+                            onChange={(e) =>
+                              field.onChange(parseInt(e.target.value, 10) || 1)
+                            }
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t(
+                            'Create multiple redemption codes at once (1-100000)'
+                          )}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='key_prefix'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Key prefix')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder={t('Optional redemption code prefix')}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t(
+                            'Generated codes keep 32 characters total and reserve at least 8 random characters.'
+                          )}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='random_quota_enabled'
+                    render={({ field }) => (
+                      <FormItem className='flex items-center justify-between gap-4 rounded-lg border p-4'>
+                        <div className='space-y-1'>
+                          <FormLabel>{t('Random quota')}</FormLabel>
+                          <FormDescription>
+                            {t(
+                              'Generate each redemption code with a random quota in the configured range.'
+                            )}
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  {randomQuotaEnabled && (
+                    <div className='grid gap-4 sm:grid-cols-2'>
+                      <FormField
+                        control={form.control}
+                        name='quota_min_dollars'
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              {t('Minimum quota ({{currency}})', {
+                                currency: currencyLabel,
+                              })}
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type='number'
+                                step={tokensOnly ? 1 : 0.01}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    parseFloat(e.target.value) || 0
+                                  )
+                                }
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name='quota_max_dollars'
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              {t('Maximum quota ({{currency}})', {
+                                currency: currencyLabel,
+                              })}
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type='number'
+                                step={tokensOnly ? 1 : 0.01}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    parseFloat(e.target.value) || 0
+                                  )
+                                }
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   )}
-                />
+                </>
               )}
             </SideDrawerSection>
           </form>
@@ -319,7 +451,16 @@ export function RedemptionsMutateDrawer({
             {t('Close')}
           </SheetClose>
           <Button form='redemption-form' type='submit' disabled={isSubmitting}>
-            {isSubmitting ? t('Saving...') : t('Save changes')}
+            {isSubmitting ? (
+              t('Saving...')
+            ) : !isUpdate ? (
+              <>
+                <Download className='mr-2 h-4 w-4' />
+                {t('Create and download')}
+              </>
+            ) : (
+              t('Save changes')
+            )}
           </Button>
         </SheetFooter>
       </SheetContent>

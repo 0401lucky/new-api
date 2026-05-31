@@ -277,6 +277,32 @@ func UpdateOption(c *gin.Context) {
 			})
 			return
 		}
+	case "ModelRequestRateLimitExemptUserIDs":
+		_, err = setting.ParseModelRequestRateLimitExemptUserIDs(option.Value.(string))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": err.Error(),
+			})
+			return
+		}
+	case "checkin_setting.min_quota", "checkin_setting.max_quota", "checkin_setting.fixed_quota":
+		quota, err := strconv.Atoi(strings.TrimSpace(option.Value.(string)))
+		if err != nil || quota < 0 {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "签到额度必须是非负整数",
+			})
+			return
+		}
+	case "checkin_setting.random_mode":
+		if _, err := strconv.ParseBool(strings.TrimSpace(option.Value.(string))); err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "签到随机模式必须是布尔值",
+			})
+			return
+		}
 	case "AutomaticDisableStatusCodes":
 		_, err = operation_setting.ParseHTTPStatusCodeRanges(option.Value.(string))
 		if err != nil {

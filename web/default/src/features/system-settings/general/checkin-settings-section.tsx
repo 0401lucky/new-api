@@ -41,13 +41,28 @@ import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
 
-const schema = z.object({
-  enabled: z.boolean(),
-  minQuota: z.coerce.number().int().min(0),
-  maxQuota: z.coerce.number().int().min(0),
-})
+const createSchema = (t: (key: string) => string) =>
+  z
+    .object({
+      enabled: z.boolean(),
+      minQuota: z.coerce.number().int().min(0),
+      maxQuota: z.coerce.number().int().min(0),
+      fixedQuota: z.coerce.number().int().min(0),
+      randomMode: z.boolean(),
+    })
+    .superRefine((values, ctx) => {
+      if (values.randomMode && values.maxQuota < values.minQuota) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['maxQuota'],
+          message: t(
+            'Maximum check-in quota must be greater than or equal to minimum'
+          ),
+        })
+      }
+    })
 
-type Values = z.infer<typeof schema>
+type Values = z.infer<ReturnType<typeof createSchema>>
 
 export function CheckinSettingsSection({
   defaultValues,
@@ -56,10 +71,13 @@ export function CheckinSettingsSection({
     enabled: boolean
     minQuota: number
     maxQuota: number
+    fixedQuota: number
+    randomMode: boolean
   }
 }) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
+  const schema = createSchema(t)
 
   const form = useForm<Values>({
     resolver: zodResolver(schema) as unknown as Resolver<Values>,
@@ -67,11 +85,14 @@ export function CheckinSettingsSection({
       enabled: defaultValues.enabled,
       minQuota: defaultValues.minQuota,
       maxQuota: defaultValues.maxQuota,
+      fixedQuota: defaultValues.fixedQuota,
+      randomMode: defaultValues.randomMode,
     },
   })
 
   const { isDirty, isSubmitting } = form.formState
   const enabled = form.watch('enabled')
+  const randomMode = form.watch('randomMode')
 
   async function onSubmit(values: Values) {
     const updates: Array<{ key: string; value: string }> = []
@@ -94,6 +115,20 @@ export function CheckinSettingsSection({
       updates.push({
         key: 'checkin_setting.max_quota',
         value: String(values.maxQuota),
+      })
+    }
+
+    if (values.fixedQuota !== defaultValues.fixedQuota) {
+      updates.push({
+        key: 'checkin_setting.fixed_quota',
+        value: String(values.fixedQuota),
+      })
+    }
+
+    if (values.randomMode !== defaultValues.randomMode) {
+      updates.push({
+        key: 'checkin_setting.random_mode',
+        value: String(values.randomMode),
       })
     }
 
@@ -127,9 +162,7 @@ export function CheckinSettingsSection({
                 <SettingsSwitchContent>
                   <FormLabel>{t('Enable check-in feature')}</FormLabel>
                   <FormDescription>
-                    {t(
-                      'Allow users to check in daily for random quota rewards'
-                    )}
+                    {t('Allow users to check in daily for quota rewards')}
                   </FormDescription>
                 </SettingsSwitchContent>
                 <FormControl>
@@ -144,51 +177,99 @@ export function CheckinSettingsSection({
           />
 
           {enabled && (
-            <div className='grid gap-6 sm:grid-cols-2'>
+            <>
               <FormField
                 control={form.control}
-                name='minQuota'
+                name='randomMode'
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('Minimum check-in quota')}</FormLabel>
+                  <SettingsSwitchItem>
+                    <SettingsSwitchContent>
+                      <FormLabel>{t('Random quota mode')}</FormLabel>
+                      <FormDescription>
+                        {t('Use random check-in quota rewards')}
+                      </FormDescription>
+                    </SettingsSwitchContent>
                     <FormControl>
-                      <Input
-                        type='number'
-                        min={0}
-                        placeholder={t('1000')}
-                        {...field}
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={updateOption.isPending || isSubmitting}
                       />
                     </FormControl>
-                    <FormDescription>
-                      {t('Minimum quota amount awarded for check-in')}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
+                  </SettingsSwitchItem>
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name='maxQuota'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('Maximum check-in quota')}</FormLabel>
-                    <FormControl>
-                      <Input
-                        type='number'
-                        min={0}
-                        placeholder={t('10000')}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      {t('Maximum quota amount awarded for check-in')}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+              {randomMode ? (
+                <div className='grid gap-6 sm:grid-cols-2'>
+                  <FormField
+                    control={form.control}
+                    name='minQuota'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Minimum check-in quota')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type='number'
+                            min={0}
+                            placeholder={t('1000')}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t('Minimum quota amount awarded for check-in')}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='maxQuota'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Maximum check-in quota')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type='number'
+                            min={0}
+                            placeholder={t('10000')}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t('Maximum quota amount awarded for check-in')}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              ) : (
+                <FormField
+                  control={form.control}
+                  name='fixedQuota'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Fixed check-in quota')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          type='number'
+                          min={0}
+                          placeholder={t('1000')}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t('Fixed quota amount awarded for check-in')}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </>
           )}
         </SettingsForm>
       </Form>

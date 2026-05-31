@@ -45,6 +45,7 @@ export interface ApiResponse<T = unknown> {
   success: boolean
   message?: string
   data?: T
+  keys?: T
 }
 
 export interface GetRedemptionsParams {
@@ -75,6 +76,10 @@ export interface RedemptionFormData {
   quota: number
   expired_time: number
   count?: number // Only for create
+  key_prefix?: string // Only for create
+  random_quota_enabled?: boolean // Only for create
+  quota_min?: number // Only for create
+  quota_max?: number // Only for create
   status?: number // Only for status update
 }
 

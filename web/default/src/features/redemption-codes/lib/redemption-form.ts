@@ -31,19 +31,60 @@ import { type RedemptionFormData, type Redemption } from '../types'
 
 export function getRedemptionFormSchema(t: TFunction) {
   const msg = getRedemptionFormErrorMessages(t)
-  return z.object({
-    name: z
-      .string()
-      .min(REDEMPTION_VALIDATION.NAME_MIN_LENGTH, msg.NAME_LENGTH_INVALID)
-      .max(REDEMPTION_VALIDATION.NAME_MAX_LENGTH, msg.NAME_LENGTH_INVALID),
-    quota_dollars: z.number().min(0, t('Quota must be a positive number')),
-    expired_time: z.date().optional(),
-    count: z
-      .number()
-      .min(REDEMPTION_VALIDATION.COUNT_MIN, msg.COUNT_INVALID)
-      .max(REDEMPTION_VALIDATION.COUNT_MAX, msg.COUNT_INVALID)
-      .optional(),
-  })
+  return z
+    .object({
+      name: z
+        .string()
+        .min(REDEMPTION_VALIDATION.NAME_MIN_LENGTH, msg.NAME_LENGTH_INVALID)
+        .max(REDEMPTION_VALIDATION.NAME_MAX_LENGTH, msg.NAME_LENGTH_INVALID),
+      quota_dollars: z.number().min(0, t('Quota must be a positive number')),
+      expired_time: z.date().optional(),
+      count: z
+        .number()
+        .min(REDEMPTION_VALIDATION.COUNT_MIN, msg.COUNT_INVALID)
+        .max(REDEMPTION_VALIDATION.COUNT_MAX, msg.COUNT_INVALID)
+        .optional(),
+      key_prefix: z
+        .string()
+        .max(
+          REDEMPTION_VALIDATION.KEY_PREFIX_MAX_LENGTH,
+          t('Key prefix must be at most {{max}} characters', {
+            max: REDEMPTION_VALIDATION.KEY_PREFIX_MAX_LENGTH,
+          })
+        )
+        .optional(),
+      random_quota_enabled: z.boolean().optional(),
+      quota_min_dollars: z.number().optional(),
+      quota_max_dollars: z.number().optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (!data.random_quota_enabled) return
+      if (!data.quota_min_dollars || data.quota_min_dollars <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['quota_min_dollars'],
+          message: t('Minimum random quota must be greater than 0'),
+        })
+      }
+      if (!data.quota_max_dollars || data.quota_max_dollars <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['quota_max_dollars'],
+          message: t('Maximum random quota must be greater than 0'),
+        })
+      }
+      if (
+        data.quota_min_dollars &&
+        data.quota_max_dollars &&
+        data.quota_min_dollars > data.quota_max_dollars
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['quota_max_dollars'],
+          message: t('Maximum random quota must be greater than minimum'),
+        })
+      }
+    })
 }
 
 export type RedemptionFormValues = {
@@ -51,6 +92,10 @@ export type RedemptionFormValues = {
   quota_dollars: number
   expired_time?: Date
   count?: number
+  key_prefix?: string
+  random_quota_enabled?: boolean
+  quota_min_dollars?: number
+  quota_max_dollars?: number
 }
 
 // ============================================================================
@@ -62,6 +107,10 @@ export const REDEMPTION_FORM_DEFAULT_VALUES: RedemptionFormValues = {
   quota_dollars: 10,
   expired_time: undefined,
   count: 1,
+  key_prefix: '',
+  random_quota_enabled: false,
+  quota_min_dollars: 1,
+  quota_max_dollars: 10,
 }
 
 // ============================================================================
@@ -74,7 +123,7 @@ export const REDEMPTION_FORM_DEFAULT_VALUES: RedemptionFormValues = {
 export function transformFormDataToPayload(
   data: RedemptionFormValues
 ): RedemptionFormData {
-  return {
+  const payload: RedemptionFormData = {
     name: data.name,
     quota: parseQuotaFromDollars(data.quota_dollars),
     expired_time: data.expired_time
@@ -82,6 +131,15 @@ export function transformFormDataToPayload(
       : 0,
     count: data.count || 1,
   }
+  if (data.key_prefix?.trim()) {
+    payload.key_prefix = data.key_prefix.trim()
+  }
+  if (data.random_quota_enabled) {
+    payload.random_quota_enabled = true
+    payload.quota_min = parseQuotaFromDollars(data.quota_min_dollars || 0)
+    payload.quota_max = parseQuotaFromDollars(data.quota_max_dollars || 0)
+  }
+  return payload
 }
 
 /**
@@ -98,5 +156,9 @@ export function transformRedemptionToFormDefaults(
         ? new Date(redemption.expired_time * 1000)
         : undefined,
     count: 1,
+    key_prefix: '',
+    random_quota_enabled: false,
+    quota_min_dollars: 1,
+    quota_max_dollars: 10,
   }
 }
