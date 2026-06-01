@@ -369,6 +369,11 @@ func ReleaseBlackroomBan(id int, releasedBy int, reason string) (*BlackroomBan, 
 	if result.RowsAffected == 0 {
 		return nil, errors.New("该小黑屋记录不是生效状态")
 	}
+	if ban.Source == BlackroomBanSourceExternal {
+		if err := SetBlackroomUserStatus(ban.UserId, common.UserStatusEnabled); err != nil {
+			return nil, err
+		}
+	}
 	InvalidateBlackroomUserAuthCache(ban.UserId)
 	return GetBlackroomBanByID(id)
 }

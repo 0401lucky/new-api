@@ -158,3 +158,60 @@ func TestSetBlackroomUserStatus(t *testing.T) {
 	require.NoError(t, DB.First(&reloaded, "id = ?", user.Id).Error)
 	require.Equal(t, common.UserStatusEnabled, reloaded.Status)
 }
+
+func TestReleaseExternalBlackroomBanRestoresUserStatus(t *testing.T) {
+	truncateTables(t)
+
+	user := User{
+		Username: "blackroom-external-user",
+		Password: "password",
+		Role:     common.RoleCommonUser,
+		Status:   common.UserStatusDisabled,
+		Group:    "default",
+	}
+	require.NoError(t, DB.Create(&user).Error)
+
+	ban, _, err := UpsertActiveBlackroomBan(BlackroomBanInput{
+		UserId:   user.Id,
+		Username: user.Username,
+		Source:   BlackroomBanSourceExternal,
+		Reason:   "外部封禁",
+	})
+	require.NoError(t, err)
+
+	_, err = ReleaseBlackroomBan(ban.Id, 1, "测试解封")
+	require.NoError(t, err)
+
+	var reloaded User
+	require.NoError(t, DB.First(&reloaded, "id = ?", user.Id).Error)
+	require.Equal(t, common.UserStatusEnabled, reloaded.Status)
+}
+
+func TestReleaseAutoBlackroomBanKeepsUserStatus(t *testing.T) {
+	truncateTables(t)
+
+	// status 预置为禁用，验证 auto 来源解封不会改动它
+	user := User{
+		Username: "blackroom-auto-status-user",
+		Password: "password",
+		Role:     common.RoleCommonUser,
+		Status:   common.UserStatusDisabled,
+		Group:    "default",
+	}
+	require.NoError(t, DB.Create(&user).Error)
+
+	ban, _, err := UpsertActiveBlackroomBan(BlackroomBanInput{
+		UserId:   user.Id,
+		Username: user.Username,
+		Source:   BlackroomBanSourceAuto,
+		Reason:   "自动封禁",
+	})
+	require.NoError(t, err)
+
+	_, err = ReleaseBlackroomBan(ban.Id, 1, "测试解封")
+	require.NoError(t, err)
+
+	var reloaded User
+	require.NoError(t, DB.First(&reloaded, "id = ?", user.Id).Error)
+	require.Equal(t, common.UserStatusDisabled, reloaded.Status)
+}
