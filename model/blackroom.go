@@ -18,8 +18,9 @@ const (
 	BlackroomBanStatusReleased = "released"
 	BlackroomBanStatusExpired  = "expired"
 
-	BlackroomBanSourceAuto   = "auto"
-	BlackroomBanSourceManual = "manual"
+	BlackroomBanSourceAuto     = "auto"
+	BlackroomBanSourceManual   = "manual"
+	BlackroomBanSourceExternal = "external"
 
 	blackroomCacheNone = "-"
 	blackroomCacheTTL  = 10 * time.Second
@@ -333,6 +334,15 @@ func updateActiveBlackroomBan(tx *gorm.DB, ban *BlackroomBan, input BlackroomBan
 		return err
 	}
 	return tx.First(ban, "id = ?", ban.Id).Error
+}
+
+// SetBlackroomUserStatus 仅更新用户的 status 列，供小黑屋 external 来源联动
+// users.status 使用（封禁置 2、解封置 1）。
+func SetBlackroomUserStatus(userID int, status int) error {
+	if userID <= 0 {
+		return errors.New("无效的用户 ID")
+	}
+	return DB.Model(&User{}).Where("id = ?", userID).Update("status", status).Error
 }
 
 func ReleaseBlackroomBan(id int, releasedBy int, reason string) (*BlackroomBan, error) {

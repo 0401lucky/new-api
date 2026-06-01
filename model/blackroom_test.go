@@ -136,3 +136,25 @@ func TestUpsertActiveBlackroomBanKeepsSingleActiveRecord(t *testing.T) {
 	require.NotEqual(t, second.Id, third.Id)
 	require.NotNil(t, third.ActiveKey)
 }
+
+func TestSetBlackroomUserStatus(t *testing.T) {
+	truncateTables(t)
+
+	user := User{
+		Username: "blackroom-status-user",
+		Password: "password",
+		Role:     common.RoleCommonUser,
+		Status:   common.UserStatusEnabled,
+		Group:    "default",
+	}
+	require.NoError(t, DB.Create(&user).Error)
+
+	require.NoError(t, SetBlackroomUserStatus(user.Id, common.UserStatusDisabled))
+	var reloaded User
+	require.NoError(t, DB.First(&reloaded, "id = ?", user.Id).Error)
+	require.Equal(t, common.UserStatusDisabled, reloaded.Status)
+
+	require.NoError(t, SetBlackroomUserStatus(user.Id, common.UserStatusEnabled))
+	require.NoError(t, DB.First(&reloaded, "id = ?", user.Id).Error)
+	require.Equal(t, common.UserStatusEnabled, reloaded.Status)
+}
