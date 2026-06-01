@@ -66,6 +66,21 @@ func insertTopUpForPaymentGuardTest(t *testing.T, tradeNo string, userID int, pa
 	require.NoError(t, topUp.Insert())
 }
 
+func insertEpayTopUpForPaymentGuardTest(t *testing.T, tradeNo string, userID int, amount int64, money float64) {
+	t.Helper()
+	topUp := &TopUp{
+		UserId:          userID,
+		Amount:          amount,
+		Money:           money,
+		TradeNo:         tradeNo,
+		PaymentMethod:   "alipay",
+		PaymentProvider: PaymentProviderEpay,
+		Status:          common.TopUpStatusPending,
+		CreateTime:      time.Now().Unix(),
+	}
+	require.NoError(t, topUp.Insert())
+}
+
 func getTopUpStatusForPaymentGuardTest(t *testing.T, tradeNo string) string {
 	t.Helper()
 	topUp := GetTopUpByTradeNo(tradeNo)
@@ -171,4 +186,79 @@ func TestExpireSubscriptionOrder_RejectsMismatchedPaymentProvider(t *testing.T) 
 	order := GetSubscriptionOrderByTradeNo("sub-expire-guard")
 	require.NotNil(t, order)
 	assert.Equal(t, common.TopUpStatusPending, order.Status)
+}
+
+func TestCompleteEpayTopUp_CompletesAndAddsQuota(t *testing.T) {
+	truncateTables(t)
+
+	insertUserForPaymentGuardTest(t, 501, 100)
+	insertEpayTopUpForPaymentGuardTest(t, "epay-complete-guard", 501, 2, 2.00)
+
+	err := CompleteEpayTopUp("epay-complete-guard", CompleteEpayTopUpOptions{
+		CallerIP:              "127.0.0.1",
+		ActualPaymentMethod:   "alipay",
+		CallbackPaymentMethod: PaymentProviderEpay,
+		ProviderTradeNo:       "epay-provider-001",
+		ProviderMoney:         "2.00",
+		LogPrefix:             "使用在线充值成功",
+	})
+	require.NoError(t, err)
+
+	topUp := GetTopUpByTradeNo("epay-complete-guard")
+	require.NotNil(t, topUp)
+	assert.Equal(t, common.TopUpStatusSuccess, topUp.Status)
+	assert.Equal(t, "alipay", topUp.PaymentMethod)
+	assert.NotZero(t, topUp.CompleteTime)
+	assert.Equal(t, 100+int(2*common.QuotaPerUnit), getUserQuotaForPaymentGuardTest(t, 501))
+}
+
+func TestCompleteEpayTopUp_IsIdempotentAfterSuccess(t *testing.T) {
+	truncateTables(t)
+
+	insertUserForPaymentGuardTest(t, 502, 0)
+	insertEpayTopUpForPaymentGuardTest(t, "epay-idempotent-guard", 502, 2, 2.00)
+
+	err := CompleteEpayTopUp("epay-idempotent-guard", CompleteEpayTopUpOptions{
+		CallerIP:              "127.0.0.1",
+		ActualPaymentMethod:   "wechat",
+		CallbackPaymentMethod: PaymentProviderEpay,
+		ProviderTradeNo:       "epay-provider-002",
+		ProviderMoney:         "2.00",
+		LogPrefix:             "使用在线充值成功",
+	})
+	require.NoError(t, err)
+
+	err = CompleteEpayTopUp("epay-idempotent-guard", CompleteEpayTopUpOptions{
+		CallerIP:              "127.0.0.1",
+		ActualPaymentMethod:   "wechat",
+		CallbackPaymentMethod: PaymentProviderEpay,
+		ProviderTradeNo:       "epay-provider-002",
+		ProviderMoney:         "2.00",
+		LogPrefix:             "使用在线充值成功",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, 2*int(common.QuotaPerUnit), getUserQuotaForPaymentGuardTest(t, 502))
+}
+
+func TestCompleteEpayTopUp_RejectsMoneyMismatch(t *testing.T) {
+	truncateTables(t)
+
+	insertUserForPaymentGuardTest(t, 503, 0)
+	insertEpayTopUpForPaymentGuardTest(t, "epay-money-guard", 503, 2, 2.00)
+
+	err := CompleteEpayTopUp("epay-money-guard", CompleteEpayTopUpOptions{
+		CallerIP:              "127.0.0.1",
+		ActualPaymentMethod:   "alipay",
+		CallbackPaymentMethod: PaymentProviderEpay,
+		ProviderTradeNo:       "epay-provider-003",
+		ProviderMoney:         "9.99",
+		LogPrefix:             "使用在线充值成功",
+	})
+	require.Error(t, err)
+
+	topUp := GetTopUpByTradeNo("epay-money-guard")
+	require.NotNil(t, topUp)
+	assert.Equal(t, common.TopUpStatusPending, topUp.Status)
+	assert.Equal(t, 0, getUserQuotaForPaymentGuardTest(t, 503))
 }

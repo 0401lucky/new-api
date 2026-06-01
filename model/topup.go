@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
@@ -47,6 +48,15 @@ var (
 	ErrTopUpStatusInvalid    = errors.New("topup status invalid")
 )
 
+type CompleteEpayTopUpOptions struct {
+	CallerIP              string
+	ActualPaymentMethod   string
+	CallbackPaymentMethod string
+	ProviderTradeNo       string
+	ProviderMoney         string
+	LogPrefix             string
+}
+
 func (topUp *TopUp) Insert() error {
 	var err error
 	err = DB.Create(topUp).Error
@@ -77,6 +87,42 @@ func GetTopUpByTradeNo(tradeNo string) *TopUp {
 		return nil
 	}
 	return topUp
+}
+
+func GetPendingEpayTopUps(limit int, minAgeSeconds int64, maxAgeSeconds int64) ([]*TopUp, error) {
+	if limit == 0 {
+		limit = 100
+	}
+	now := common.GetTimestamp()
+	query := DB.Where("status = ? AND payment_provider = ?", common.TopUpStatusPending, PaymentProviderEpay)
+	if minAgeSeconds > 0 {
+		query = query.Where("create_time <= ?", now-minAgeSeconds)
+	}
+	if maxAgeSeconds > 0 {
+		query = query.Where("create_time >= ?", now-maxAgeSeconds)
+	}
+	var topUps []*TopUp
+	query = query.Order("id asc")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if err := query.Find(&topUps).Error; err != nil {
+		return nil, err
+	}
+	return topUps, nil
+}
+
+func topUpMoneyMatches(providerMoney string, localMoney float64) bool {
+	providerMoney = strings.TrimSpace(providerMoney)
+	if providerMoney == "" {
+		return true
+	}
+	parsed, err := decimal.NewFromString(providerMoney)
+	if err != nil {
+		return false
+	}
+	diff := parsed.Sub(decimal.NewFromFloat(localMoney)).Abs()
+	return diff.LessThan(decimal.NewFromFloat(0.01))
 }
 
 func UpdatePendingTopUpStatus(tradeNo string, expectedPaymentProvider string, targetStatus string) error {
@@ -389,6 +435,101 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 	RecordTopupLog(userId, fmt.Sprintf("管理员补单成功，充值金额: %v，支付金额：%f", logger.FormatQuota(quotaToAdd), payMoney), callerIp, paymentMethod, "admin")
 	return nil
 }
+
+func CompleteEpayTopUp(tradeNo string, opts CompleteEpayTopUpOptions) error {
+	if tradeNo == "" {
+		return errors.New("未提供订单号")
+	}
+
+	refCol := "`trade_no`"
+	if common.UsingPostgreSQL {
+		refCol = `"trade_no"`
+	}
+
+	var userId int
+	var quotaToAdd int
+	var payMoney float64
+	var paymentMethod string
+
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		topUp := &TopUp{}
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where(refCol+" = ?", tradeNo).First(topUp).Error; err != nil {
+			return ErrTopUpNotFound
+		}
+		if topUp.PaymentProvider != PaymentProviderEpay {
+			return ErrPaymentMethodMismatch
+		}
+		if topUp.Status == common.TopUpStatusSuccess {
+			return nil
+		}
+		if topUp.Status != common.TopUpStatusPending {
+			return ErrTopUpStatusInvalid
+		}
+
+		if opts.ActualPaymentMethod != "" && topUp.PaymentMethod != opts.ActualPaymentMethod {
+			topUp.PaymentMethod = opts.ActualPaymentMethod
+		}
+		if !topUpMoneyMatches(opts.ProviderMoney, topUp.Money) {
+			return errors.New("易支付订单金额不匹配")
+		}
+
+		quotaToAdd = int(decimal.NewFromInt(topUp.Amount).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+		if quotaToAdd <= 0 {
+			return errors.New("无效的充值额度")
+		}
+
+		topUp.CompleteTime = common.GetTimestamp()
+		topUp.Status = common.TopUpStatusSuccess
+		if err := tx.Save(topUp).Error; err != nil {
+			return err
+		}
+
+		result := tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quotaToAdd))
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return errors.New("用户不存在")
+		}
+
+		userId = topUp.UserId
+		payMoney = topUp.Money
+		paymentMethod = topUp.PaymentMethod
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	if userId > 0 {
+		_ = invalidateUserCache(userId)
+		prefix := opts.LogPrefix
+		if prefix == "" {
+			prefix = "使用在线充值成功"
+		}
+		msg := fmt.Sprintf("%s，充值金额: %v，支付金额：%f", prefix, logger.FormatQuota(quotaToAdd), payMoney)
+		if opts.ProviderTradeNo != "" {
+			msg = fmt.Sprintf("%s，平台订单号：%s", msg, opts.ProviderTradeNo)
+		}
+		callbackPaymentMethod := opts.CallbackPaymentMethod
+		if callbackPaymentMethod == "" {
+			callbackPaymentMethod = PaymentProviderEpay
+		}
+		RecordTopupLog(userId, msg, opts.CallerIP, paymentMethod, callbackPaymentMethod)
+	}
+	return nil
+}
+
+func CompleteEpayTopUpByQuery(tradeNo string, providerTradeNo string, actualPaymentMethod string, providerMoney string) error {
+	return CompleteEpayTopUp(tradeNo, CompleteEpayTopUpOptions{
+		ActualPaymentMethod:   actualPaymentMethod,
+		CallbackPaymentMethod: "epay_reconcile",
+		ProviderTradeNo:       providerTradeNo,
+		ProviderMoney:         providerMoney,
+		LogPrefix:             "易支付主动查单补单成功",
+	})
+}
+
 func RechargeCreem(referenceId string, customerEmail string, customerName string, callerIp string) (err error) {
 	if referenceId == "" {
 		return errors.New("未提供支付单号")
