@@ -162,28 +162,13 @@ func handleBlackroomCandidate(setting *operation_setting.BlackroomSetting, candi
 		return false, false, true, nil
 	}
 
-	permanent := rule.Permanent
-	durationSeconds := int64(rule.DurationHours * 3600)
-	bannedUntil := int64(0)
-	escalated := false
-	if !permanent {
-		if existingErr != nil {
-			since := windowEnd - int64(setting.EscalationWindowDays*24*3600)
-			recentTemporaryCount, err := model.CountRecentTemporaryBlackroomBans(user.Id, since)
-			if err != nil {
-				return false, false, false, err
-			}
-			if setting.EscalationTemporaryBanCount > 0 &&
-				recentTemporaryCount+1 >= int64(setting.EscalationTemporaryBanCount) {
-				permanent = true
-				durationSeconds = 0
-				escalated = true
-			}
-		}
-		if !permanent {
-			bannedUntil = windowEnd + durationSeconds
-		}
+	decision, err := resolveBlackroomBanDecision(setting, user.Id, candidate.IpCount, windowEnd, existingErr != nil)
+	if err != nil {
+		return false, false, false, err
 	}
+	durationSeconds := decision.DurationSeconds
+	bannedUntil := decision.BannedUntil
+	escalated := decision.Escalated
 
 	ips, err := model.GetDistinctIPsForUser(user.Id, windowStart, windowEnd, 200)
 	if err != nil {
