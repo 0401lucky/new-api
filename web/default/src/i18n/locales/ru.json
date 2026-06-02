@@ -1589,6 +1589,7 @@
     "Expired at": "Истекает",
     "Expired time cannot be earlier than current time": "Время истечения срока действия не может быть раньше текущего времени",
     "Expires": "Истекает",
+    "External": "Внешний",
     "Expose ratio API": "Интерфейс экспонирования коэффициента",
     "Exposes the pricing/models catalog in the top navigation.": "Отображает каталог цен/моделей в верхней навигации.",
     "Expression": "Выражение",

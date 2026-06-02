@@ -24,7 +24,7 @@ export const BLACKROOM_STATUS_VALUES = [
   'expired',
 ] as const
 
-export const BLACKROOM_SOURCE_VALUES = ['auto', 'manual'] as const
+export const BLACKROOM_SOURCE_VALUES = ['auto', 'manual', 'external'] as const
 
 export const BLACKROOM_STATUSES: Record<
   string,
@@ -41,6 +41,7 @@ export const BLACKROOM_SOURCES: Record<
 > = {
   auto: { labelKey: 'Auto', variant: 'warning' },
   manual: { labelKey: 'Manual', variant: 'neutral' },
+  external: { labelKey: 'External', variant: 'danger' },
 }
 
 export function getBlackroomStatusOptions(t: TFunction) {

@@ -343,6 +343,7 @@ func SetApiRouter(router *gin.Engine) {
 			blackroomRoute.GET("/setting", controller.GetBlackroomSetting)
 			blackroomRoute.PUT("/setting", controller.UpdateBlackroomSetting)
 			blackroomRoute.POST("/manual-ban", controller.ManualBanBlackroomUser)
+			blackroomRoute.POST("/external-ban", controller.ExternalBanBlackroomUser)
 			blackroomRoute.POST("/scan", controller.RunBlackroomScan)
 			blackroomRoute.POST("/:id/release", controller.ReleaseBlackroomBan)
 		}

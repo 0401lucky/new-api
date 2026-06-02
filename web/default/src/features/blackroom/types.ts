@@ -44,7 +44,7 @@ export const blackroomEntrySchema = z
 export type BlackroomEntry = z.infer<typeof blackroomEntrySchema>
 
 export type BlackroomStatus = 'active' | 'released' | 'expired'
-export type BlackroomSource = 'auto' | 'manual'
+export type BlackroomSource = 'auto' | 'manual' | 'external'
 
 export interface BlackroomRule {
   ip_count: number

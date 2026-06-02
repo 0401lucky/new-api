@@ -1589,6 +1589,7 @@
     "Expired at": "有効期限",
     "Expired time cannot be earlier than current time": "有効期限は現在時刻より早く設定できません",
     "Expires": "有効期限",
+    "External": "外部",
     "Expose ratio API": "倍率APIを公開",
     "Exposes the pricing/models catalog in the top navigation.": "価格/モデルカタログをトップナビゲーションに表示します。",
     "Expression": "式",

@@ -23,6 +23,15 @@ type blackroomReleaseRequest struct {
 	Reason string `json:"reason"`
 }
 
+type blackroomExternalBanRequest struct {
+	UserID        int    `json:"user_id"`
+	IpCount       int    `json:"ip_count"`
+	Reason        string `json:"reason"`
+	Evidence      string `json:"evidence"`
+	Permanent     bool   `json:"permanent"`
+	DurationHours int    `json:"duration_hours"`
+}
+
 func GetBlackroomBans(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
 	userID, _ := strconv.Atoi(c.Query("user_id"))
@@ -111,6 +120,24 @@ func ManualBanBlackroomUser(c *gin.Context) {
 		return
 	}
 	ban, err := service.CreateManualBlackroomBan(req.UserID, req.DurationHours, req.Permanent, req.Reason)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, ban)
+}
+
+func ExternalBanBlackroomUser(c *gin.Context) {
+	var req blackroomExternalBanRequest
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		common.ApiErrorMsg(c, "无效的参数")
+		return
+	}
+	if req.UserID <= 0 {
+		common.ApiErrorMsg(c, "无效的用户 ID")
+		return
+	}
+	ban, err := service.CreateExternalBlackroomBan(req.UserID, req.IpCount, req.Reason, req.Evidence, req.Permanent, req.DurationHours)
 	if err != nil {
 		common.ApiError(c, err)
 		return

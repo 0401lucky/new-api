@@ -1589,6 +1589,7 @@
     "Expired at": "过期于",
     "Expired time cannot be earlier than current time": "过期时间不能早于当前时间",
     "Expires": "过期",
+    "External": "外部",
     "Expose ratio API": "暴露倍率接口",
     "Exposes the pricing/models catalog in the top navigation.": "在顶部导航中显示定价/模型目录。",
     "Expression": "表达式",

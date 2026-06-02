@@ -98,7 +98,7 @@ export function BlackroomSettingDialog() {
 
   return (
     <Dialog open={isOpen} onOpenChange={(value) => !value && setOpen(null)}>
-      <DialogContent className='sm:max-w-2xl'>
+      <DialogContent className='max-h-[85vh] sm:max-w-2xl flex flex-col'>
         <DialogHeader>
           <DialogTitle>{t('Blackroom settings')}</DialogTitle>
           <DialogDescription>
@@ -109,7 +109,7 @@ export function BlackroomSettingDialog() {
           <form
             id='blackroom-setting-form'
             onSubmit={form.handleSubmit(onSubmit)}
-            className='space-y-4'
+            className='min-h-0 flex-1 space-y-4 overflow-y-auto pr-1'
           >
             <FormField
               control={form.control}

@@ -73,3 +73,87 @@ func TestResolveBlackroomBanDecision_Escalation(t *testing.T) {
 	require.True(t, decision.Permanent)
 	require.True(t, decision.Escalated)
 }
+
+func seedBlackroomUser(t *testing.T, id int, role int) {
+	t.Helper()
+	user := &model.User{
+		Id:       id,
+		Username: "ext_user",
+		Role:     role,
+		Status:   common.UserStatusEnabled,
+		Group:    "default",
+	}
+	require.NoError(t, model.DB.Create(user).Error)
+}
+
+func TestCreateExternalBlackroomBan_TieredRule(t *testing.T) {
+	truncate(t)
+	seedBlackroomUser(t, 9001, common.RoleCommonUser)
+
+	ban, err := CreateExternalBlackroomBan(9001, 13, "外部风控", "", false, 0)
+	require.NoError(t, err)
+	require.Equal(t, model.BlackroomBanSourceExternal, ban.Source)
+	require.Equal(t, "外部风控", ban.Reason)
+	require.Equal(t, int64(72*3600), ban.BanDurationSeconds)
+	require.False(t, ban.IsPermanent())
+
+	var reloaded model.User
+	require.NoError(t, model.DB.First(&reloaded, "id = ?", 9001).Error)
+	require.Equal(t, common.UserStatusDisabled, reloaded.Status)
+}
+
+func TestCreateExternalBlackroomBan_PermanentFlag(t *testing.T) {
+	truncate(t)
+	seedBlackroomUser(t, 9002, common.RoleCommonUser)
+
+	ban, err := CreateExternalBlackroomBan(9002, 0, "", "", true, 0)
+	require.NoError(t, err)
+	require.True(t, ban.IsPermanent())
+	require.NotEmpty(t, ban.Reason)
+}
+
+func TestCreateExternalBlackroomBan_ExplicitDuration(t *testing.T) {
+	truncate(t)
+	seedBlackroomUser(t, 9003, common.RoleCommonUser)
+
+	ban, err := CreateExternalBlackroomBan(9003, 0, "", "", false, 5)
+	require.NoError(t, err)
+	require.Equal(t, int64(5*3600), ban.BanDurationSeconds)
+	require.False(t, ban.IsPermanent())
+}
+
+func TestCreateExternalBlackroomBan_NoRulePermanentFallback(t *testing.T) {
+	truncate(t)
+	seedBlackroomUser(t, 9004, common.RoleCommonUser)
+
+	ban, err := CreateExternalBlackroomBan(9004, 3, "", "", false, 0)
+	require.NoError(t, err)
+	require.True(t, ban.IsPermanent())
+}
+
+func TestCreateExternalBlackroomBan_RejectsAdmin(t *testing.T) {
+	truncate(t)
+	seedBlackroomUser(t, 9005, common.RoleAdminUser)
+
+	_, err := CreateExternalBlackroomBan(9005, 17, "", "", false, 0)
+	require.Error(t, err)
+}
+
+func TestCreateExternalBlackroomBan_KeepsManualBan(t *testing.T) {
+	truncate(t)
+	seedBlackroomUser(t, 9006, common.RoleCommonUser)
+
+	manualBan, _, err := model.UpsertActiveBlackroomBan(model.BlackroomBanInput{
+		UserId:   9006,
+		Username: "ext_user",
+		Source:   model.BlackroomBanSourceManual,
+		Reason:   "管理员手动封禁",
+	})
+	require.NoError(t, err)
+
+	ban, err := CreateExternalBlackroomBan(9006, 17, "外部风控", "", false, 0)
+	require.NoError(t, err)
+	require.Equal(t, manualBan.Id, ban.Id)
+	require.Equal(t, model.BlackroomBanSourceManual, ban.Source)
+	require.Equal(t, "管理员手动封禁", ban.Reason)
+}
