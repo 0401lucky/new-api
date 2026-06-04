@@ -51,6 +51,7 @@ export function ProfileHeader({ profile, loading }: ProfileHeaderProps) {
               </div>
               <div className='flex flex-col items-center gap-1 sm:flex-row sm:justify-start sm:gap-4'>
                 <Skeleton className='h-4 w-24' />
+                <Skeleton className='h-4 w-16' />
                 <Skeleton className='h-4 w-40' />
                 <Skeleton className='h-4 w-20' />
               </div>
@@ -122,6 +123,10 @@ export function ProfileHeader({ profile, loading }: ProfileHeaderProps) {
 
             <div className='text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:gap-x-4 sm:text-sm'>
               <span className='truncate'>@{profile.username}</span>
+              <span>•</span>
+              <span className='shrink-0'>
+                {t('ID')}: {profile.id}
+              </span>
               {profile.email && (
                 <>
                   <span>•</span>
