@@ -147,15 +147,21 @@ function applyAdminUserFilter(
   const userFilter = String(value || '').trim()
   if (!userFilter) return
 
-  if (/^\d+$/.test(userFilter)) {
-    const userId = Number(userFilter)
-    if (Number.isSafeInteger(userId) && userId > 0) {
-      params.user_id = userId
-      return
-    }
+  const explicitUserId = parseExplicitUserIdFilter(userFilter)
+  if (explicitUserId !== null) {
+    params.user_id = explicitUserId
+    return
   }
 
   params.username = userFilter
+}
+
+function parseExplicitUserIdFilter(value: string): number | null {
+  const match = value.match(/^(?:#\s*|(?:id|uid)\s*[:：]\s*)(\d+)$/i)
+  if (!match) return null
+
+  const userId = Number(match[1])
+  return Number.isSafeInteger(userId) && userId > 0 ? userId : null
 }
 
 /**

@@ -107,6 +107,7 @@ export function UserInfoDialog({
           <div className='space-y-4 py-4'>
             {/* Basic Info */}
             <div className='grid grid-cols-2 gap-4'>
+              <InfoItem label={t('User ID')} value={userInfo.id} />
               <InfoItem label={t('Username')} value={userInfo.username} />
               {userInfo.display_name && (
                 <InfoItem

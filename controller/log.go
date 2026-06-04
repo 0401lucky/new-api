@@ -3,12 +3,57 @@ package controller
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 
 	"github.com/gin-gonic/gin"
 )
+
+func parseLogUserFilter(username string, userId int) (string, int) {
+	if userId > 0 {
+		return "", userId
+	}
+
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return "", 0
+	}
+
+	lowerUsername := strings.ToLower(username)
+	idText := ""
+	if strings.HasPrefix(username, "#") {
+		idText = strings.TrimSpace(strings.TrimPrefix(username, "#"))
+	} else {
+		for _, prefix := range []string{"id:", "id：", "uid:", "uid："} {
+			if strings.HasPrefix(lowerUsername, prefix) {
+				idText = strings.TrimSpace(username[len(prefix):])
+				break
+			}
+		}
+	}
+
+	if idText != "" && isPositiveIntegerText(idText) {
+		if parsedUserId, err := strconv.Atoi(idText); err == nil && parsedUserId > 0 {
+			return "", parsedUserId
+		}
+	}
+
+	return username, 0
+}
+
+func isPositiveIntegerText(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
 
 func GetAllLogs(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
@@ -17,6 +62,7 @@ func GetAllLogs(c *gin.Context) {
 	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
 	username := c.Query("username")
 	userId, _ := strconv.Atoi(c.Query("user_id"))
+	username, userId = parseLogUserFilter(username, userId)
 	tokenName := c.Query("token_name")
 	modelName := c.Query("model_name")
 	channel, _ := strconv.Atoi(c.Query("channel"))
@@ -103,6 +149,7 @@ func GetLogsStat(c *gin.Context) {
 	tokenName := c.Query("token_name")
 	username := c.Query("username")
 	userId, _ := strconv.Atoi(c.Query("user_id"))
+	username, userId = parseLogUserFilter(username, userId)
 	modelName := c.Query("model_name")
 	channel, _ := strconv.Atoi(c.Query("channel"))
 	group := c.Query("group")
