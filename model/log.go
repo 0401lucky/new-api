@@ -31,6 +31,13 @@ func applyExplicitLogTextFilter(tx *gorm.DB, column string, value string) (*gorm
 	return tx.Where(column+" = ?", value), nil
 }
 
+func applyLogUserFilter(tx *gorm.DB, usernameColumn string, userIdColumn string, username string, userId int) (*gorm.DB, error) {
+	if userId > 0 {
+		return tx.Where(userIdColumn+" = ?", userId), nil
+	}
+	return applyExplicitLogTextFilter(tx, usernameColumn, username)
+}
+
 type Log struct {
 	Id                int    `json:"id" gorm:"index:idx_created_at_id,priority:2;index:idx_user_id_id,priority:2"`
 	UserId            int    `json:"user_id" gorm:"index;index:idx_user_id_id,priority:1"`
@@ -345,7 +352,7 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 	}
 }
 
-func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, group string, requestId string, upstreamRequestId string) (logs []*Log, total int64, err error) {
+func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, userId int, tokenName string, startIdx int, num int, channel int, group string, requestId string, upstreamRequestId string) (logs []*Log, total int64, err error) {
 	var tx *gorm.DB
 	if logType == LogTypeUnknown {
 		tx = LOG_DB
@@ -356,7 +363,7 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 	if tx, err = applyExplicitLogTextFilter(tx, "logs.model_name", modelName); err != nil {
 		return nil, 0, err
 	}
-	if tx, err = applyExplicitLogTextFilter(tx, "logs.username", username); err != nil {
+	if tx, err = applyLogUserFilter(tx, "logs.username", "logs.user_id", username, userId); err != nil {
 		return nil, 0, err
 	}
 	if tokenName != "" {
@@ -484,16 +491,16 @@ type Stat struct {
 	Tpm   int `json:"tpm"`
 }
 
-func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int, group string) (stat Stat, err error) {
+func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, userId int, tokenName string, channel int, group string) (stat Stat, err error) {
 	tx := LOG_DB.Table("logs").Select("sum(quota) quota")
 
 	// 为rpm和tpm创建单独的查询
 	rpmTpmQuery := LOG_DB.Table("logs").Select("count(*) rpm, sum(prompt_tokens) + sum(completion_tokens) tpm")
 
-	if tx, err = applyExplicitLogTextFilter(tx, "username", username); err != nil {
+	if tx, err = applyLogUserFilter(tx, "username", "user_id", username, userId); err != nil {
 		return stat, err
 	}
-	if rpmTpmQuery, err = applyExplicitLogTextFilter(rpmTpmQuery, "username", username); err != nil {
+	if rpmTpmQuery, err = applyLogUserFilter(rpmTpmQuery, "username", "user_id", username, userId); err != nil {
 		return stat, err
 	}
 	if tokenName != "" {

@@ -137,6 +137,27 @@ function buildTimeRangeParams(
   }
 }
 
+function applyAdminUserFilter(
+  params: GetLogsParams,
+  value: unknown,
+  isAdmin: boolean
+) {
+  if (!isAdmin) return
+
+  const userFilter = String(value || '').trim()
+  if (!userFilter) return
+
+  if (/^\d+$/.test(userFilter)) {
+    const userId = Number(userFilter)
+    if (Number.isSafeInteger(userId) && userId > 0) {
+      params.user_id = userId
+      return
+    }
+  }
+
+  params.username = userFilter
+}
+
 /**
  * Build base parameters with time range (for drawing and task logs)
  * @param useMilliseconds - Whether to use millisecond timestamps (true for drawing logs, false for task logs)
@@ -206,9 +227,6 @@ export function buildApiParams(config: {
     ...(isAdmin && searchParams.channel
       ? { channel: Number(searchParams.channel) || 0 }
       : {}),
-    ...(isAdmin && searchParams.username
-      ? { username: String(searchParams.username) }
-      : {}),
     ...(searchParams.requestId
       ? { request_id: String(searchParams.requestId) }
       : {}),
@@ -217,6 +235,7 @@ export function buildApiParams(config: {
       : {}),
     ...buildTimeRangeParams(searchParams, false),
   }
+  applyAdminUserFilter(params, searchParams.username, isAdmin)
 
   // Override with column filters if present
   if (columnFilters.length > 0) {
@@ -240,7 +259,9 @@ export function buildApiParams(config: {
           if (isAdmin) params.channel = Number(value) || 0
           break
         case 'username':
-          if (isAdmin) params.username = String(value)
+          delete params.username
+          delete params.user_id
+          applyAdminUserFilter(params, value, isAdmin)
           break
       }
     })

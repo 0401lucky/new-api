@@ -293,7 +293,7 @@ export function CommonLogsFilterBar<TData>(
       {isAdmin && (
         <LogsFilterField>
           <LogsFilterInput
-            placeholder={t('Username')}
+            placeholder={t('Username or user ID')}
             type={sensitiveType}
             value={filters.username || ''}
             onChange={(e) => handleChange('username', e.target.value)}

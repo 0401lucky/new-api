@@ -248,18 +248,23 @@ func SearchUsers(keyword string, group string, role *int, status *int, startIdx 
 	query := tx.Unscoped().Model(&User{})
 
 	// 构建搜索条件
-	likeCondition := "username LIKE ? OR email LIKE ? OR display_name LIKE ?"
-	likeArgs := []interface{}{"%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%"}
+	keyword = strings.TrimSpace(keyword)
+	if keyword != "" {
+		likeCondition := "username LIKE ? OR email LIKE ? OR display_name LIKE ?"
+		likeArgs := []interface{}{"%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%"}
 
-	// 尝试将关键字转换为整数ID
-	keywordInt, err := strconv.Atoi(keyword)
-	if err == nil {
-		// 如果是数字，同时搜索ID和其他字段
-		likeCondition = "id = ? OR " + likeCondition
-		likeArgs = append([]interface{}{keywordInt}, likeArgs...)
+		if _, err := strconv.Atoi(keyword); err == nil {
+			idLikeCondition := "CAST(id AS TEXT) LIKE ?"
+			if common.UsingMySQL {
+				idLikeCondition = "CAST(id AS CHAR) LIKE ?"
+			}
+			likeCondition = idLikeCondition + " OR " + likeCondition
+			likeArgs = append([]interface{}{"%" + keyword + "%"}, likeArgs...)
+		}
+
+		query = query.Where("("+likeCondition+")", likeArgs...)
 	}
 
-	query = query.Where("("+likeCondition+")", likeArgs...)
 	if group != "" {
 		query = query.Where(commonGroupCol+" = ?", group)
 	}
