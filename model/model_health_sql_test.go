@@ -71,13 +71,16 @@ func TestHourStartExprSQLForDialect(t *testing.T) {
 	}
 }
 
-func TestSuccessRateExprSQLUsesBooleanSafeAggregation(t *testing.T) {
+func TestSuccessRateExprSQLUsesRequestCounters(t *testing.T) {
 	expr := successRateExprSQL()
-	if !strings.Contains(expr, "CASE WHEN has_success_qualified THEN 1 ELSE 0 END") {
-		t.Fatalf("successRateExprSQL should use CASE aggregation, got %q", expr)
+	if !strings.Contains(expr, "SUM(success_qualified_requests)") {
+		t.Fatalf("successRateExprSQL should use qualified success requests, got %q", expr)
 	}
-	if strings.Contains(expr, "SUM(has_success_qualified)") {
-		t.Fatalf("successRateExprSQL should not sum boolean directly, got %q", expr)
+	if !strings.Contains(expr, "SUM(total_requests)") {
+		t.Fatalf("successRateExprSQL should use total requests as denominator, got %q", expr)
+	}
+	if strings.Contains(expr, "COUNT(*)") {
+		t.Fatalf("successRateExprSQL should not use slice count as denominator, got %q", expr)
 	}
 }
 
@@ -121,6 +124,12 @@ func TestModelHealthSuccessTokensAggregated(t *testing.T) {
 	}
 	if rows[0].SuccessTokens != 42 {
 		t.Fatalf("expected success tokens 42, got %d", rows[0].SuccessTokens)
+	}
+	if rows[0].QualifiedSuccessRequests != 1 {
+		t.Fatalf("expected qualified success requests 1, got %d", rows[0].QualifiedSuccessRequests)
+	}
+	if rows[0].SuccessRate != 0.5 {
+		t.Fatalf("expected request-level success rate 0.5, got %f", rows[0].SuccessRate)
 	}
 	if rows[0].TotalRequests != 2 || rows[0].ErrorRequests != 1 {
 		t.Fatalf("unexpected request counters: total=%d error=%d", rows[0].TotalRequests, rows[0].ErrorRequests)
@@ -185,5 +194,16 @@ func TestBackfillModelHealthSlicesFromLogs(t *testing.T) {
 	}
 	if slice.SuccessTokens != 13 || slice.MaxCompletionTokens != 3 {
 		t.Fatalf("unexpected token metrics: success_tokens=%d max_completion_tokens=%d", slice.SuccessTokens, slice.MaxCompletionTokens)
+	}
+
+	rows, err := GetAllModelsHealthHourlyStats(db, 3600, 3900)
+	if err != nil {
+		t.Fatalf("failed to query backfilled hourly stats: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one backfilled hourly row, got %d", len(rows))
+	}
+	if rows[0].SuccessRate != 0.5 {
+		t.Fatalf("expected backfilled request-level success rate 0.5, got %f", rows[0].SuccessRate)
 	}
 }

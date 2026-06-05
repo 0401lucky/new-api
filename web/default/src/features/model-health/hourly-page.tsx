@@ -242,30 +242,38 @@ export function ModelHealthHourlyPage() {
 
     let totalSuccess = 0
     let totalSlices = 0
+    let qualifiedSuccessRequests = 0
     let minRate = 1
     let maxRate = 0
     let totalRequests = 0
     let errorRequests = 0
     let successRequests = 0
+    let hasRateSample = false
 
     for (const row of rows) {
       totalSuccess += Number(row.success_slices) || 0
       totalSlices += Number(row.total_slices) || 0
-      const rate = Number(row.success_rate) || 0
-      if (rate < minRate) minRate = rate
-      if (rate > maxRate) maxRate = rate
+      qualifiedSuccessRequests +=
+        Number(row.qualified_success_requests) || 0
+      if ((Number(row.total_requests) || 0) > 0) {
+        const rate = Number(row.success_rate) || 0
+        if (rate < minRate) minRate = rate
+        if (rate > maxRate) maxRate = rate
+        hasRateSample = true
+      }
       totalRequests += Number(row.total_requests) || 0
       errorRequests += Number(row.error_requests) || 0
       successRequests += Number(row.success_requests) || 0
     }
 
-    const avgRate = totalSlices > 0 ? totalSuccess / totalSlices : 0
+    const avgRate =
+      totalRequests > 0 ? qualifiedSuccessRequests / totalRequests : 0
     return {
       avgRate,
       totalSuccess,
       totalSlices,
-      minRate,
-      maxRate,
+      minRate: hasRateSample ? minRate : 0,
+      maxRate: hasRateSample ? maxRate : 0,
       totalRequests,
       errorRequests,
       successRequests,

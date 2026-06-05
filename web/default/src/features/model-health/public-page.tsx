@@ -38,7 +38,6 @@ import {
   formatRate,
   formatTokens,
   hourLabel,
-  percentileNearestRank,
 } from './utils'
 
 type RateLevel = {
@@ -53,39 +52,39 @@ function getRateLevel(rate: number): RateLevel {
   if (v >= 0.95) {
     return {
       level: 'excellent',
-      color: '#4dd0e1',
-      bg: 'rgba(77, 208, 225, 0.15)',
+      color: '#22c7d8',
+      bg: 'rgba(34, 199, 216, 0.16)',
       text: 'Excellent',
     }
   }
   if (v >= 0.8) {
     return {
       level: 'good',
-      color: '#66bb6a',
-      bg: 'rgba(102, 187, 106, 0.15)',
+      color: '#34b567',
+      bg: 'rgba(52, 181, 103, 0.16)',
       text: 'Good',
     }
   }
   if (v >= 0.6) {
     return {
       level: 'warning',
-      color: '#aed581',
-      bg: 'rgba(174, 213, 129, 0.15)',
+      color: '#9ac447',
+      bg: 'rgba(154, 196, 71, 0.17)',
       text: 'Average',
     }
   }
   if (v >= 0.2) {
     return {
       level: 'poor',
-      color: '#ffb74d',
-      bg: 'rgba(255, 183, 77, 0.15)',
+      color: '#f5a524',
+      bg: 'rgba(245, 165, 36, 0.18)',
       text: 'Poor',
     }
   }
   return {
     level: 'critical',
-    color: '#ff8a65',
-    bg: 'rgba(255, 138, 101, 0.15)',
+    color: '#f36b4f',
+    bg: 'rgba(243, 107, 79, 0.18)',
     text: 'Abnormal',
   }
 }
@@ -96,26 +95,29 @@ function HealthCell(props: {
 }) {
   const { t } = useTranslation()
   const rate = Number(props.cell?.success_rate) || 0
-  const isFilled = props.cell?.is_filled
+  const hasHealthData =
+    (Number(props.cell?.total_requests) || 0) > 0 ||
+    (Number(props.cell?.total_slices) || 0) > 0
+  const isFilled = props.cell?.is_filled || !hasHealthData
   const tokens = Number(props.cell?.success_tokens) || 0
-  const { color, bg } = getRateLevel(rate)
-
-  const borderColor = color
-  const backgroundColor = bg
-  const opacity = isFilled ? 0.75 : 0.95
+  const { color } = getRateLevel(rate)
 
   return (
     <Tooltip>
       <TooltipTrigger
         render={
           <div
-            className='h-[22px] w-[15px] cursor-pointer rounded-[6px] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm sm:h-[26px] sm:w-[19px]'
+            className={
+              isFilled
+                ? 'h-[28px] w-[18px] cursor-pointer rounded-[6px] border border-slate-300/80 bg-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:h-[32px] sm:w-[22px] dark:border-slate-700 dark:bg-slate-800/70'
+                : 'h-[28px] w-[18px] cursor-pointer rounded-[6px] border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:h-[32px] sm:w-[22px]'
+            }
             style={{
-              border: '2px solid',
-              borderColor,
-              borderStyle: 'solid',
-              backgroundColor,
-              opacity,
+              borderColor: isFilled ? undefined : color,
+              backgroundColor: isFilled ? undefined : color,
+              boxShadow: isFilled
+                ? undefined
+                : `0 8px 18px ${color}2e, inset 0 1px 0 rgba(255,255,255,0.32)`,
             }}
           />
         }
@@ -128,7 +130,7 @@ function HealthCell(props: {
           <div>
             {t('Success rate')}:{' '}
             <span className='font-medium'>
-              {isFilled ? `~${formatRate(rate)}` : formatRate(rate)}
+              {isFilled ? t('No data') : formatRate(rate)}
             </span>
           </div>
           <div>
@@ -153,7 +155,7 @@ function HealthCell(props: {
           )}
           {isFilled && (
             <div className='text-muted-foreground italic'>
-              {t('No data, using average value')}
+              {t('No data')}
             </div>
           )}
         </div>
@@ -245,7 +247,7 @@ function LegendSkeleton() {
         <div className='flex flex-wrap items-center gap-3'>
           <Skeleton className='h-3.5 w-[72px] rounded-lg' />
           <div className='flex flex-wrap items-center gap-2'>
-            {[86, 92, 78, 96, 82].map((w, idx) => (
+            {[86, 92, 78, 96, 82, 64].map((w, idx) => (
               <div
                 key={idx}
                 className='flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-1.5 dark:bg-gray-800/50'
@@ -269,7 +271,7 @@ function TimeLabelsSkeleton() {
         {Array.from({ length: 24 }).map((_, idx) => (
           <div
             key={idx}
-            className='w-[19px] flex-shrink-0 text-center sm:w-[23px]'
+            className='w-[22px] flex-shrink-0 text-center sm:w-[26px]'
           >
             {idx % 3 === 0 && (
               <Skeleton className='mx-auto h-3 w-[14px] rounded-md' />
@@ -307,7 +309,7 @@ function ModelListSkeleton() {
                 {Array.from({ length: 24 }).map((__, jdx) => (
                   <div
                     key={jdx}
-                    className='h-[22px] w-[15px] animate-pulse rounded-[6px] bg-gray-100 sm:h-[26px] sm:w-[19px] dark:bg-gray-800'
+                    className='h-[28px] w-[18px] animate-pulse rounded-[6px] bg-gray-100 sm:h-[32px] sm:w-[22px] dark:bg-gray-800'
                   />
                 ))}
               </div>
@@ -410,62 +412,62 @@ export function ModelHealthPublicPage() {
     let healthyModels = 0
     let warningModels = 0
     let criticalModels = 0
-    let totalSuccessSlices = 0
-    let totalSlices = 0
+    let totalQualifiedRequests = 0
+    let totalRequests = 0
     let totalSuccessTokens = 0
 
     const modelData = models.map((modelName) => {
       const hourMap = byModel.get(modelName)
-      let modelTotalSuccess = 0
+      let modelQualifiedRequests = 0
+      let modelTotalRequests = 0
+      let modelTotalSuccessSlices = 0
       let modelTotalSlices = 0
       let modelTotalTokens = 0
-
-      const hourlyTokens = hourStarts.map(
-        (ts) => Number(hourMap?.get(ts)?.success_tokens) || 0
-      )
-      const p10Tokens = percentileNearestRank(
-        hourlyTokens.filter((token) => token > 0),
-        0.1
-      )
 
       for (const ts of hourStarts) {
         const stat = hourMap?.get(ts)
         const hourTokens = Number(stat?.success_tokens) || 0
-        const hasData = Boolean(stat && Number(stat.total_slices) > 0)
-        const isLowTraffic = p10Tokens > 0 && hourTokens < p10Tokens
-        if (hasData && !isLowTraffic) {
-          modelTotalSuccess += Number(stat?.success_slices) || 0
+        const hasData = Boolean(stat && Number(stat.total_requests) > 0)
+        if (hasData) {
+          modelQualifiedRequests +=
+            Number(stat?.qualified_success_requests) || 0
+          modelTotalRequests += Number(stat?.total_requests) || 0
+          modelTotalSuccessSlices += Number(stat?.success_slices) || 0
           modelTotalSlices += Number(stat?.total_slices) || 0
         }
         modelTotalTokens += hourTokens
       }
 
       const avgRate =
-        modelTotalSlices > 0 ? modelTotalSuccess / modelTotalSlices : 0
-      totalSuccessSlices += modelTotalSuccess
-      totalSlices += modelTotalSlices
+        modelTotalRequests > 0
+          ? modelQualifiedRequests / modelTotalRequests
+          : 0
+      totalQualifiedRequests += modelQualifiedRequests
+      totalRequests += modelTotalRequests
       totalSuccessTokens += modelTotalTokens
 
       const { level } = getRateLevel(avgRate)
-      if (level === 'excellent' || level === 'good') healthyModels++
-      else if (level === 'warning') warningModels++
-      else if (level === 'critical') criticalModels++
+      if (modelTotalRequests > 0) {
+        if (level === 'excellent' || level === 'good') healthyModels++
+        else if (level === 'warning') warningModels++
+        else if (level === 'critical') criticalModels++
+      }
 
       const hourlyData = hourStarts.map((ts) => {
         const stat = hourMap?.get(ts)
         const hourTokens = Number(stat?.success_tokens) || 0
-        const hasData = Boolean(stat && Number(stat.total_slices) > 0)
-        const isLowTraffic = p10Tokens > 0 && hourTokens < p10Tokens
-        if (stat && hasData && !isLowTraffic) return stat
+        const hasData = Boolean(stat && Number(stat.total_requests) > 0)
+        if (stat && hasData) return stat
         return {
           hour_start_ts: ts,
           model_name: modelName,
           success_slices: 0,
           total_slices: 0,
-          success_rate: avgRate,
+          success_rate: 0,
           total_requests: 0,
           error_requests: 0,
           success_requests: 0,
+          qualified_success_requests: 0,
           success_tokens: hourTokens,
           is_filled: true,
         }
@@ -474,15 +476,19 @@ export function ModelHealthPublicPage() {
       return {
         model_name: modelName,
         avg_rate: avgRate,
-        total_success: modelTotalSuccess,
+        has_health_data: modelTotalRequests > 0,
+        total_success: modelQualifiedRequests,
+        total_success_slices: modelTotalSuccessSlices,
         total_slices: modelTotalSlices,
+        total_requests: modelTotalRequests,
         total_tokens: modelTotalTokens,
         hourly: hourlyData.reverse(),
       }
     })
 
     modelData.sort((a, b) => (b.total_tokens || 0) - (a.total_tokens || 0))
-    const overallRate = totalSlices > 0 ? totalSuccessSlices / totalSlices : 0
+    const overallRate =
+      totalRequests > 0 ? totalQualifiedRequests / totalRequests : 0
 
     return {
       modelData,
@@ -492,8 +498,8 @@ export function ModelHealthPublicPage() {
         warningModels,
         criticalModels,
         overallRate,
-        totalSuccessSlices,
-        totalSlices,
+        totalSuccessSlices: totalQualifiedRequests,
+        totalSlices: totalRequests,
         totalSuccessTokens,
       },
     }
@@ -604,13 +610,14 @@ export function ModelHealthPublicPage() {
                   </span>
                   <div className='flex flex-wrap items-center gap-3'>
                     <LegendItem
-                      color='#4dd0e1'
+                      color='#22c7d8'
                       label={t('Excellent (>=95%)')}
                     />
-                    <LegendItem color='#66bb6a' label={t('Good (80-95%)')} />
-                    <LegendItem color='#aed581' label={t('Average (60-80%)')} />
-                    <LegendItem color='#ffb74d' label={t('Poor (20-60%)')} />
-                    <LegendItem color='#ff8a65' label={t('Abnormal (<20%)')} />
+                    <LegendItem color='#34b567' label={t('Good (80-95%)')} />
+                    <LegendItem color='#9ac447' label={t('Average (60-80%)')} />
+                    <LegendItem color='#f5a524' label={t('Poor (20-60%)')} />
+                    <LegendItem color='#f36b4f' label={t('Abnormal (<20%)')} />
+                    <LegendItem color='#cbd5e1' label={t('No data')} />
                   </div>
                 </div>
                 <div className='relative w-full sm:w-[220px]'>
@@ -645,7 +652,7 @@ export function ModelHealthPublicPage() {
                   {[...hourStarts].reverse().map((ts, idx) => (
                     <div
                       key={ts}
-                      className='w-[19px] flex-shrink-0 text-center sm:w-[23px]'
+                      className='w-[22px] flex-shrink-0 text-center sm:w-[26px]'
                     >
                       {idx % 3 === 0 && (
                         <div className='text-[11px] font-medium text-gray-400'>
@@ -665,6 +672,9 @@ export function ModelHealthPublicPage() {
             <div className='space-y-4'>
               {filteredModelData.map((item) => {
                 const { color, bg } = getRateLevel(item.avg_rate)
+                const indicatorColor = item.has_health_data
+                  ? color
+                  : 'rgb(148 163 184)'
                 return (
                   <div
                     key={item.model_name}
@@ -675,7 +685,7 @@ export function ModelHealthPublicPage() {
                         <div className='flex items-center gap-3'>
                           <div
                             className='h-10 w-2.5 flex-shrink-0 rounded-full shadow-sm'
-                            style={{ backgroundColor: color }}
+                            style={{ backgroundColor: indicatorColor }}
                           />
                           <div className='min-w-0 flex-1'>
                             <Tooltip>
@@ -688,10 +698,20 @@ export function ModelHealthPublicPage() {
                             </Tooltip>
                             <div className='mt-1.5 flex flex-wrap items-center gap-3 text-xs sm:text-sm'>
                               <span
-                                className='rounded-[6px] px-2 py-0.5 text-xs font-bold'
-                                style={{ color, backgroundColor: bg }}
+                                className={
+                                  item.has_health_data
+                                    ? 'rounded-[6px] px-2 py-0.5 text-xs font-bold'
+                                    : 'rounded-[6px] bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                                }
+                                style={
+                                  item.has_health_data
+                                    ? { color, backgroundColor: bg }
+                                    : undefined
+                                }
                               >
-                                {formatRate(item.avg_rate)}
+                                {item.has_health_data
+                                  ? formatRate(item.avg_rate)
+                                  : t('No data')}
                               </span>
                               <span className='font-medium text-gray-400 dark:text-gray-500'>
                                 {formatTokens(item.total_tokens)}

@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	publicModelHealthCacheKey = "public_model_health:hourly_last24h:v3"
+	publicModelHealthCacheKey = "public_model_health:hourly_last24h:v4"
 	publicModelHealthCacheTTL = 30 * time.Second
 )
 
@@ -31,27 +31,29 @@ type publicModelHealthCacheData struct {
 }
 
 type modelHealthHourlyRespItem struct {
-	ModelName       string  `json:"model_name"`
-	HourStartTs     int64   `json:"hour_start_ts"`
-	SuccessSlices   int64   `json:"success_slices"`
-	TotalSlices     int64   `json:"total_slices"`
-	SuccessRate     float64 `json:"success_rate"`
-	TotalRequests   int64   `json:"total_requests"`
-	ErrorRequests   int64   `json:"error_requests"`
-	SuccessRequests int64   `json:"success_requests"`
-	SuccessTokens   int64   `json:"success_tokens"`
+	ModelName                string  `json:"model_name"`
+	HourStartTs              int64   `json:"hour_start_ts"`
+	SuccessSlices            int64   `json:"success_slices"`
+	TotalSlices              int64   `json:"total_slices"`
+	SuccessRate              float64 `json:"success_rate"`
+	TotalRequests            int64   `json:"total_requests"`
+	ErrorRequests            int64   `json:"error_requests"`
+	SuccessRequests          int64   `json:"success_requests"`
+	QualifiedSuccessRequests int64   `json:"qualified_success_requests"`
+	SuccessTokens            int64   `json:"success_tokens"`
 }
 
 type publicModelsHealthHourlyLast24hRespItem struct {
-	ModelName       string  `json:"model_name"`
-	HourStartTs     int64   `json:"hour_start_ts"`
-	SuccessSlices   int64   `json:"success_slices"`
-	TotalSlices     int64   `json:"total_slices"`
-	SuccessRate     float64 `json:"success_rate"`
-	TotalRequests   int64   `json:"total_requests"`
-	ErrorRequests   int64   `json:"error_requests"`
-	SuccessRequests int64   `json:"success_requests"`
-	SuccessTokens   int64   `json:"success_tokens"`
+	ModelName                string  `json:"model_name"`
+	HourStartTs              int64   `json:"hour_start_ts"`
+	SuccessSlices            int64   `json:"success_slices"`
+	TotalSlices              int64   `json:"total_slices"`
+	SuccessRate              float64 `json:"success_rate"`
+	TotalRequests            int64   `json:"total_requests"`
+	ErrorRequests            int64   `json:"error_requests"`
+	SuccessRequests          int64   `json:"success_requests"`
+	QualifiedSuccessRequests int64   `json:"qualified_success_requests"`
+	SuccessTokens            int64   `json:"success_tokens"`
 }
 
 type publicModelHealthPayload struct {
@@ -146,45 +148,44 @@ func GetModelHealthHourlyStatsAPI(c *gin.Context) {
 				successTokens = quotaRow.SuccessTokens
 			}
 			resp = append(resp, modelHealthHourlyRespItem{
-				ModelName:       stat.ModelName,
-				HourStartTs:     stat.HourStartTs,
-				SuccessSlices:   stat.SuccessSlices,
-				TotalSlices:     stat.TotalSlices,
-				SuccessRate:     stat.SuccessRate,
-				TotalRequests:   stat.TotalRequests,
-				ErrorRequests:   stat.ErrorRequests,
-				SuccessRequests: stat.SuccessRequests,
-				SuccessTokens:   successTokens,
+				ModelName:                stat.ModelName,
+				HourStartTs:              stat.HourStartTs,
+				SuccessSlices:            stat.SuccessSlices,
+				TotalSlices:              stat.TotalSlices,
+				SuccessRate:              stat.SuccessRate,
+				TotalRequests:            stat.TotalRequests,
+				ErrorRequests:            stat.ErrorRequests,
+				SuccessRequests:          stat.SuccessRequests,
+				QualifiedSuccessRequests: stat.QualifiedSuccessRequests,
+				SuccessTokens:            successTokens,
 			})
 			continue
 		}
 		if hasQuota {
-			successRequests := quotaRow.SuccessRequests
-			if successRequests <= 0 {
-				successRequests = 1
-			}
 			resp = append(resp, modelHealthHourlyRespItem{
-				ModelName:       modelName,
-				HourStartTs:     h,
-				SuccessSlices:   1,
-				TotalSlices:     1,
-				SuccessRate:     1,
-				TotalRequests:   successRequests,
-				ErrorRequests:   0,
-				SuccessRequests: successRequests,
-				SuccessTokens:   quotaRow.SuccessTokens,
+				ModelName:                modelName,
+				HourStartTs:              h,
+				SuccessSlices:            0,
+				TotalSlices:              0,
+				SuccessRate:              0,
+				TotalRequests:            0,
+				ErrorRequests:            0,
+				SuccessRequests:          0,
+				QualifiedSuccessRequests: 0,
+				SuccessTokens:            quotaRow.SuccessTokens,
 			})
 			continue
 		}
 		resp = append(resp, modelHealthHourlyRespItem{
-			ModelName:       modelName,
-			HourStartTs:     h,
-			SuccessSlices:   0,
-			TotalSlices:     0,
-			SuccessRate:     0,
-			TotalRequests:   0,
-			ErrorRequests:   0,
-			SuccessRequests: 0,
+			ModelName:                modelName,
+			HourStartTs:              h,
+			SuccessSlices:            0,
+			TotalSlices:              0,
+			SuccessRate:              0,
+			TotalRequests:            0,
+			ErrorRequests:            0,
+			SuccessRequests:          0,
+			QualifiedSuccessRequests: 0,
 		})
 	}
 
@@ -260,20 +261,17 @@ func GetPublicModelsHealthHourlyLast24hAPI(c *gin.Context) {
 				if q, ok := modelQuota[h]; ok {
 					fallbackSuccessTokens = q.SuccessTokens
 					if _, hasHealthStat := hourMap[h]; !hasHealthStat && (q.SuccessRequests > 0 || q.SuccessTokens > 0) {
-						successRequests := q.SuccessRequests
-						if successRequests <= 0 {
-							successRequests = 1
-						}
 						resp = append(resp, publicModelsHealthHourlyLast24hRespItem{
-							ModelName:       modelName,
-							HourStartTs:     h,
-							SuccessSlices:   1,
-							TotalSlices:     1,
-							SuccessRate:     1,
-							TotalRequests:   successRequests,
-							ErrorRequests:   0,
-							SuccessRequests: successRequests,
-							SuccessTokens:   q.SuccessTokens,
+							ModelName:                modelName,
+							HourStartTs:              h,
+							SuccessSlices:            0,
+							TotalSlices:              0,
+							SuccessRate:              0,
+							TotalRequests:            0,
+							ErrorRequests:            0,
+							SuccessRequests:          0,
+							QualifiedSuccessRequests: 0,
+							SuccessTokens:            q.SuccessTokens,
 						})
 						continue
 					}
@@ -286,28 +284,30 @@ func GetPublicModelsHealthHourlyLast24hAPI(c *gin.Context) {
 					successTokens = fallbackSuccessTokens
 				}
 				resp = append(resp, publicModelsHealthHourlyLast24hRespItem{
-					ModelName:       stat.ModelName,
-					HourStartTs:     stat.HourStartTs,
-					SuccessSlices:   stat.SuccessSlices,
-					TotalSlices:     stat.TotalSlices,
-					SuccessRate:     stat.SuccessRate,
-					TotalRequests:   stat.TotalRequests,
-					ErrorRequests:   stat.ErrorRequests,
-					SuccessRequests: stat.SuccessRequests,
-					SuccessTokens:   successTokens,
+					ModelName:                stat.ModelName,
+					HourStartTs:              stat.HourStartTs,
+					SuccessSlices:            stat.SuccessSlices,
+					TotalSlices:              stat.TotalSlices,
+					SuccessRate:              stat.SuccessRate,
+					TotalRequests:            stat.TotalRequests,
+					ErrorRequests:            stat.ErrorRequests,
+					SuccessRequests:          stat.SuccessRequests,
+					QualifiedSuccessRequests: stat.QualifiedSuccessRequests,
+					SuccessTokens:            successTokens,
 				})
 				continue
 			}
 			resp = append(resp, publicModelsHealthHourlyLast24hRespItem{
-				ModelName:       modelName,
-				HourStartTs:     h,
-				SuccessSlices:   0,
-				TotalSlices:     0,
-				SuccessRate:     0,
-				TotalRequests:   0,
-				ErrorRequests:   0,
-				SuccessRequests: 0,
-				SuccessTokens:   fallbackSuccessTokens,
+				ModelName:                modelName,
+				HourStartTs:              h,
+				SuccessSlices:            0,
+				TotalSlices:              0,
+				SuccessRate:              0,
+				TotalRequests:            0,
+				ErrorRequests:            0,
+				SuccessRequests:          0,
+				QualifiedSuccessRequests: 0,
+				SuccessTokens:            fallbackSuccessTokens,
 			})
 		}
 	}

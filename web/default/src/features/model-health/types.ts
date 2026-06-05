@@ -26,6 +26,7 @@ export type ModelHealthHourlyStat = {
   total_requests: number
   error_requests: number
   success_requests: number
+  qualified_success_requests: number
   success_tokens: number
 }
 

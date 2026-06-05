@@ -7,15 +7,16 @@ import (
 )
 
 type ModelHealthHourlyStat struct {
-	ModelName       string  `json:"model_name"`
-	HourStartTs     int64   `json:"hour_start_ts"`
-	SuccessSlices   int64   `json:"success_slices"`
-	TotalSlices     int64   `json:"total_slices"`
-	SuccessRate     float64 `json:"success_rate"`
-	TotalRequests   int64   `json:"total_requests"`
-	ErrorRequests   int64   `json:"error_requests"`
-	SuccessRequests int64   `json:"success_requests"`
-	SuccessTokens   int64   `json:"success_tokens"`
+	ModelName                string  `json:"model_name"`
+	HourStartTs              int64   `json:"hour_start_ts"`
+	SuccessSlices            int64   `json:"success_slices"`
+	TotalSlices              int64   `json:"total_slices"`
+	SuccessRate              float64 `json:"success_rate"`
+	TotalRequests            int64   `json:"total_requests"`
+	ErrorRequests            int64   `json:"error_requests"`
+	SuccessRequests          int64   `json:"success_requests"`
+	QualifiedSuccessRequests int64   `json:"qualified_success_requests"`
+	SuccessTokens            int64   `json:"success_tokens"`
 }
 
 func hourStartExprSQL(db *gorm.DB) string {
@@ -38,7 +39,7 @@ func successSliceExprSQL() string {
 }
 
 func successRateExprSQL() string {
-	return fmt.Sprintf("CASE WHEN COUNT(*) = 0 THEN 0 ELSE (1.0 * SUM(%s)) / COUNT(*) END", successSliceExprSQL())
+	return "CASE WHEN SUM(total_requests) = 0 THEN 0 ELSE (1.0 * SUM(success_qualified_requests)) / SUM(total_requests) END"
 }
 
 func GetModelHealthHourlyStats(db *gorm.DB, modelName string, startHourTs int64, endHourTs int64) ([]ModelHealthHourlyStat, error) {
@@ -63,6 +64,7 @@ COUNT(*) as total_slices,
 SUM(total_requests) as total_requests,
 SUM(error_requests) as error_requests,
 SUM(total_requests) - SUM(error_requests) as success_requests,
+SUM(success_qualified_requests) as qualified_success_requests,
 SUM(success_tokens) as success_tokens`, hourStartExprSQL(db), successSliceExprSQL(), successRateExprSQL())).
 		Where("model_name = ?", modelName).
 		Where("slice_start_ts >= ? AND slice_start_ts < ?", startHourTs, endHourTs).
@@ -94,6 +96,7 @@ COUNT(*) as total_slices,
 SUM(total_requests) as total_requests,
 SUM(error_requests) as error_requests,
 SUM(total_requests) - SUM(error_requests) as success_requests,
+SUM(success_qualified_requests) as qualified_success_requests,
 SUM(success_tokens) as success_tokens`, hourStartExprSQL(db), successSliceExprSQL(), successRateExprSQL())).
 		Where("slice_start_ts >= ? AND slice_start_ts < ?", startHourTs, endHourTs).
 		Group("model_name, hour_start_ts").
