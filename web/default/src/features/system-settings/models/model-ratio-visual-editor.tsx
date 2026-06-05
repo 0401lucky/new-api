@@ -553,16 +553,36 @@ export const ModelRatioVisualEditor = memo(
       [models]
     )
 
+    const resetTableBrowsingState = useCallback(() => {
+      setRowSelection({})
+      setPagination((previous) =>
+        previous.pageIndex === 0 ? previous : { ...previous, pageIndex: 0 }
+      )
+    }, [])
+
+    const closeInlineEditor = useCallback(() => {
+      setEditData(null)
+      setEditorOpen(false)
+      setSheetOpen(false)
+    }, [])
+
     const handleToggleChannelModelView = useCallback(() => {
       const next = !channelModelView
       setChannelModelView(next)
-      setRowSelection({})
-      setPagination((previous) => ({ ...previous, pageIndex: 0 }))
       setGlobalFilter('')
+      setColumnFilters([])
+      resetTableBrowsingState()
+      closeInlineEditor()
       if (next && !channelModelsLoaded) {
         void loadChannelModels()
       }
-    }, [channelModelView, channelModelsLoaded, loadChannelModels])
+    }, [
+      channelModelView,
+      channelModelsLoaded,
+      closeInlineEditor,
+      loadChannelModels,
+      resetTableBrowsingState,
+    ])
 
     const handleCancel = useCallback(() => {
       setEditData(null)
@@ -570,20 +590,28 @@ export const ModelRatioVisualEditor = memo(
       setSheetOpen(false)
     }, [])
 
+    const handleColumnFiltersChange = useCallback<
+      OnChangeFn<ColumnFiltersState>
+    >(
+      (updater) => {
+        setColumnFilters((previous) =>
+          typeof updater === 'function' ? updater(previous) : updater
+        )
+        resetTableBrowsingState()
+        closeInlineEditor()
+      },
+      [closeInlineEditor, resetTableBrowsingState]
+    )
+
     const handleGlobalFilterChange = useCallback<OnChangeFn<string>>(
       (updater) => {
         setGlobalFilter((previous) => {
-          const next =
-            typeof updater === 'function' ? updater(previous) : updater
-          if (next !== previous) {
-            setEditData(null)
-            setEditorOpen(false)
-            setSheetOpen(false)
-          }
-          return next
+          return typeof updater === 'function' ? updater(previous) : updater
         })
+        resetTableBrowsingState()
+        closeInlineEditor()
       },
-      []
+      [closeInlineEditor, resetTableBrowsingState]
     )
 
     const handleDelete = useCallback(
@@ -812,7 +840,7 @@ export const ModelRatioVisualEditor = memo(
       },
       enableRowSelection: true,
       onSortingChange: setSorting,
-      onColumnFiltersChange: setColumnFilters,
+      onColumnFiltersChange: handleColumnFiltersChange,
       onGlobalFilterChange: handleGlobalFilterChange,
       onColumnVisibilityChange: setColumnVisibility,
       onPaginationChange: setPagination,
@@ -1041,14 +1069,21 @@ export const ModelRatioVisualEditor = memo(
     }, [editData, persistPricingData, t, table])
 
     const selectedTargetCount = table.getFilteredSelectedRowModel().rows.length
+    const isTableFiltered =
+      Boolean(table.getState().globalFilter) ||
+      table.getState().columnFilters.length > 0
     const emptyTableMessage = channelModelsLoading
       ? t('Loading channel models...')
-      : table.getState().globalFilter ||
-          table.getState().columnFilters.length > 0
-        ? t('No models match your search')
+      : isTableFiltered
+        ? channelModelView
+          ? t('No channel models match your search')
+          : t('No models match your search')
         : channelModelView && channelModelNames.length === 0
           ? t('No enabled channel models found')
           : t('No models configured. Use Add model to get started.')
+    const searchPlaceholder = channelModelView
+      ? t('Search channel models...')
+      : t('Search models...')
 
     return (
       <div className='flex flex-col gap-4'>
@@ -1056,7 +1091,17 @@ export const ModelRatioVisualEditor = memo(
           <div className='flex min-w-0 flex-col gap-4'>
             <DataTableToolbar
               table={table}
-              searchPlaceholder={t('Search models...')}
+              searchPlaceholder={searchPlaceholder}
+              additionalSearch={
+                channelModelView ? (
+                  <StatusBadge
+                    label={t('Channel models')}
+                    variant='info'
+                    size='lg'
+                    copyable={false}
+                  />
+                ) : undefined
+              }
               filters={[
                 {
                   columnId: 'billingMode',
@@ -1096,7 +1141,7 @@ export const ModelRatioVisualEditor = memo(
                       <ListFilter data-icon='inline-start' />
                     )}
                     {channelModelView
-                      ? t('Showing channel models')
+                      ? t('Show configured models')
                       : t('Show channel models')}
                   </Button>
                   <Button
