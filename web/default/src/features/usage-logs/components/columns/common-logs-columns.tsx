@@ -90,6 +90,33 @@ function getGroupRatioText(other: LogOtherData | null): string | null {
   return null
 }
 
+function getGroupRatioDetailSegment(
+  other: LogOtherData | null,
+  t: (key: string) => string
+): DetailSegment | null {
+  const userGroupRatio = other?.user_group_ratio
+  if (
+    userGroupRatio != null &&
+    userGroupRatio !== -1 &&
+    Number.isFinite(userGroupRatio)
+  ) {
+    return {
+      text: `${t('User Exclusive Ratio')} ${formatRatioCompact(userGroupRatio)}x`,
+      muted: true,
+    }
+  }
+
+  const groupRatio = other?.group_ratio
+  if (groupRatio != null && Number.isFinite(groupRatio)) {
+    return {
+      text: `${t('Group Ratio')} ${formatRatioCompact(groupRatio)}x`,
+      muted: true,
+    }
+  }
+
+  return null
+}
+
 function splitQuotaDisplay(value: string): { prefix: string; amount: string } {
   const match = value.match(/^([^0-9+\-.,\s]+)(.+)$/)
   if (!match) return { prefix: '', amount: value }
@@ -231,23 +258,17 @@ function buildDetailSegments(
         }
       }
     } else {
-      const userGroupRatio = other.user_group_ratio
-      const groupRatio = other.group_ratio
-      const isUserGroup =
-        userGroupRatio != null &&
-        Number.isFinite(userGroupRatio) &&
-        userGroupRatio !== -1
-      const effectiveRatio = isUserGroup ? userGroupRatio : groupRatio
-      const ratioLabel = isUserGroup
-        ? t('User Exclusive Ratio')
-        : t('Group Ratio')
-
-      if (effectiveRatio != null && Number.isFinite(effectiveRatio)) {
-        segments.push({
-          text: `${ratioLabel} ${formatRatioCompact(effectiveRatio)}x`,
-        })
-      }
+      const groupSegment = getGroupRatioDetailSegment(other, t)
+      if (groupSegment) segments.push(groupSegment)
     }
+  }
+
+  const groupSegment = getGroupRatioDetailSegment(other, t)
+  if (
+    groupSegment &&
+    !segments.some((segment) => segment.text === groupSegment.text)
+  ) {
+    segments.push(groupSegment)
   }
 
   if (other.is_system_prompt_overwritten) {
