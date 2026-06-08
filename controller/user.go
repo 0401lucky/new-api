@@ -23,11 +23,17 @@ import (
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+}
+
+type RegisterRequest struct {
+	model.User
+	InvitationCode string `json:"invite_code"`
 }
 
 func Login(c *gin.Context) {
@@ -144,10 +150,16 @@ func Register(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserPasswordRegisterDisabled)
 		return
 	}
-	var user model.User
-	err := json.NewDecoder(c.Request.Body).Decode(&user)
+	var registerRequest RegisterRequest
+	err := common.DecodeJson(c.Request.Body, &registerRequest)
 	if err != nil {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	user := registerRequest.User
+	invitationCode := strings.TrimSpace(registerRequest.InvitationCode)
+	if common.InvitationCodeEnabled && invitationCode == "" {
+		common.ApiErrorMsg(c, "请填写邀请码")
 		return
 	}
 	if err := common.Validate.Struct(&user); err != nil {
@@ -186,17 +198,23 @@ func Register(c *gin.Context) {
 	if common.EmailVerificationEnabled {
 		cleanUser.Email = user.Email
 	}
-	if err := cleanUser.Insert(inviterId); err != nil {
-		common.ApiError(c, err)
+	err = model.DB.Transaction(func(tx *gorm.DB) error {
+		if err := cleanUser.InsertWithTx(tx, inviterId); err != nil {
+			return err
+		}
+		if common.InvitationCodeEnabled {
+			if err := model.UseInvitationCodeWithTx(tx, invitationCode, cleanUser.Id); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		common.ApiErrorMsg(c, err.Error())
 		return
 	}
+	cleanUser.FinalizeUserCreation(inviterId)
 
-	// 获取插入后的用户ID
-	var insertedUser model.User
-	if err := model.DB.Where("username = ?", cleanUser.Username).First(&insertedUser).Error; err != nil {
-		common.ApiErrorI18n(c, i18n.MsgUserRegisterFailed)
-		return
-	}
 	// 生成默认令牌
 	if constant.GenerateDefaultToken {
 		key, err := common.GenerateKey()
@@ -207,7 +225,7 @@ func Register(c *gin.Context) {
 		}
 		// 生成默认令牌
 		token := model.Token{
-			UserId:             insertedUser.Id, // 使用插入后的用户ID
+			UserId:             cleanUser.Id,
 			Name:               cleanUser.Username + "的初始令牌",
 			Key:                key,
 			CreatedTime:        common.GetTimestamp(),
@@ -513,6 +531,7 @@ func generateDefaultSidebarConfig(userRole int) string {
 			"fingerprints": true,
 			"active_tasks": true,
 			"redemption":   true,
+			"invite_code":  true,
 			"user":         true,
 			"setting":      false, // 管理员不能访问系统设置
 		}
@@ -526,6 +545,7 @@ func generateDefaultSidebarConfig(userRole int) string {
 			"fingerprints": true,
 			"active_tasks": true,
 			"redemption":   true,
+			"invite_code":  true,
 			"user":         true,
 			"setting":      true,
 		}

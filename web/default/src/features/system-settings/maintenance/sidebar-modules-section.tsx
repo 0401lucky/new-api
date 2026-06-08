@@ -160,7 +160,11 @@ export function SidebarModulesSection({
       },
       redemption: {
         title: t('Redeem codes'),
-        description: t('Create and review invite or credit codes.'),
+        description: t('Create and review balance redemption codes.'),
+      },
+      invite_code: {
+        title: t('Invite codes'),
+        description: t('Create and review registration invite codes.'),
       },
       user: {
         title: t('Users'),

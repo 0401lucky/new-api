@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/i18n"
@@ -26,6 +27,12 @@ func GenerateOAuthCode(c *gin.Context) {
 	affCode := c.Query("aff")
 	if affCode != "" {
 		session.Set("aff", affCode)
+	}
+	invitationCode := strings.TrimSpace(c.Query("invite_code"))
+	if invitationCode != "" {
+		session.Set("invite_code", invitationCode)
+	} else {
+		session.Delete("invite_code")
 	}
 	session.Set("oauth_state", state)
 	err := session.Save()
@@ -111,6 +118,8 @@ func HandleOAuth(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgOAuthUserDeleted)
 		case *OAuthRegistrationDisabledError:
 			common.ApiErrorI18n(c, i18n.MsgUserRegisterDisabled)
+		case *OAuthInvitationCodeRequiredError:
+			common.ApiErrorMsg(c, "请填写邀请码")
 		default:
 			common.ApiError(c, err)
 		}
@@ -236,6 +245,17 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 	if !common.RegisterEnabled {
 		return nil, &OAuthRegistrationDisabledError{}
 	}
+	invitationCode := ""
+	if common.InvitationCodeEnabled {
+		if rawCode := session.Get("invite_code"); rawCode != nil {
+			if code, ok := rawCode.(string); ok {
+				invitationCode = strings.TrimSpace(code)
+			}
+		}
+		if invitationCode == "" {
+			return nil, &OAuthInvitationCodeRequiredError{}
+		}
+	}
 
 	// Set up new user
 	user.Username = provider.GetProviderPrefix() + strconv.Itoa(model.GetMaxUserId()+1)
@@ -277,6 +297,11 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 			if err := user.InsertWithTx(tx, inviterId); err != nil {
 				return err
 			}
+			if common.InvitationCodeEnabled {
+				if err := model.UseInvitationCodeWithTx(tx, invitationCode, user.Id); err != nil {
+					return err
+				}
+			}
 
 			// Create OAuth binding
 			binding := &model.UserOAuthBinding{
@@ -303,6 +328,11 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 			if err := user.InsertWithTx(tx, inviterId); err != nil {
 				return err
 			}
+			if common.InvitationCodeEnabled {
+				if err := model.UseInvitationCodeWithTx(tx, invitationCode, user.Id); err != nil {
+					return err
+				}
+			}
 
 			// Set the provider user ID on the user model and update
 			provider.SetProviderUserID(user, oauthUser.ProviderUserID)
@@ -326,6 +356,10 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 		// Perform post-transaction tasks
 		user.FinalizeOAuthUserCreation(inviterId)
 	}
+	if common.InvitationCodeEnabled {
+		session.Delete("invite_code")
+		_ = session.Save()
+	}
 
 	return user, nil
 }
@@ -341,6 +375,12 @@ type OAuthRegistrationDisabledError struct{}
 
 func (e *OAuthRegistrationDisabledError) Error() string {
 	return "registration is disabled"
+}
+
+type OAuthInvitationCodeRequiredError struct{}
+
+func (e *OAuthInvitationCodeRequiredError) Error() string {
+	return "invitation code is required"
 }
 
 // handleOAuthError handles OAuth errors and returns translated message

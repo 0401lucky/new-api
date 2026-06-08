@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type wechatLoginResponse struct {
@@ -91,12 +93,34 @@ func WeChatAuth(c *gin.Context) {
 		}
 	} else {
 		if common.RegisterEnabled {
+			invitationCode := strings.TrimSpace(c.Query("invite_code"))
+			if common.InvitationCodeEnabled && invitationCode == "" {
+				c.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"message": "请填写邀请码",
+				})
+				return
+			}
 			user.Username = "wechat_" + strconv.Itoa(model.GetMaxUserId()+1)
 			user.DisplayName = "WeChat User"
 			user.Role = common.RoleCommonUser
 			user.Status = common.UserStatusEnabled
 
-			if err := user.Insert(0); err != nil {
+			var err error
+			if common.InvitationCodeEnabled {
+				err = model.DB.Transaction(func(tx *gorm.DB) error {
+					if err := user.InsertWithTx(tx, 0); err != nil {
+						return err
+					}
+					return model.UseInvitationCodeWithTx(tx, invitationCode, user.Id)
+				})
+				if err == nil {
+					user.FinalizeUserCreation(0)
+				}
+			} else {
+				err = user.Insert(0)
+			}
+			if err != nil {
 				c.JSON(http.StatusOK, gin.H{
 					"success": false,
 					"message": err.Error(),

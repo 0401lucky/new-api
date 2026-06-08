@@ -139,6 +139,7 @@ func generateDefaultSidebarConfigForRole(userRole int) string {
 			"fingerprints": true,
 			"active_tasks": true,
 			"redemption":   true,
+			"invite_code":  true,
 			"user":         true,
 			"setting":      false, // 管理员不能访问系统设置
 		}
@@ -152,6 +153,7 @@ func generateDefaultSidebarConfigForRole(userRole int) string {
 			"fingerprints": true,
 			"active_tasks": true,
 			"redemption":   true,
+			"invite_code":  true,
 			"user":         true,
 			"setting":      true,
 		}
@@ -472,9 +474,9 @@ func (user *User) InsertWithTx(tx *gorm.DB, inviterId int) error {
 	return nil
 }
 
-// FinalizeOAuthUserCreation performs post-transaction tasks for OAuth user creation.
+// FinalizeUserCreation performs post-transaction tasks for user creation.
 // This should be called after the transaction commits successfully.
-func (user *User) FinalizeOAuthUserCreation(inviterId int) {
+func (user *User) FinalizeUserCreation(inviterId int) {
 	// 用户创建成功后，根据角色初始化边栏配置
 	var createdUser User
 	if err := DB.Where("id = ?", user.Id).First(&createdUser).Error; err == nil {
@@ -501,6 +503,12 @@ func (user *User) FinalizeOAuthUserCreation(inviterId int) {
 			_ = inviteUser(inviterId)
 		}
 	}
+}
+
+// FinalizeOAuthUserCreation keeps the OAuth caller name stable while sharing
+// the same post-create workflow with password registration.
+func (user *User) FinalizeOAuthUserCreation(inviterId int) {
+	user.FinalizeUserCreation(inviterId)
 }
 
 func (user *User) Update(updatePassword bool) error {

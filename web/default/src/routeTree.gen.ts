@@ -52,6 +52,7 @@ import { Route as AuthenticatedModelHealthHourlyIndexRouteImport } from './route
 import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authenticated/keys/index'
 import { Route as AuthenticatedFingerprintsIndexRouteImport } from './routes/_authenticated/fingerprints/index'
 import { Route as AuthenticatedDynamicRatioIndexRouteImport } from './routes/_authenticated/dynamic-ratio/index'
+import { Route as AuthenticatedInviteCodesIndexRouteImport } from './routes/_authenticated/invite-codes/index'
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard/index'
 import { Route as AuthenticatedChannelsIndexRouteImport } from './routes/_authenticated/channels/index'
 import { Route as AuthenticatedBlackroomIndexRouteImport } from './routes/_authenticated/blackroom/index'
@@ -304,6 +305,12 @@ const AuthenticatedDynamicRatioIndexRoute =
     path: '/dynamic-ratio/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedInviteCodesIndexRoute =
+  AuthenticatedInviteCodesIndexRouteImport.update({
+    id: '/invite-codes/',
+    path: '/invite-codes/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardIndexRoute =
   AuthenticatedDashboardIndexRouteImport.update({
     id: '/dashboard/',
@@ -486,6 +493,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/dynamic-ratio/': typeof AuthenticatedDynamicRatioIndexRoute
   '/fingerprints/': typeof AuthenticatedFingerprintsIndexRoute
+  '/invite-codes/': typeof AuthenticatedInviteCodesIndexRoute
   '/keys/': typeof AuthenticatedKeysIndexRoute
   '/model-health-hourly/': typeof AuthenticatedModelHealthHourlyIndexRoute
   '/models/': typeof AuthenticatedModelsIndexRoute
@@ -552,6 +560,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/dynamic-ratio': typeof AuthenticatedDynamicRatioIndexRoute
   '/fingerprints': typeof AuthenticatedFingerprintsIndexRoute
+  '/invite-codes': typeof AuthenticatedInviteCodesIndexRoute
   '/keys': typeof AuthenticatedKeysIndexRoute
   '/model-health-hourly': typeof AuthenticatedModelHealthHourlyIndexRoute
   '/models': typeof AuthenticatedModelsIndexRoute
@@ -622,6 +631,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/_authenticated/dynamic-ratio/': typeof AuthenticatedDynamicRatioIndexRoute
   '/_authenticated/fingerprints/': typeof AuthenticatedFingerprintsIndexRoute
+  '/_authenticated/invite-codes/': typeof AuthenticatedInviteCodesIndexRoute
   '/_authenticated/keys/': typeof AuthenticatedKeysIndexRoute
   '/_authenticated/model-health-hourly/': typeof AuthenticatedModelHealthHourlyIndexRoute
   '/_authenticated/models/': typeof AuthenticatedModelsIndexRoute
@@ -691,6 +701,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/dynamic-ratio/'
     | '/fingerprints/'
+    | '/invite-codes/'
     | '/keys/'
     | '/model-health-hourly/'
     | '/models/'
@@ -757,6 +768,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/dynamic-ratio'
     | '/fingerprints'
+    | '/invite-codes'
     | '/keys'
     | '/model-health-hourly'
     | '/models'
@@ -826,6 +838,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard/'
     | '/_authenticated/dynamic-ratio/'
     | '/_authenticated/fingerprints/'
+    | '/_authenticated/invite-codes/'
     | '/_authenticated/keys/'
     | '/_authenticated/model-health-hourly/'
     | '/_authenticated/models/'
@@ -1174,6 +1187,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFingerprintsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/invite-codes/': {
+      id: '/_authenticated/invite-codes/'
+      path: '/invite-codes'
+      fullPath: '/invite-codes/'
+      preLoaderRoute: typeof AuthenticatedInviteCodesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dynamic-ratio/': {
       id: '/_authenticated/dynamic-ratio/'
       path: '/dynamic-ratio'
@@ -1449,6 +1469,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
   AuthenticatedDynamicRatioIndexRoute: typeof AuthenticatedDynamicRatioIndexRoute
   AuthenticatedFingerprintsIndexRoute: typeof AuthenticatedFingerprintsIndexRoute
+  AuthenticatedInviteCodesIndexRoute: typeof AuthenticatedInviteCodesIndexRoute
   AuthenticatedKeysIndexRoute: typeof AuthenticatedKeysIndexRoute
   AuthenticatedModelHealthHourlyIndexRoute: typeof AuthenticatedModelHealthHourlyIndexRoute
   AuthenticatedModelsIndexRoute: typeof AuthenticatedModelsIndexRoute
@@ -1477,6 +1498,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
   AuthenticatedDynamicRatioIndexRoute: AuthenticatedDynamicRatioIndexRoute,
   AuthenticatedFingerprintsIndexRoute: AuthenticatedFingerprintsIndexRoute,
+  AuthenticatedInviteCodesIndexRoute: AuthenticatedInviteCodesIndexRoute,
   AuthenticatedKeysIndexRoute: AuthenticatedKeysIndexRoute,
   AuthenticatedModelHealthHourlyIndexRoute:
     AuthenticatedModelHealthHourlyIndexRoute,

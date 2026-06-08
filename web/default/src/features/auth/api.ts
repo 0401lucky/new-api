@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
+import { getInvitationCode } from './lib/storage'
 import type {
   LoginPayload,
   LoginResponse,
@@ -88,14 +89,22 @@ export async function githubOAuthStart(clientId: string, state: string) {
 export async function getOAuthState(): Promise<string> {
   const aff =
     typeof window !== 'undefined' ? (localStorage.getItem('aff') ?? '') : ''
-  const res = await api.get('/api/oauth/state', { params: { aff } })
+  const inviteCode = getInvitationCode()
+  const res = await api.get('/api/oauth/state', {
+    params: { aff, invite_code: inviteCode },
+  })
   if (res.data?.success) return res.data.data
   return ''
 }
 
 // WeChat login by authorization code
-export async function wechatLoginByCode(code: string): Promise<ApiResponse> {
-  const res = await api.get('/api/oauth/wechat', { params: { code } })
+export async function wechatLoginByCode(
+  code: string,
+  inviteCode?: string
+): Promise<ApiResponse> {
+  const res = await api.get('/api/oauth/wechat', {
+    params: { code, invite_code: inviteCode || getInvitationCode() },
+  })
   return res.data
 }
 
