@@ -79,11 +79,18 @@ export function buildLinuxDOOAuthUrl(clientId: string, state: string): string {
  */
 export async function getOAuthState(): Promise<string | null> {
   try {
-    let path = '/api/oauth/state'
+    const params = new URLSearchParams()
     const affCode = localStorage.getItem('aff')
     if (affCode && affCode.length > 0) {
-      path += `?aff=${affCode}`
+      params.set('aff', affCode)
     }
+    const inviteCode = localStorage.getItem('invite_code')
+    if (inviteCode && inviteCode.length > 0) {
+      params.set('invite_code', inviteCode)
+    }
+    const path = params.toString()
+      ? `/api/oauth/state?${params.toString()}`
+      : '/api/oauth/state'
     const res = await api.get(path)
     if (res.data.success) {
       return res.data.data

@@ -25,6 +25,7 @@ import {
   FlaskConical,
   HeartPulse,
   Key,
+  MailPlus,
   LayoutDashboard,
   ListTodo,
   MessageSquare,
@@ -147,6 +148,11 @@ export function useSidebarData(): SidebarData {
             title: t('Redemption Codes'),
             url: '/redemption-codes',
             icon: Ticket,
+          },
+          {
+            title: t('Invite Codes'),
+            url: '/invite-codes',
+            icon: MailPlus,
           },
           {
             title: t('Subscription Management'),

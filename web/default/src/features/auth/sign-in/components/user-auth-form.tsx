@@ -58,6 +58,10 @@ import { OAuthProviders } from '@/features/auth/components/oauth-providers'
 import { loginFormSchema } from '@/features/auth/constants'
 import { useAuthRedirect } from '@/features/auth/hooks/use-auth-redirect'
 import { useTurnstile } from '@/features/auth/hooks/use-turnstile'
+import {
+  getInvitationCode,
+  saveInvitationCode,
+} from '@/features/auth/lib/storage'
 import { beginPasskeyLogin, finishPasskeyLogin } from '@/features/auth/passkey'
 import type { AuthFormProps } from '@/features/auth/types'
 
@@ -69,6 +73,7 @@ export function UserAuthForm({
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
   const [wechatCode, setWeChatCode] = useState('')
+  const [invitationCode, setInvitationCode] = useState('')
   const [agreedToLegal, setAgreedToLegal] = useState(false)
   const [passkeySupported, setPasskeySupported] = useState(false)
   const [isPasskeyLoading, setIsPasskeyLoading] = useState(false)
@@ -102,6 +107,9 @@ export function UserAuthForm({
     !passkeySupported ||
     (requiresLegalConsent && !agreedToLegal)
   const hasWeChatLogin = Boolean(status?.wechat_login)
+  const invitationCodeRequired = Boolean(
+    status?.invitation_code_enabled ?? status?.data?.invitation_code_enabled
+  )
   const hasOAuthLogin = Boolean(
     status?.github_oauth ||
     status?.discord_oauth ||
@@ -112,6 +120,10 @@ export function UserAuthForm({
   )
   const hasAlternativeLogin =
     passkeyLoginEnabled || hasWeChatLogin || hasOAuthLogin
+  const invitationCodeReady =
+    !invitationCodeRequired ||
+    !(hasWeChatLogin || hasOAuthLogin) ||
+    Boolean(invitationCode.trim())
 
   useEffect(() => {
     if (requiresLegalConsent) {
@@ -125,6 +137,22 @@ export function UserAuthForm({
     detectPasskeySupport()
       .then(setPasskeySupported)
       .catch(() => setPasskeySupported(false))
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const inviteCode = (
+      params.get('invite_code') ||
+      params.get('invitation_code') ||
+      params.get('invite') ||
+      ''
+    ).trim()
+    if (inviteCode) {
+      saveInvitationCode(inviteCode)
+      setInvitationCode(inviteCode)
+      return
+    }
+    setInvitationCode(getInvitationCode())
   }, [])
 
   const form = useForm<z.infer<typeof loginFormSchema>>({
@@ -186,6 +214,10 @@ export function UserAuthForm({
       toast.error(legalConsentErrorMessage)
       return
     }
+    if (!invitationCodeReady) {
+      toast.error(t('Please enter an invite code'))
+      return
+    }
 
     setIsWeChatDialogOpen(true)
   }
@@ -203,10 +235,14 @@ export function UserAuthForm({
       toast.error(t('Please enter the verification code'))
       return
     }
+    if (!invitationCodeReady) {
+      toast.error(t('Please enter an invite code'))
+      return
+    }
 
     setIsWeChatSubmitting(true)
     try {
-      const res = await wechatLoginByCode(wechatCode)
+      const res = await wechatLoginByCode(wechatCode, invitationCode.trim())
       if (res?.success) {
         await handleLoginSuccess(res.data as { id?: number } | null, redirectTo)
         toast.success(t('Signed in via WeChat'))
@@ -315,10 +351,30 @@ export function UserAuthForm({
         </div>
       )}
 
+      {invitationCodeRequired && (hasWeChatLogin || hasOAuthLogin) && (
+        <div className='grid gap-2'>
+          <Label htmlFor='signin-invite-code'>{t('Invite Code')}</Label>
+          <Input
+            id='signin-invite-code'
+            value={invitationCode}
+            onChange={(event) => {
+              const next = event.target.value
+              setInvitationCode(next)
+              saveInvitationCode(next.trim())
+            }}
+            placeholder={t('Enter your invite code')}
+          />
+        </div>
+      )}
+
       {/* OAuth Providers */}
       <OAuthProviders
         status={status}
-        disabled={isLoading || (requiresLegalConsent && !agreedToLegal)}
+        disabled={
+          isLoading ||
+          (requiresLegalConsent && !agreedToLegal) ||
+          !invitationCodeReady
+        }
         onWeChatLogin={hasWeChatLogin ? handleOpenWeChatDialog : undefined}
         isWeChatLoading={isWeChatSubmitting}
       />
@@ -465,7 +521,8 @@ export function UserAuthForm({
                 disabled={
                   isWeChatSubmitting ||
                   !wechatCode.trim() ||
-                  (requiresLegalConsent && !agreedToLegal)
+                  (requiresLegalConsent && !agreedToLegal) ||
+                  !invitationCodeReady
                 }
                 className='gap-2'
               >

@@ -39,10 +39,7 @@ export type HeaderNavModulesConfig = {
   custom_links: HeaderNavCustomLinkConfig[]
   docs: boolean
   about: boolean
-  [key: string]:
-    | boolean
-    | HeaderNavAccessConfig
-    | HeaderNavCustomLinkConfig[]
+  [key: string]: boolean | HeaderNavAccessConfig | HeaderNavCustomLinkConfig[]
 }
 
 export type SidebarSectionConfig = {
@@ -98,6 +95,7 @@ export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
     model_health: true,
     blackroom: true,
     redemption: true,
+    invite_code: true,
     user: true,
     setting: true,
     subscription: true,
