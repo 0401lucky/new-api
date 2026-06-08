@@ -197,6 +197,7 @@ const BILLING_SECTIONS = [
           maxQuota: settings['checkin_setting.max_quota'],
           fixedQuota: settings['checkin_setting.fixed_quota'],
           randomMode: settings['checkin_setting.random_mode'],
+          quotaPerUnit: settings.QuotaPerUnit,
         }}
       />
     ),
