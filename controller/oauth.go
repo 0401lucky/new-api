@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -120,6 +121,8 @@ func HandleOAuth(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgUserRegisterDisabled)
 		case *OAuthInvitationCodeRequiredError:
 			common.ApiErrorMsg(c, "请填写邀请码")
+		case *oauth.TrustLevelError:
+			common.ApiErrorI18n(c, i18n.MsgOAuthTrustLevelLow)
 		default:
 			common.ApiError(c, err)
 		}
@@ -241,6 +244,16 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 		}
 	}
 
+	if linuxDOProvider, ok := provider.(*oauth.LinuxDOProvider); ok {
+		legacyUser, err := findExistingLinuxDOUsernameUser(linuxDOProvider, oauthUser)
+		if err != nil {
+			return nil, err
+		}
+		if legacyUser != nil {
+			return legacyUser, nil
+		}
+	}
+
 	// User doesn't exist, create new user if registration is enabled
 	if !common.RegisterEnabled {
 		return nil, &OAuthRegistrationDisabledError{}
@@ -254,6 +267,14 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 		}
 		if invitationCode == "" {
 			return nil, &OAuthInvitationCodeRequiredError{}
+		}
+	}
+	if _, ok := provider.(*oauth.LinuxDOProvider); ok {
+		if trustLevel, ok := oauthUser.Extra["trust_level"].(int); ok && trustLevel < common.LinuxDOMinimumTrustLevel {
+			return nil, &oauth.TrustLevelError{
+				Required: common.LinuxDOMinimumTrustLevel,
+				Current:  trustLevel,
+			}
 		}
 	}
 
@@ -361,6 +382,29 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 		_ = session.Save()
 	}
 
+	return user, nil
+}
+
+func findExistingLinuxDOUsernameUser(provider *oauth.LinuxDOProvider, oauthUser *oauth.OAuthUser) (*model.User, error) {
+	username := strings.TrimSpace(oauthUser.Username)
+	providerUserID := strings.TrimSpace(oauthUser.ProviderUserID)
+	if username == "" || providerUserID == "" {
+		return nil, nil
+	}
+
+	user := &model.User{}
+	err := model.DB.Where("username = ? AND (linux_do_id IS NULL OR linux_do_id = ?)", username, "").First(user).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	provider.SetProviderUserID(user, providerUserID)
+	if err := model.DB.Model(user).Update("linux_do_id", providerUserID).Error; err != nil {
+		return nil, err
+	}
 	return user, nil
 }
 

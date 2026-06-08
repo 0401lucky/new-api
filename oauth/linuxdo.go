@@ -143,16 +143,6 @@ func (p *LinuxDOProvider) GetUserInfo(ctx context.Context, token *OAuthToken) (*
 	logger.LogDebug(ctx, "[OAuth-LinuxDO] GetUserInfo: id=%d, username=%s, name=%s, trust_level=%d, active=%v, silenced=%v",
 		linuxdoUser.Id, linuxdoUser.Username, linuxdoUser.Name, linuxdoUser.TrustLevel, linuxdoUser.Active, linuxdoUser.Silenced)
 
-	// Check trust level
-	if linuxdoUser.TrustLevel < common.LinuxDOMinimumTrustLevel {
-		logger.LogWarn(ctx, fmt.Sprintf("[OAuth-LinuxDO] GetUserInfo: trust level too low (required=%d, current=%d)",
-			common.LinuxDOMinimumTrustLevel, linuxdoUser.TrustLevel))
-		return nil, &TrustLevelError{
-			Required: common.LinuxDOMinimumTrustLevel,
-			Current:  linuxdoUser.TrustLevel,
-		}
-	}
-
 	logger.LogDebug(ctx, "[OAuth-LinuxDO] GetUserInfo success: id=%d, username=%s", linuxdoUser.Id, linuxdoUser.Username)
 
 	return &OAuthUser{
