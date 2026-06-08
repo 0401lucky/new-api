@@ -120,10 +120,6 @@ export function UserAuthForm({
   )
   const hasAlternativeLogin =
     passkeyLoginEnabled || hasWeChatLogin || hasOAuthLogin
-  const invitationCodeReady =
-    !invitationCodeRequired ||
-    !(hasWeChatLogin || hasOAuthLogin) ||
-    Boolean(invitationCode.trim())
 
   useEffect(() => {
     if (requiresLegalConsent) {
@@ -214,10 +210,6 @@ export function UserAuthForm({
       toast.error(legalConsentErrorMessage)
       return
     }
-    if (!invitationCodeReady) {
-      toast.error(t('Please enter an invite code'))
-      return
-    }
 
     setIsWeChatDialogOpen(true)
   }
@@ -233,10 +225,6 @@ export function UserAuthForm({
   async function handleWeChatLogin() {
     if (!wechatCode.trim()) {
       toast.error(t('Please enter the verification code'))
-      return
-    }
-    if (!invitationCodeReady) {
-      toast.error(t('Please enter an invite code'))
       return
     }
 
@@ -371,9 +359,7 @@ export function UserAuthForm({
       <OAuthProviders
         status={status}
         disabled={
-          isLoading ||
-          (requiresLegalConsent && !agreedToLegal) ||
-          !invitationCodeReady
+          isLoading || (requiresLegalConsent && !agreedToLegal)
         }
         onWeChatLogin={hasWeChatLogin ? handleOpenWeChatDialog : undefined}
         isWeChatLoading={isWeChatSubmitting}
@@ -521,8 +507,7 @@ export function UserAuthForm({
                 disabled={
                   isWeChatSubmitting ||
                   !wechatCode.trim() ||
-                  (requiresLegalConsent && !agreedToLegal) ||
-                  !invitationCodeReady
+                  (requiresLegalConsent && !agreedToLegal)
                 }
                 className='gap-2'
               >
