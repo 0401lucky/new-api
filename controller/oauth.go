@@ -393,7 +393,7 @@ func findExistingLinuxDOUsernameUser(provider *oauth.LinuxDOProvider, oauthUser 
 	}
 
 	user := &model.User{}
-	err := model.DB.Where("username = ? AND (linux_do_id IS NULL OR linux_do_id = ?)", username, "").First(user).Error
+	err := model.DB.Where("LOWER(username) = LOWER(?) AND (linux_do_id IS NULL OR linux_do_id = ?)", username, "").First(user).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
