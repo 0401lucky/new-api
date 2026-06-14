@@ -138,6 +138,10 @@ export function SidebarModulesSection({
         title: t('Model health'),
         description: t('Analyze hourly model health and request outcomes.'),
       },
+      recent_calls: {
+        title: t('Recent calls'),
+        description: t('Inspect recent relay requests and responses.'),
+      },
       blackroom: {
         title: t('Blackroom'),
         description: t('Review and release users blocked by risk rules.'),

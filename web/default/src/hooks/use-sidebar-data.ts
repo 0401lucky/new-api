@@ -20,6 +20,7 @@ import {
   Activity,
   Ban,
   Box,
+  ClipboardList,
   CreditCard,
   FileText,
   FlaskConical,
@@ -132,6 +133,11 @@ export function useSidebarData(): SidebarData {
             title: t('Model health'),
             url: '/model-health-hourly',
             icon: HeartPulse,
+          },
+          {
+            title: t('Recent calls'),
+            url: '/recent-calls',
+            icon: ClipboardList,
           },
           {
             title: t('Users'),

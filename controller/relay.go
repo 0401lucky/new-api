@@ -104,6 +104,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 				})
 			}
 		}
+		service.FinalizeRecentCallResponse(c)
 	}()
 
 	request, err := helper.GetAndValidateRequest(c, relayFormat)
@@ -212,6 +213,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			}
 			break
 		}
+		startRecentCallCapture(c, relayInfo, bodyStorage)
 		c.Request.Body = io.NopCloser(bodyStorage)
 
 		switch relayFormat {
@@ -269,6 +271,22 @@ func addUsedChannel(c *gin.Context, channelId int) {
 	useChannel := c.GetStringSlice("use_channel")
 	useChannel = append(useChannel, fmt.Sprintf("%d", channelId))
 	c.Set("use_channel", useChannel)
+}
+
+func startRecentCallCapture(c *gin.Context, relayInfo *relaycommon.RelayInfo, bodyStorage common.BodyStorage) {
+	if c == nil || relayInfo == nil || bodyStorage == nil {
+		return
+	}
+	if _, exists := c.Get(service.RecentCallsContextKeyID); exists {
+		return
+	}
+	bodyBytes, err := bodyStorage.Bytes()
+	if err != nil {
+		logger.LogWarn(c, "recent calls read request body failed: "+err.Error())
+		return
+	}
+	service.RecentCallsCache().BeginFromContext(c, relayInfo, bodyBytes)
+	service.AttachRecentCallResponseCapture(c)
 }
 
 func fastTokenCountMetaForPricing(request dto.Request) *types.TokenCountMeta {
@@ -387,6 +405,7 @@ func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) b
 
 func processChannelError(c *gin.Context, channelError types.ChannelError, err *types.NewAPIError) {
 	logger.LogError(c, fmt.Sprintf("channel error (channel #%d, status code: %d): %s", channelError.ChannelId, err.StatusCode, common.LocalLogPreview(err.Error())))
+	service.RecentCallsCache().UpsertErrorByContext(c, err.MaskSensitiveError(), fmt.Sprint(err.GetErrorType()), fmt.Sprint(err.GetErrorCode()), err.StatusCode)
 	// 不要使用context获取渠道信息，异步处理时可能会出现渠道信息不一致的情况
 	// do not use context to get channel info, there may be inconsistent channel info when processing asynchronously
 	if service.ShouldDisableChannel(err) && channelError.AutoBan {
@@ -533,6 +552,7 @@ func RelayTask(c *gin.Context) {
 		})
 		return
 	}
+	defer service.FinalizeRecentCallResponse(c)
 
 	if taskErr := relay.ResolveOriginTask(c, relayInfo); taskErr != nil {
 		respondTaskError(c, taskErr)
@@ -590,6 +610,7 @@ func RelayTask(c *gin.Context) {
 			}
 			break
 		}
+		startRecentCallCapture(c, relayInfo, bodyStorage)
 		c.Request.Body = io.NopCloser(bodyStorage)
 
 		result, taskErr = relay.RelayTaskSubmit(c, relayInfo)
