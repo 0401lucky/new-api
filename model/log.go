@@ -216,6 +216,7 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 			IsError:   true,
 		})
 	}
+	recordActiveTaskSlotSafe(c, userId, username, modelName)
 }
 
 type RecordConsumeLogParams struct {
@@ -235,7 +236,9 @@ type RecordConsumeLogParams struct {
 
 func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams) {
 	if !common.LogConsumeEnabled {
-		recordModelHealthSuccessEvent(c, params, common.GetTimestamp())
+		createdAt := common.GetTimestamp()
+		recordModelHealthSuccessEvent(c, params, createdAt)
+		recordActiveTaskSlotSafe(c, userId, c.GetString("username"), params.ModelName)
 		return
 	}
 	logger.LogInfo(c, fmt.Sprintf("record consume log: userId=%d, params=%s", userId, common.GetJsonString(params)))
@@ -286,6 +289,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		})
 	}
 	recordModelHealthSuccessEvent(c, params, log.CreatedAt)
+	recordActiveTaskSlotSafe(c, userId, username, params.ModelName)
 }
 
 func recordModelHealthSuccessEvent(c *gin.Context, params RecordConsumeLogParams, createdAt int64) {

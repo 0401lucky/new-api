@@ -97,6 +97,8 @@ export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
     models: true,
     model_health: true,
     recent_calls: true,
+    fingerprints: true,
+    active_tasks: true,
     blackroom: true,
     redemption: true,
     user: true,

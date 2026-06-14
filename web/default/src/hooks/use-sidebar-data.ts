@@ -23,6 +23,7 @@ import {
   ClipboardList,
   CreditCard,
   FileText,
+  Fingerprint,
   FlaskConical,
   HeartPulse,
   Key,
@@ -138,6 +139,16 @@ export function useSidebarData(): SidebarData {
             title: t('Recent calls'),
             url: '/recent-calls',
             icon: ClipboardList,
+          },
+          {
+            title: t('Fingerprints'),
+            url: '/fingerprints',
+            icon: Fingerprint,
+          },
+          {
+            title: t('Active tasks'),
+            url: '/active-tasks',
+            icon: Activity,
           },
           {
             title: t('Users'),

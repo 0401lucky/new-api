@@ -50,9 +50,11 @@ import { Route as AuthenticatedPlaygroundIndexRouteImport } from './routes/_auth
 import { Route as AuthenticatedModelsIndexRouteImport } from './routes/_authenticated/models/index'
 import { Route as AuthenticatedModelHealthHourlyIndexRouteImport } from './routes/_authenticated/model-health-hourly/index'
 import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authenticated/keys/index'
+import { Route as AuthenticatedFingerprintsIndexRouteImport } from './routes/_authenticated/fingerprints/index'
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard/index'
 import { Route as AuthenticatedChannelsIndexRouteImport } from './routes/_authenticated/channels/index'
 import { Route as AuthenticatedBlackroomIndexRouteImport } from './routes/_authenticated/blackroom/index'
+import { Route as AuthenticatedActiveTasksIndexRouteImport } from './routes/_authenticated/active-tasks/index'
 import { Route as AuthenticatedUsageLogsSectionRouteImport } from './routes/_authenticated/usage-logs/$section'
 import { Route as AuthenticatedModelsSectionRouteImport } from './routes/_authenticated/models/$section'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
@@ -289,6 +291,12 @@ const AuthenticatedKeysIndexRoute = AuthenticatedKeysIndexRouteImport.update({
   path: '/keys/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedFingerprintsIndexRoute =
+  AuthenticatedFingerprintsIndexRouteImport.update({
+    id: '/fingerprints/',
+    path: '/fingerprints/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardIndexRoute =
   AuthenticatedDashboardIndexRouteImport.update({
     id: '/dashboard/',
@@ -305,6 +313,12 @@ const AuthenticatedBlackroomIndexRoute =
   AuthenticatedBlackroomIndexRouteImport.update({
     id: '/blackroom/',
     path: '/blackroom/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedActiveTasksIndexRoute =
+  AuthenticatedActiveTasksIndexRouteImport.update({
+    id: '/active-tasks/',
+    path: '/active-tasks/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedUsageLogsSectionRoute =
@@ -459,9 +473,11 @@ export interface FileRoutesByFullPath {
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/models/$section': typeof AuthenticatedModelsSectionRoute
   '/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
+  '/active-tasks/': typeof AuthenticatedActiveTasksIndexRoute
   '/blackroom/': typeof AuthenticatedBlackroomIndexRoute
   '/channels/': typeof AuthenticatedChannelsIndexRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
+  '/fingerprints/': typeof AuthenticatedFingerprintsIndexRoute
   '/keys/': typeof AuthenticatedKeysIndexRoute
   '/model-health-hourly/': typeof AuthenticatedModelHealthHourlyIndexRoute
   '/models/': typeof AuthenticatedModelsIndexRoute
@@ -522,9 +538,11 @@ export interface FileRoutesByTo {
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/models/$section': typeof AuthenticatedModelsSectionRoute
   '/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
+  '/active-tasks': typeof AuthenticatedActiveTasksIndexRoute
   '/blackroom': typeof AuthenticatedBlackroomIndexRoute
   '/channels': typeof AuthenticatedChannelsIndexRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
+  '/fingerprints': typeof AuthenticatedFingerprintsIndexRoute
   '/keys': typeof AuthenticatedKeysIndexRoute
   '/model-health-hourly': typeof AuthenticatedModelHealthHourlyIndexRoute
   '/models': typeof AuthenticatedModelsIndexRoute
@@ -589,9 +607,11 @@ export interface FileRoutesById {
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/_authenticated/models/$section': typeof AuthenticatedModelsSectionRoute
   '/_authenticated/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
+  '/_authenticated/active-tasks/': typeof AuthenticatedActiveTasksIndexRoute
   '/_authenticated/blackroom/': typeof AuthenticatedBlackroomIndexRoute
   '/_authenticated/channels/': typeof AuthenticatedChannelsIndexRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
+  '/_authenticated/fingerprints/': typeof AuthenticatedFingerprintsIndexRoute
   '/_authenticated/keys/': typeof AuthenticatedKeysIndexRoute
   '/_authenticated/model-health-hourly/': typeof AuthenticatedModelHealthHourlyIndexRoute
   '/_authenticated/models/': typeof AuthenticatedModelsIndexRoute
@@ -655,9 +675,11 @@ export interface FileRouteTypes {
     | '/errors/$error'
     | '/models/$section'
     | '/usage-logs/$section'
+    | '/active-tasks/'
     | '/blackroom/'
     | '/channels/'
     | '/dashboard/'
+    | '/fingerprints/'
     | '/keys/'
     | '/model-health-hourly/'
     | '/models/'
@@ -718,9 +740,11 @@ export interface FileRouteTypes {
     | '/errors/$error'
     | '/models/$section'
     | '/usage-logs/$section'
+    | '/active-tasks'
     | '/blackroom'
     | '/channels'
     | '/dashboard'
+    | '/fingerprints'
     | '/keys'
     | '/model-health-hourly'
     | '/models'
@@ -784,9 +808,11 @@ export interface FileRouteTypes {
     | '/_authenticated/errors/$error'
     | '/_authenticated/models/$section'
     | '/_authenticated/usage-logs/$section'
+    | '/_authenticated/active-tasks/'
     | '/_authenticated/blackroom/'
     | '/_authenticated/channels/'
     | '/_authenticated/dashboard/'
+    | '/_authenticated/fingerprints/'
     | '/_authenticated/keys/'
     | '/_authenticated/model-health-hourly/'
     | '/_authenticated/models/'
@@ -1128,6 +1154,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedKeysIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/fingerprints/': {
+      id: '/_authenticated/fingerprints/'
+      path: '/fingerprints'
+      fullPath: '/fingerprints/'
+      preLoaderRoute: typeof AuthenticatedFingerprintsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard/': {
       id: '/_authenticated/dashboard/'
       path: '/dashboard'
@@ -1147,6 +1180,13 @@ declare module '@tanstack/react-router' {
       path: '/blackroom'
       fullPath: '/blackroom/'
       preLoaderRoute: typeof AuthenticatedBlackroomIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/active-tasks/': {
+      id: '/_authenticated/active-tasks/'
+      path: '/active-tasks'
+      fullPath: '/active-tasks/'
+      preLoaderRoute: typeof AuthenticatedActiveTasksIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/usage-logs/$section': {
@@ -1383,9 +1423,11 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
   AuthenticatedModelsSectionRoute: typeof AuthenticatedModelsSectionRoute
   AuthenticatedUsageLogsSectionRoute: typeof AuthenticatedUsageLogsSectionRoute
+  AuthenticatedActiveTasksIndexRoute: typeof AuthenticatedActiveTasksIndexRoute
   AuthenticatedBlackroomIndexRoute: typeof AuthenticatedBlackroomIndexRoute
   AuthenticatedChannelsIndexRoute: typeof AuthenticatedChannelsIndexRoute
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
+  AuthenticatedFingerprintsIndexRoute: typeof AuthenticatedFingerprintsIndexRoute
   AuthenticatedKeysIndexRoute: typeof AuthenticatedKeysIndexRoute
   AuthenticatedModelHealthHourlyIndexRoute: typeof AuthenticatedModelHealthHourlyIndexRoute
   AuthenticatedModelsIndexRoute: typeof AuthenticatedModelsIndexRoute
@@ -1408,9 +1450,11 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
   AuthenticatedModelsSectionRoute: AuthenticatedModelsSectionRoute,
   AuthenticatedUsageLogsSectionRoute: AuthenticatedUsageLogsSectionRoute,
+  AuthenticatedActiveTasksIndexRoute: AuthenticatedActiveTasksIndexRoute,
   AuthenticatedBlackroomIndexRoute: AuthenticatedBlackroomIndexRoute,
   AuthenticatedChannelsIndexRoute: AuthenticatedChannelsIndexRoute,
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
+  AuthenticatedFingerprintsIndexRoute: AuthenticatedFingerprintsIndexRoute,
   AuthenticatedKeysIndexRoute: AuthenticatedKeysIndexRoute,
   AuthenticatedModelHealthHourlyIndexRoute:
     AuthenticatedModelHealthHourlyIndexRoute,

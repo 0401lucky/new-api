@@ -114,6 +114,8 @@ export interface UserSettings {
   accept_unset_model_ratio_model?: boolean
   /** Record IP log */
   record_ip_log?: boolean
+  /** Disable balanced leak protection */
+  disable_leak_protection_balanced?: boolean
   /** Receive upstream model update notifications (admin only) */
   upstream_model_update_notify_enabled?: boolean
   /** Preferred interface/API response language */
@@ -144,6 +146,7 @@ export interface UpdateUserSettingsRequest {
   gotify_priority?: number
   accept_unset_model_ratio_model?: boolean
   record_ip_log?: boolean
+  disable_leak_protection_balanced?: boolean
   upstream_model_update_notify_enabled?: boolean
 }
 

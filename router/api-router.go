@@ -160,6 +160,35 @@ func SetApiRouter(router *gin.Engine) {
 			}
 		}
 
+		fingerprintRoute := apiRouter.Group("/fingerprint")
+		{
+			fingerprintUserRoute := fingerprintRoute.Group("")
+			fingerprintUserRoute.Use(middleware.UserAuth())
+			{
+				fingerprintUserRoute.POST("/record", controller.RecordFingerprint)
+				fingerprintUserRoute.GET("/self", controller.GetUserFingerprints)
+			}
+
+			fingerprintAdminRoute := fingerprintRoute.Group("")
+			fingerprintAdminRoute.Use(middleware.AdminAuth())
+			{
+				fingerprintAdminRoute.GET("/", controller.GetAllFingerprints)
+				fingerprintAdminRoute.GET("/search", controller.SearchFingerprints)
+				fingerprintAdminRoute.GET("/users", controller.FindUsersByVisitorId)
+				fingerprintAdminRoute.GET("/users_by_ip", controller.FindUsersByIP)
+				fingerprintAdminRoute.GET("/duplicates", controller.GetDuplicateVisitorIds)
+			}
+		}
+
+		activeTaskRoute := apiRouter.Group("/active_task")
+		activeTaskRoute.Use(middleware.AdminAuth())
+		{
+			activeTaskRoute.GET("/rank", controller.GetActiveTaskRankAPI)
+			activeTaskRoute.GET("/stats", controller.GetActiveTaskStatsAPI)
+			activeTaskRoute.GET("/history", controller.GetHighActiveTaskHistoryAPI)
+			activeTaskRoute.GET("/user_token_usage", controller.GetUserTokenUsage24hAPI)
+		}
+
 		// Subscription billing (plans, purchase, admin management)
 		subscriptionRoute := apiRouter.Group("/subscription")
 		subscriptionRoute.Use(middleware.UserAuth())

@@ -142,6 +142,14 @@ export function SidebarModulesSection({
         title: t('Recent calls'),
         description: t('Inspect recent relay requests and responses.'),
       },
+      fingerprints: {
+        title: t('Fingerprints'),
+        description: t('Review device fingerprints linked to user accounts.'),
+      },
+      active_tasks: {
+        title: t('Active tasks'),
+        description: t('Monitor concurrent request patterns by user.'),
+      },
       blackroom: {
         title: t('Blackroom'),
         description: t('Review and release users blocked by risk rules.'),

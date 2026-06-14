@@ -103,6 +103,9 @@ func main() {
 	// 数据看板
 	go model.UpdateQuotaData()
 
+	// 活跃任务监控，用于管理员观察高并发/高相似请求用户。
+	model.StartHighActiveTaskScanner()
+
 	if os.Getenv("CHANNEL_UPDATE_FREQUENCY") != "" {
 		frequency, err := strconv.Atoi(os.Getenv("CHANNEL_UPDATE_FREQUENCY"))
 		if err != nil {

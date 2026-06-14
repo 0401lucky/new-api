@@ -67,6 +67,7 @@ export function NotificationTab({ profile, onUpdate }: NotificationTabProps) {
     gotify_priority: 5,
     accept_unset_model_ratio_model: false,
     record_ip_log: false,
+    disable_leak_protection_balanced: false,
     upstream_model_update_notify_enabled: false,
   })
 
@@ -95,6 +96,8 @@ export function NotificationTab({ profile, onUpdate }: NotificationTabProps) {
         accept_unset_model_ratio_model:
           parsed.accept_unset_model_ratio_model || false,
         record_ip_log: parsed.record_ip_log || false,
+        disable_leak_protection_balanced:
+          parsed.disable_leak_protection_balanced || false,
         upstream_model_update_notify_enabled:
           parsed.upstream_model_update_notify_enabled || false,
       })
@@ -378,6 +381,26 @@ export function NotificationTab({ profile, onUpdate }: NotificationTabProps) {
             className='shrink-0'
             checked={settings.record_ip_log}
             onCheckedChange={(checked) => updateField('record_ip_log', checked)}
+          />
+        </div>
+
+        {/* Leak Protection */}
+        <div className='flex items-start justify-between gap-3 rounded-lg border p-3 sm:items-center sm:p-4'>
+          <div className='space-y-0.5'>
+            <Label htmlFor='leakProtection'>{t('Leak protection')}</Label>
+            <p className='text-muted-foreground text-xs sm:text-sm'>
+              {t(
+                'Block requests that appear to contain leaked API keys or credentials'
+              )}
+            </p>
+          </div>
+          <Switch
+            id='leakProtection'
+            className='shrink-0'
+            checked={!settings.disable_leak_protection_balanced}
+            onCheckedChange={(checked) =>
+              updateField('disable_leak_protection_balanced', !checked)
+            }
           />
         </div>
       </div>

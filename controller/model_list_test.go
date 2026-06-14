@@ -212,6 +212,7 @@ func TestListModelsIncludesTieredBillingModel(t *testing.T) {
 
 func TestListModelsTokenLimitIncludesTieredBillingModel(t *testing.T) {
 	withSelfUseModeDisabled(t)
+	setupModelListControllerTestDB(t)
 	withTieredBillingConfig(t, map[string]string{
 		"zz-token-tiered-visible-model":      "tiered_expr",
 		"zz-token-tiered-empty-expr-model":   "tiered_expr",
@@ -224,6 +225,7 @@ func TestListModelsTokenLimitIncludesTieredBillingModel(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	common.SetContextKey(ctx, constant.ContextKeyUserGroup, "default")
 	common.SetContextKey(ctx, constant.ContextKeyTokenModelLimitEnabled, true)
 	common.SetContextKey(ctx, constant.ContextKeyTokenModelLimit, map[string]bool{
 		"zz-token-tiered-visible-model":      true,

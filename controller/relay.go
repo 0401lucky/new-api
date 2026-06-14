@@ -118,6 +118,16 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		return
 	}
 
+	userSetting := getRelayUserSetting(c)
+	if service.IsLeakProtectionBalancedEnabled(userSetting) {
+		if blocked, reason := service.CheckRequestLeakProtection(request); blocked {
+			logger.LogWarn(c, fmt.Sprintf("leak protection blocked request: %s", common.LocalLogPreview(reason)))
+			recordLeakProtectionBlockedLog(c, reason)
+			newAPIError = service.NewLeakProtectionAPIError()
+			return
+		}
+	}
+
 	relayInfo, err := relaycommon.GenRelayInfo(c, relayFormat, request, ws)
 	if err != nil {
 		newAPIError = types.NewError(err, types.ErrorCodeGenRelayInfoFailed)
@@ -316,6 +326,63 @@ func fastTokenCountMetaForPricing(request dto.Request) *types.TokenCountMeta {
 		// Best-effort: leave CombineText empty to avoid large allocations.
 	}
 	return meta
+}
+
+func getRelayUserSetting(c *gin.Context) dto.UserSetting {
+	userSetting, ok := common.GetContextKeyType[dto.UserSetting](c, constant.ContextKeyUserSetting)
+	if ok {
+		return userSetting
+	}
+	userId := c.GetInt("id")
+	if userId <= 0 {
+		return dto.UserSetting{}
+	}
+	userSetting, err := model.GetUserSetting(userId, false)
+	if err != nil {
+		logger.LogWarn(c, fmt.Sprintf("load user setting for relay failed: %s", err.Error()))
+		return dto.UserSetting{}
+	}
+	common.SetContextKey(c, constant.ContextKeyUserSetting, userSetting)
+	return userSetting
+}
+
+func recordLeakProtectionBlockedLog(c *gin.Context, reason string) {
+	if !constant.ErrorLogEnabled || c == nil {
+		return
+	}
+	userId := c.GetInt("id")
+	if userId <= 0 {
+		return
+	}
+
+	other := map[string]interface{}{
+		"reject_reason":            "leak_protection",
+		"leak_protection_reason":   reason,
+		"leak_protection_balanced": true,
+	}
+	if c.Request != nil && c.Request.URL != nil {
+		other["request_path"] = c.Request.URL.Path
+	}
+
+	useTimeSeconds := 0
+	startTime := common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)
+	if !startTime.IsZero() {
+		useTimeSeconds = int(time.Since(startTime).Seconds())
+	}
+
+	model.RecordErrorLog(
+		c,
+		userId,
+		common.GetContextKeyInt(c, constant.ContextKeyChannelId),
+		c.GetString("original_model"),
+		c.GetString("token_name"),
+		"leak protection blocked request: "+reason,
+		c.GetInt("token_id"),
+		useTimeSeconds,
+		common.GetContextKeyBool(c, constant.ContextKeyIsStream),
+		c.GetString("group"),
+		other,
+	)
 }
 
 func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service.RetryParam) (*model.Channel, *types.NewAPIError) {

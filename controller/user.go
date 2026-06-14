@@ -510,6 +510,8 @@ func generateDefaultSidebarConfig(userRole int) string {
 			"channel":      true,
 			"models":       true,
 			"model_health": true,
+			"fingerprints": true,
+			"active_tasks": true,
 			"redemption":   true,
 			"user":         true,
 			"setting":      false, // 管理员不能访问系统设置
@@ -521,6 +523,8 @@ func generateDefaultSidebarConfig(userRole int) string {
 			"channel":      true,
 			"models":       true,
 			"model_health": true,
+			"fingerprints": true,
+			"active_tasks": true,
 			"redemption":   true,
 			"user":         true,
 			"setting":      true,
@@ -1153,6 +1157,7 @@ type UpdateUserSettingRequest struct {
 	UpstreamModelUpdateNotifyEnabled *bool   `json:"upstream_model_update_notify_enabled,omitempty"`
 	AcceptUnsetModelRatioModel       bool    `json:"accept_unset_model_ratio_model"`
 	RecordIpLog                      bool    `json:"record_ip_log"`
+	DisableLeakProtectionBalanced    bool    `json:"disable_leak_protection_balanced"`
 }
 
 func UpdateUserSetting(c *gin.Context) {
@@ -1248,14 +1253,21 @@ func UpdateUserSetting(c *gin.Context) {
 		upstreamModelUpdateNotifyEnabled = *req.UpstreamModelUpdateNotifyEnabled
 	}
 
-	// 构建设置
-	settings := dto.UserSetting{
-		NotifyType:                       req.QuotaWarningType,
-		QuotaWarningThreshold:            req.QuotaWarningThreshold,
-		UpstreamModelUpdateNotifyEnabled: upstreamModelUpdateNotifyEnabled,
-		AcceptUnsetRatioModel:            req.AcceptUnsetModelRatioModel,
-		RecordIpLog:                      req.RecordIpLog,
-	}
+	// 在现有设置上更新，避免覆盖语言、侧边栏和扣费偏好等独立设置。
+	settings := existingSettings
+	settings.NotifyType = req.QuotaWarningType
+	settings.QuotaWarningThreshold = req.QuotaWarningThreshold
+	settings.WebhookUrl = ""
+	settings.WebhookSecret = ""
+	settings.NotificationEmail = ""
+	settings.BarkUrl = ""
+	settings.GotifyUrl = ""
+	settings.GotifyToken = ""
+	settings.GotifyPriority = 0
+	settings.UpstreamModelUpdateNotifyEnabled = upstreamModelUpdateNotifyEnabled
+	settings.AcceptUnsetRatioModel = req.AcceptUnsetModelRatioModel
+	settings.RecordIpLog = req.RecordIpLog
+	settings.DisableLeakProtectionBalanced = req.DisableLeakProtectionBalanced
 
 	// 如果是webhook类型,添加webhook相关设置
 	if req.QuotaWarningType == dto.NotifyTypeWebhook {
