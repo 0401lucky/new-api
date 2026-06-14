@@ -21,6 +21,8 @@ import { useQuery } from '@tanstack/react-query'
 import { AlertCircle, ChevronLeft, Copy, Eye, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -58,8 +60,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { sideDrawerContentClassName } from '@/components/drawer-layout'
 import { SectionPageLayout } from '@/components/layout'
+import { UserInfoDialog } from '@/features/usage-logs/components/dialogs/user-info-dialog'
 import { getRecentCallById, getRecentCalls } from './api'
 import type {
   RecentCallBody,
@@ -101,6 +110,7 @@ function metadataForRequest(record?: RecentCallRecord | null) {
     id: record.id,
     created_at: record.created_at,
     user_id: record.user_id,
+    username: record.username,
     channel_id: record.channel_id,
     model_name: record.model_name,
     method: record.method,
@@ -133,6 +143,55 @@ function StatusBadge(props: { status?: number }) {
     <Badge variant={status >= 400 ? 'destructive' : 'secondary'}>
       {status}
     </Badge>
+  )
+}
+
+function UserCell(props: {
+  record: RecentCallRecord
+  onOpenUser: (userId: number) => void
+}) {
+  const { record, onOpenUser } = props
+  const username = record.username
+  if (!username) {
+    return <span className='text-muted-foreground'>-</span>
+  }
+
+  return (
+    <button
+      type='button'
+      className='flex max-w-[150px] items-center gap-1.5 text-left disabled:cursor-default'
+      disabled={!record.user_id}
+      onClick={(event) => {
+        event.stopPropagation()
+        if (record.user_id) {
+          onOpenUser(record.user_id)
+        }
+      }}
+      onDoubleClick={(event) => event.stopPropagation()}
+    >
+      <Avatar className='ring-border/60 size-6 ring-1 max-sm:hidden'>
+        <AvatarFallback
+          className='text-[11px] font-semibold'
+          style={getUserAvatarStyle(username)}
+        >
+          {getUserAvatarFallback(username)}
+        </AvatarFallback>
+      </Avatar>
+      <TooltipProvider delay={300}>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span className='text-muted-foreground max-w-[110px] truncate text-sm hover:underline' />
+            }
+          >
+            {username}
+          </TooltipTrigger>
+          {username.length > 12 && (
+            <TooltipContent side='top'>{username}</TooltipContent>
+          )}
+        </Tooltip>
+      </TooltipProvider>
+    </button>
   )
 }
 
@@ -245,7 +304,12 @@ function DetailSheet(props: {
             <div className='flex flex-col gap-4 py-4'>
               <div className='flex flex-wrap items-center gap-2'>
                 <Badge variant='outline'>{formatDate(record.created_at)}</Badge>
-                <Badge variant='secondary'>uid: {record.user_id}</Badge>
+                {record.username ? (
+                  <Badge variant='secondary'>{record.username}</Badge>
+                ) : null}
+                <Badge variant='outline'>
+                  {t('User ID')}: {record.user_id || '-'}
+                </Badge>
                 {record.channel_id ? (
                   <Badge variant='outline'>ch: {record.channel_id}</Badge>
                 ) : null}
@@ -325,6 +389,8 @@ export function RecentCalls() {
   const [beforeId, setBeforeId] = useState('')
   const [activeId, setActiveId] = useState<number | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
+  const [userInfoOpen, setUserInfoOpen] = useState(false)
 
   const listQuery = useQuery({
     queryKey: ['recent-calls', limit, beforeId],
@@ -346,6 +412,11 @@ export function RecentCalls() {
   const openDetail = (record: RecentCallRecord) => {
     setActiveId(record.id)
     setDetailOpen(true)
+  }
+
+  const openUser = (userId: number) => {
+    setSelectedUserId(userId)
+    setUserInfoOpen(true)
   }
 
   return (
@@ -488,7 +559,9 @@ export function RecentCalls() {
                         >
                           <TableCell>#{record.id}</TableCell>
                           <TableCell>{formatDate(record.created_at)}</TableCell>
-                          <TableCell>{record.user_id || '-'}</TableCell>
+                          <TableCell>
+                            <UserCell record={record} onOpenUser={openUser} />
+                          </TableCell>
                           <TableCell>{record.channel_id || '-'}</TableCell>
                           <TableCell className='max-w-56 truncate'>
                             {record.model_name || '-'}
@@ -550,6 +623,11 @@ export function RecentCalls() {
         onOpenChange={setDetailOpen}
         loading={detailQuery.isFetching}
         record={detailQuery.data?.data}
+      />
+      <UserInfoDialog
+        userId={selectedUserId}
+        open={userInfoOpen}
+        onOpenChange={setUserInfoOpen}
       />
     </>
   )

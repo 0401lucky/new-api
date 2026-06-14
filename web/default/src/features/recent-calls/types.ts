@@ -54,6 +54,7 @@ export interface RecentCallRecord {
   id: number
   created_at: string
   user_id: number
+  username?: string
   channel_id?: number
   model_name?: string
   method: string

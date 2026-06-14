@@ -15,6 +15,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/gin-gonic/gin"
 )
@@ -79,6 +80,7 @@ type RecentCallRecord struct {
 	CreatedAt time.Time `json:"created_at"`
 
 	UserID    int    `json:"user_id"`
+	Username  string `json:"username,omitempty"`
 	ChannelID int    `json:"channel_id,omitempty"`
 	ModelName string `json:"model_name,omitempty"`
 
@@ -178,11 +180,17 @@ func (cch *recentCallsCache) BeginFromContext(c *gin.Context, info *relaycommon.
 			modelName = info.UpstreamModelName
 		}
 	}
+	userID := common.GetContextKeyInt(c, constant.ContextKeyUserId)
+	username := common.GetContextKeyString(c, constant.ContextKeyUserName)
+	if username == "" && userID > 0 {
+		username, _ = model.GetUsernameById(userID, false)
+	}
 
 	rec := RecentCallRecord{
 		ID:        id,
 		CreatedAt: time.Now().UTC(),
-		UserID:    common.GetContextKeyInt(c, constant.ContextKeyUserId),
+		UserID:    userID,
+		Username:  username,
 		ChannelID: common.GetContextKeyInt(c, constant.ContextKeyChannelId),
 		ModelName: modelName,
 		Method:    method,

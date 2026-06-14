@@ -28,6 +28,7 @@ func TestRecentCallsCacheRecordsRequestAndResponse(t *testing.T) {
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Request.Header.Set("Authorization", "Bearer sk-test-secret")
 	common.SetContextKey(c, constant.ContextKeyUserId, 7)
+	common.SetContextKey(c, constant.ContextKeyUserName, "tester")
 	common.SetContextKey(c, constant.ContextKeyChannelId, 9)
 
 	id := cache.BeginFromContext(c, &relaycommon.RelayInfo{OriginModelName: "gpt-test"}, []byte(`{"messages":[{"role":"user","content":"hello"}]}`))
@@ -45,6 +46,9 @@ func TestRecentCallsCacheRecordsRequestAndResponse(t *testing.T) {
 	}
 	if record.UserID != 7 || record.ChannelID != 9 || record.ModelName != "gpt-test" {
 		t.Fatalf("unexpected metadata: %+v", record)
+	}
+	if record.Username != "tester" {
+		t.Fatalf("unexpected username: %q", record.Username)
 	}
 	if !strings.Contains(record.Request.Body, `"hello"`) {
 		t.Fatalf("request body was not materialized: %q", record.Request.Body)
