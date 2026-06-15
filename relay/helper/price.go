@@ -61,6 +61,13 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) types.
 		groupRatioInfo.GroupRatio = ratio_setting.GetGroupRatio(relayInfo.UsingGroup)
 	}
 
+	originalGroupRatio := groupRatioInfo.GroupRatio
+	dynamicRatio := model.GetMatchedDynamicRatio(relayInfo.UsingGroup, relayInfo.OriginModelName)
+	if dynamicRatio > 0 {
+		groupRatioInfo.GroupRatio = originalGroupRatio * dynamicRatio
+		groupRatioInfo.DynamicRatio = dynamicRatio
+	}
+
 	return groupRatioInfo
 }
 

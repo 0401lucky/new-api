@@ -99,6 +99,7 @@ func main() {
 
 	// 热更新配置
 	go model.SyncOptions(common.SyncFrequency)
+	go model.SyncDynamicRatioCache(common.SyncFrequency)
 
 	// 数据看板
 	go model.UpdateQuotaData()
@@ -275,6 +276,7 @@ func InitResources() error {
 	common.InitEnv()
 
 	logger.SetupLogger()
+	common.GetActiveConnectionsFunc = middleware.GetActiveConnectionCount
 
 	// Initialize model settings
 	ratio_setting.InitRatioSettings()
@@ -294,6 +296,7 @@ func InitResources() error {
 
 	// Initialize options, should after model.InitDB()
 	model.InitOptionMap()
+	model.InitDynamicRatioCache()
 
 	// 清理旧的磁盘缓存文件
 	common.CleanupOldCacheFiles()

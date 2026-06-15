@@ -30,6 +30,7 @@ func printHelp() {
 
 func InitEnv() {
 	flag.Parse()
+	InitStartupTimezone()
 
 	envVersion := os.Getenv("VERSION")
 	if envVersion != "" {

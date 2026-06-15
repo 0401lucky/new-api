@@ -30,6 +30,7 @@ import {
   LayoutDashboard,
   ListTodo,
   MessageSquare,
+  Percent,
   Radio,
   Settings,
   Ticket,
@@ -129,6 +130,11 @@ export function useSidebarData(): SidebarData {
             title: t('Models'),
             url: '/models/metadata',
             icon: Box,
+          },
+          {
+            title: t('Dynamic Ratio'),
+            url: '/dynamic-ratio',
+            icon: Percent,
           },
           {
             title: t('Model health'),

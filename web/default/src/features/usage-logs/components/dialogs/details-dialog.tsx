@@ -209,6 +209,16 @@ function BillingBreakdown(props: {
       value: `${formatRatio(effectiveGR)}x`,
     })
   }
+  if (
+    other.dynamic_ratio != null &&
+    Number.isFinite(other.dynamic_ratio) &&
+    other.dynamic_ratio !== 1
+  ) {
+    rows.push({
+      label: t('Dynamic Ratio'),
+      value: `${formatRatio(other.dynamic_ratio)}x`,
+    })
+  }
 
   if (!isTieredExpr && isClaude && hasAnyCacheTokens(other)) {
     if (other.cache_ratio != null && other.cache_ratio !== 1) {

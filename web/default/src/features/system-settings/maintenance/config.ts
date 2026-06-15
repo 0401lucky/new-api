@@ -95,6 +95,7 @@ export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
     enabled: true,
     channel: true,
     models: true,
+    dynamic_ratio: true,
     model_health: true,
     recent_calls: true,
     fingerprints: true,

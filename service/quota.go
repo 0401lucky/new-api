@@ -120,6 +120,10 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 	if ok {
 		actualGroupRatio = userGroupRatio
 	}
+	dynamicRatio := model.GetMatchedDynamicRatio(relayInfo.UsingGroup, relayInfo.OriginModelName)
+	if dynamicRatio > 0 {
+		actualGroupRatio *= dynamicRatio
+	}
 
 	quotaInfo := QuotaInfo{
 		InputDetails: TokenDetails{

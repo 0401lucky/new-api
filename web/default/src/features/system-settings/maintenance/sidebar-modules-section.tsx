@@ -134,6 +134,10 @@ export function SidebarModulesSection({
         title: t('Models'),
         description: t('Manage catalog visibility and pricing.'),
       },
+      dynamic_ratio: {
+        title: t('Dynamic Ratio'),
+        description: t('Manage dynamic multipliers layered on group ratios.'),
+      },
       model_health: {
         title: t('Model health'),
         description: t('Analyze hourly model health and request outcomes.'),

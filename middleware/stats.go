@@ -39,3 +39,7 @@ func GetStats() StatsInfo {
 		ActiveConnections: atomic.LoadInt64(&globalStats.activeConnections),
 	}
 }
+
+func GetActiveConnectionCount() int64 {
+	return atomic.LoadInt64(&globalStats.activeConnections)
+}

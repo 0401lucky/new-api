@@ -157,6 +157,7 @@ func InitOptionMap() {
 	common.OptionMap["DataExportInterval"] = strconv.Itoa(common.DataExportInterval)
 	common.OptionMap["DataExportDefaultTime"] = common.DataExportDefaultTime
 	common.OptionMap["DefaultCollapseSidebar"] = strconv.FormatBool(common.DefaultCollapseSidebar)
+	common.OptionMap["DynamicRatioEnabled"] = strconv.FormatBool(common.DynamicRatioEnabled)
 	common.OptionMap["MjNotifyEnabled"] = strconv.FormatBool(setting.MjNotifyEnabled)
 	common.OptionMap["MjAccountFilterEnabled"] = strconv.FormatBool(setting.MjAccountFilterEnabled)
 	common.OptionMap["MjModeClearEnabled"] = strconv.FormatBool(setting.MjModeClearEnabled)
@@ -327,6 +328,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.DataExportEnabled = boolValue
 		case "DefaultCollapseSidebar":
 			common.DefaultCollapseSidebar = boolValue
+		case "DynamicRatioEnabled":
+			common.DynamicRatioEnabled = boolValue
 		case "MjNotifyEnabled":
 			setting.MjNotifyEnabled = boolValue
 		case "MjAccountFilterEnabled":
