@@ -94,6 +94,7 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 	if err != nil {
 		return err
 	}
+	relayInfo.UserQuota = userQuota
 
 	token, err := model.GetTokenByKey(strings.TrimPrefix(relayInfo.TokenKey, "sk-"), false)
 	if err != nil {
@@ -120,10 +121,25 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 	if ok {
 		actualGroupRatio = userGroupRatio
 	}
-	dynamicRatio := model.GetMatchedDynamicRatio(relayInfo.UsingGroup, relayInfo.OriginModelName)
-	if dynamicRatio > 0 {
-		actualGroupRatio *= dynamicRatio
+	groupRatioInfo := types.GroupRatioInfo{
+		GroupRatio:        actualGroupRatio,
+		GroupSpecialRatio: -1,
+		HasSpecialRatio:   ok,
 	}
+	if ok {
+		groupRatioInfo.GroupSpecialRatio = userGroupRatio
+	}
+	dynamicMatch := model.GetMatchedDynamicRatioMatch(relayInfo.UsingGroup, relayInfo.OriginModelName, int64(userQuota))
+	if dynamicMatch.Ratio > 0 {
+		actualGroupRatio *= dynamicMatch.Ratio
+		groupRatioInfo.GroupRatio = actualGroupRatio
+		groupRatioInfo.DynamicRatio = dynamicMatch.Ratio
+		groupRatioInfo.DynamicRatioRuleId = dynamicMatch.RuleId
+		groupRatioInfo.DynamicRatioBalanceQuota = dynamicMatch.BalanceQuota
+		groupRatioInfo.DynamicRatioBalanceMinQuota = dynamicMatch.BalanceMinQuota
+		groupRatioInfo.DynamicRatioBalanceMaxQuota = dynamicMatch.BalanceMaxQuota
+	}
+	relayInfo.PriceData.GroupRatioInfo = groupRatioInfo
 
 	quotaInfo := QuotaInfo{
 		InputDetails: TokenDetails{

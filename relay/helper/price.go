@@ -62,10 +62,23 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) types.
 	}
 
 	originalGroupRatio := groupRatioInfo.GroupRatio
-	dynamicRatio := model.GetMatchedDynamicRatio(relayInfo.UsingGroup, relayInfo.OriginModelName)
-	if dynamicRatio > 0 {
-		groupRatioInfo.GroupRatio = originalGroupRatio * dynamicRatio
-		groupRatioInfo.DynamicRatio = dynamicRatio
+	balanceQuota := int64(relayInfo.UserQuota)
+	if balanceQuota == 0 && relayInfo.UserId > 0 {
+		if quota, err := model.GetUserQuota(relayInfo.UserId, false); err == nil {
+			balanceQuota = int64(quota)
+			relayInfo.UserQuota = quota
+		} else {
+			logger.LogDebug(ctx, "dynamic ratio balance query failed: %s", err.Error())
+		}
+	}
+	dynamicMatch := model.GetMatchedDynamicRatioMatch(relayInfo.UsingGroup, relayInfo.OriginModelName, balanceQuota)
+	if dynamicMatch.Ratio > 0 {
+		groupRatioInfo.GroupRatio = originalGroupRatio * dynamicMatch.Ratio
+		groupRatioInfo.DynamicRatio = dynamicMatch.Ratio
+		groupRatioInfo.DynamicRatioRuleId = dynamicMatch.RuleId
+		groupRatioInfo.DynamicRatioBalanceQuota = dynamicMatch.BalanceQuota
+		groupRatioInfo.DynamicRatioBalanceMinQuota = dynamicMatch.BalanceMinQuota
+		groupRatioInfo.DynamicRatioBalanceMaxQuota = dynamicMatch.BalanceMaxQuota
 	}
 
 	return groupRatioInfo

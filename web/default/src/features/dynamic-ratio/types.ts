@@ -29,6 +29,8 @@ export interface DynamicRatioRule {
   group: string
   models: string
   concurrency: number | null
+  balance_min_quota: number | null
+  balance_max_quota: number | null
   weekdays: string
   start_time: string
   end_time: string
@@ -44,6 +46,8 @@ export interface DynamicRatioRulePayload {
   group: string
   models: string
   concurrency: number | null
+  balance_min_quota: number | null
+  balance_max_quota: number | null
   weekdays: string
   start_time: string
   end_time: string
@@ -54,6 +58,8 @@ export interface DynamicRatioRulePayload {
 export interface DynamicRatioSummary {
   group: string
   concurrency: number | null
+  balance_min_quota: number | null
+  balance_max_quota: number | null
   weekdays: string
   start_time: string
   end_time: string
@@ -65,6 +71,10 @@ export interface DynamicRatioStatus {
   enabled: boolean
   active_ratio: number
   active_group?: string
+  active_rule_id?: number
+  balance_quota?: number
+  active_balance_min_quota?: number | null
+  active_balance_max_quota?: number | null
   timezone: string
   rules_count: number
   rules: DynamicRatioSummary[]

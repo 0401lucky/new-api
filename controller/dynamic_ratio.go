@@ -123,7 +123,7 @@ func GetDynamicRatioStatus(c *gin.Context) {
 			common.ApiErrorMsg(c, "无权访问该分组")
 			return
 		}
-		common.ApiSuccess(c, model.GetDynamicRatioStatus(group))
+		common.ApiSuccess(c, model.GetDynamicRatioStatusWithBalance(group, int64(user.Quota)))
 		return
 	}
 
@@ -136,5 +136,5 @@ func GetDynamicRatioStatus(c *gin.Context) {
 		groups = append(groups, user.Group)
 	}
 
-	common.ApiSuccess(c, model.GetDynamicRatioStatusForGroups(groups))
+	common.ApiSuccess(c, model.GetDynamicRatioStatusForGroupsWithBalance(groups, int64(user.Quota)))
 }

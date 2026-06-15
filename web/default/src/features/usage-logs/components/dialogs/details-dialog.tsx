@@ -135,6 +135,19 @@ function formatRatio(ratio: number | undefined): string {
   return ratio.toFixed(4)
 }
 
+function formatLogBalanceRange(
+  min: number | undefined,
+  max: number | undefined,
+  unlimitedLabel: string
+): string {
+  if (min == null && max == null) return unlimitedLabel
+  if (min != null && max != null) {
+    return `${formatLogQuota(min)} - ${formatLogQuota(max)}`
+  }
+  if (min != null) return `${formatLogQuota(min)}+`
+  return `< ${formatLogQuota(max!)}`
+}
+
 function BillingBreakdown(props: {
   log: UsageLog
   other: LogOtherData
@@ -218,6 +231,31 @@ function BillingBreakdown(props: {
       label: t('Dynamic Ratio'),
       value: `${formatRatio(other.dynamic_ratio)}x`,
     })
+    if (other.dynamic_ratio_rule_id != null) {
+      rows.push({
+        label: t('Dynamic ratio rule'),
+        value: `#${other.dynamic_ratio_rule_id}`,
+      })
+    }
+    if (other.dynamic_ratio_balance_quota != null) {
+      rows.push({
+        label: t('Current wallet balance'),
+        value: formatLogQuota(other.dynamic_ratio_balance_quota),
+      })
+    }
+    if (
+      other.dynamic_ratio_balance_min_quota != null ||
+      other.dynamic_ratio_balance_max_quota != null
+    ) {
+      rows.push({
+        label: t('Matched balance range'),
+        value: formatLogBalanceRange(
+          other.dynamic_ratio_balance_min_quota,
+          other.dynamic_ratio_balance_max_quota,
+          t('Unlimited')
+        ),
+      })
+    }
   }
 
   if (!isTieredExpr && isClaude && hasAnyCacheTokens(other)) {

@@ -120,6 +120,117 @@ func TestMatchDynamicRatioConcurrencyPriority(t *testing.T) {
 	}
 }
 
+func TestMatchDynamicRatioBalanceOldRuleCompatibility(t *testing.T) {
+	rules := []DynamicRatioRule{{Id: 1, Enable: true, Group: "vip", Ratio: 1.5}}
+	parsed := dynamicRatioTestRules(rules)
+
+	for _, balance := range []int64{0, 100, 1000} {
+		match := matchDynamicRatioMatch(parsed, "vip", "gpt-4", 0, time.Now(), balance, true)
+		if match.Ratio != 1.5 {
+			t.Fatalf("balance %d ratio = %v, want 1.5", balance, match.Ratio)
+		}
+		if match.RuleId != 1 {
+			t.Fatalf("balance %d rule id = %d, want 1", balance, match.RuleId)
+		}
+	}
+}
+
+func TestMatchDynamicRatioBalanceRangeBoundaries(t *testing.T) {
+	rules := []DynamicRatioRule{
+		{Id: 1, Enable: true, Group: "vip", BalanceMinQuota: dynamicRatioInt64(10), BalanceMaxQuota: dynamicRatioInt64(200), Ratio: 1.2},
+	}
+	parsed := dynamicRatioTestRules(rules)
+
+	cases := []struct {
+		name    string
+		balance int64
+		want    float64
+	}{
+		{name: "below min", balance: 9, want: 0},
+		{name: "at min", balance: 10, want: 1.2},
+		{name: "below max", balance: 199, want: 1.2},
+		{name: "at max", balance: 200, want: 0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			match := matchDynamicRatioMatch(parsed, "vip", "gpt-4", 0, time.Now(), tc.balance, true)
+			if match.Ratio != tc.want {
+				t.Fatalf("ratio = %v, want %v", match.Ratio, tc.want)
+			}
+		})
+	}
+}
+
+func TestMatchDynamicRatioBalanceContinuousRanges(t *testing.T) {
+	rules := []DynamicRatioRule{
+		{Id: 1, Enable: true, Group: "vip", BalanceMinQuota: dynamicRatioInt64(10), BalanceMaxQuota: dynamicRatioInt64(200), Ratio: 1.0},
+		{Id: 2, Enable: true, Group: "vip", BalanceMinQuota: dynamicRatioInt64(200), BalanceMaxQuota: dynamicRatioInt64(500), Ratio: 1.5},
+	}
+
+	match := matchDynamicRatioMatch(dynamicRatioTestRules(rules), "vip", "gpt-4", 0, time.Now(), 200, true)
+	if match.Ratio != 1.5 || match.RuleId != 2 {
+		t.Fatalf("match = %+v, want rule 2 ratio 1.5", match)
+	}
+}
+
+func TestMatchDynamicRatioBalanceSingleSidedRanges(t *testing.T) {
+	rules := []DynamicRatioRule{
+		{Id: 1, Enable: true, Group: "vip", BalanceMaxQuota: dynamicRatioInt64(200), Ratio: 1.1},
+		{Id: 2, Enable: true, Group: "vip", BalanceMinQuota: dynamicRatioInt64(500), Ratio: 1.8},
+	}
+	parsed := dynamicRatioTestRules(rules)
+
+	lowMatch := matchDynamicRatioMatch(parsed, "vip", "gpt-4", 0, time.Now(), 199, true)
+	if lowMatch.Ratio != 1.1 || lowMatch.RuleId != 1 {
+		t.Fatalf("low match = %+v, want rule 1 ratio 1.1", lowMatch)
+	}
+
+	highMatch := matchDynamicRatioMatch(parsed, "vip", "gpt-4", 0, time.Now(), 500, true)
+	if highMatch.Ratio != 1.8 || highMatch.RuleId != 2 {
+		t.Fatalf("high match = %+v, want rule 2 ratio 1.8", highMatch)
+	}
+}
+
+func TestMatchDynamicRatioBalanceWithModelAndConcurrency(t *testing.T) {
+	rules := []DynamicRatioRule{
+		{
+			Id:              1,
+			Enable:          true,
+			Group:           "vip",
+			Models:          `["gpt-4*"]`,
+			Concurrency:     dynamicRatioInt64(10),
+			BalanceMinQuota: dynamicRatioInt64(100),
+			BalanceMaxQuota: dynamicRatioInt64(300),
+			Ratio:           1.6,
+		},
+	}
+	parsed := dynamicRatioTestRules(rules)
+	now := time.Now()
+
+	if ratio := matchDynamicRatioMatch(parsed, "vip", "gpt-3.5", 11, now, 150, true).Ratio; ratio != 0 {
+		t.Fatalf("model mismatch ratio = %v, want 0", ratio)
+	}
+	if ratio := matchDynamicRatioMatch(parsed, "vip", "gpt-4o", 10, now, 150, true).Ratio; ratio != 0 {
+		t.Fatalf("concurrency at threshold ratio = %v, want 0", ratio)
+	}
+	if ratio := matchDynamicRatioMatch(parsed, "vip", "gpt-4o", 11, now, 150, true).Ratio; ratio != 1.6 {
+		t.Fatalf("matched ratio = %v, want 1.6", ratio)
+	}
+}
+
+func TestMatchDynamicRatioBalanceSpecificRulePriority(t *testing.T) {
+	rules := []DynamicRatioRule{
+		{Id: 1, Enable: true, Group: "vip", Ratio: 1.1, Priority: 0},
+		{Id: 2, Enable: true, Group: "vip", BalanceMinQuota: dynamicRatioInt64(100), BalanceMaxQuota: dynamicRatioInt64(300), Ratio: 1.5, Priority: 10},
+	}
+
+	match := matchDynamicRatioMatch(dynamicRatioTestRules(rules), "vip", "gpt-4", 0, time.Now(), 150, true)
+	if match.Ratio != 1.5 || match.RuleId != 2 {
+		t.Fatalf("match = %+v, want balance rule 2 ratio 1.5", match)
+	}
+}
+
 func TestGetMatchedDynamicRatioEnabledSwitch(t *testing.T) {
 	originalEnabled := common.DynamicRatioEnabled
 	originalGetter := common.GetActiveConnectionsFunc
@@ -176,5 +287,41 @@ func TestDynamicRatioRuleValidateModelList(t *testing.T) {
 
 	if err := rule.Validate(); err == nil {
 		t.Fatal("expected empty model name validation error")
+	}
+}
+
+func TestDynamicRatioRuleValidateBalanceRange(t *testing.T) {
+	cases := []struct {
+		name string
+		rule DynamicRatioRule
+		want string
+	}{
+		{
+			name: "negative min",
+			rule: DynamicRatioRule{Group: "default", Ratio: 1.2, BalanceMinQuota: dynamicRatioInt64(-1)},
+			want: "余额下限不能为负数",
+		},
+		{
+			name: "zero max",
+			rule: DynamicRatioRule{Group: "default", Ratio: 1.2, BalanceMaxQuota: dynamicRatioInt64(0)},
+			want: "余额上限必须大于 0",
+		},
+		{
+			name: "max equals min",
+			rule: DynamicRatioRule{Group: "default", Ratio: 1.2, BalanceMinQuota: dynamicRatioInt64(100), BalanceMaxQuota: dynamicRatioInt64(100)},
+			want: "余额上限必须大于余额下限",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.rule.Validate()
+			if err == nil {
+				t.Fatalf("expected error %q", tc.want)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %q, want contains %q", err.Error(), tc.want)
+			}
+		})
 	}
 }

@@ -3,10 +3,14 @@ package types
 import "fmt"
 
 type GroupRatioInfo struct {
-	GroupRatio        float64
-	GroupSpecialRatio float64
-	HasSpecialRatio   bool
-	DynamicRatio      float64
+	GroupRatio                  float64
+	GroupSpecialRatio           float64
+	HasSpecialRatio             bool
+	DynamicRatio                float64
+	DynamicRatioRuleId          int64
+	DynamicRatioBalanceQuota    int64
+	DynamicRatioBalanceMinQuota *int64
+	DynamicRatioBalanceMaxQuota *int64
 }
 
 type PriceData struct {

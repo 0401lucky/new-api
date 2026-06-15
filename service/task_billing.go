@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 )
 
@@ -43,6 +44,11 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 		other["model_ratio"] = info.PriceData.ModelRatio
 	}
 	other["group_ratio"] = info.PriceData.GroupRatioInfo.GroupRatio
+	if info.PriceData.GroupRatioInfo.DynamicRatio > 0 {
+		other["dynamic_ratio"] = info.PriceData.GroupRatioInfo.DynamicRatio
+		other["group_ratio"] = info.PriceData.GroupRatioInfo.GroupRatio / info.PriceData.GroupRatioInfo.DynamicRatio
+		appendDynamicRatioMatchInfo(other, info.PriceData.GroupRatioInfo)
+	}
 	if info.PriceData.GroupRatioInfo.HasSpecialRatio {
 		other["user_group_ratio"] = info.PriceData.GroupRatioInfo.GroupSpecialRatio
 	}
@@ -125,6 +131,17 @@ func taskBillingOther(task *model.Task) map[string]interface{} {
 			other["model_ratio"] = bc.ModelRatio
 		}
 		other["group_ratio"] = bc.GroupRatio
+		if bc.DynamicRatio > 0 {
+			other["dynamic_ratio"] = bc.DynamicRatio
+			other["group_ratio"] = bc.GroupRatio / bc.DynamicRatio
+			appendDynamicRatioMatchInfo(other, types.GroupRatioInfo{
+				DynamicRatio:                bc.DynamicRatio,
+				DynamicRatioRuleId:          bc.DynamicRatioRuleId,
+				DynamicRatioBalanceQuota:    bc.DynamicRatioBalanceQuota,
+				DynamicRatioBalanceMinQuota: bc.DynamicRatioBalanceMinQuota,
+				DynamicRatioBalanceMaxQuota: bc.DynamicRatioBalanceMaxQuota,
+			})
+		}
 		if len(bc.OtherRatios) > 0 {
 			for k, v := range bc.OtherRatios {
 				other[k] = v

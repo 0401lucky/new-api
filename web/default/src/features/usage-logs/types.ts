@@ -128,6 +128,10 @@ export interface LogOtherData {
   model_price?: number
   group_ratio?: number
   dynamic_ratio?: number
+  dynamic_ratio_rule_id?: number
+  dynamic_ratio_balance_quota?: number
+  dynamic_ratio_balance_min_quota?: number
+  dynamic_ratio_balance_max_quota?: number
   user_group_ratio?: number
   cache_ratio?: number
   cache_creation_ratio?: number

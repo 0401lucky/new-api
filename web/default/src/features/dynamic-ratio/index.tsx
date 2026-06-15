@@ -30,6 +30,11 @@ import {
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/auth-store'
+import {
+  formatQuota,
+  parseQuotaFromDollars,
+  quotaUnitsToDollars,
+} from '@/lib/format'
 import { ROLE } from '@/lib/roles'
 import { cn } from '@/lib/utils'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -110,6 +115,8 @@ type RuleFormState = {
   group: string
   models: string
   concurrency: string
+  balance_min_quota: string
+  balance_max_quota: string
   weekdays: number[]
   start_time: string
   end_time: string
@@ -122,6 +129,8 @@ const DEFAULT_FORM: RuleFormState = {
   group: '',
   models: '',
   concurrency: '',
+  balance_min_quota: '',
+  balance_max_quota: '',
   weekdays: [],
   start_time: '',
   end_time: '',
@@ -158,6 +167,11 @@ function parseJsonArray<T>(value: string): T[] {
   return parsed as T[]
 }
 
+function quotaToInputValue(quota: number | null | undefined): string {
+  if (quota == null) return ''
+  return String(Number(quotaUnitsToDollars(quota).toFixed(6)))
+}
+
 function ruleToForm(rule: DynamicRatioRule | null): RuleFormState {
   if (!rule) return { ...DEFAULT_FORM }
 
@@ -180,6 +194,8 @@ function ruleToForm(rule: DynamicRatioRule | null): RuleFormState {
     group: rule.group,
     models,
     concurrency: rule.concurrency == null ? '' : String(rule.concurrency),
+    balance_min_quota: quotaToInputValue(rule.balance_min_quota),
+    balance_max_quota: quotaToInputValue(rule.balance_max_quota),
     weekdays,
     start_time: rule.start_time || '',
     end_time: rule.end_time || '',
@@ -198,6 +214,8 @@ function ruleToPayload(rule: DynamicRatioRule): DynamicRatioRulePayload & {
     group: rule.group,
     models: rule.models || '',
     concurrency: rule.concurrency ?? null,
+    balance_min_quota: rule.balance_min_quota ?? null,
+    balance_max_quota: rule.balance_max_quota ?? null,
     weekdays: rule.weekdays || '',
     start_time: rule.start_time || '',
     end_time: rule.end_time || '',
@@ -235,6 +253,34 @@ function buildPayload(form: RuleFormState): DynamicRatioRulePayload {
     throw new Error('Concurrency threshold must be greater than 0')
   }
 
+  const balanceMinText = form.balance_min_quota.trim()
+  const balanceMaxText = form.balance_max_quota.trim()
+  const balanceMinValue = balanceMinText === '' ? null : Number(balanceMinText)
+  const balanceMaxValue = balanceMaxText === '' ? null : Number(balanceMaxText)
+  if (
+    balanceMinValue !== null &&
+    (!Number.isFinite(balanceMinValue) || balanceMinValue < 0)
+  ) {
+    throw new Error('Balance lower limit cannot be negative')
+  }
+  if (
+    balanceMaxValue !== null &&
+    (!Number.isFinite(balanceMaxValue) || balanceMaxValue <= 0)
+  ) {
+    throw new Error('Balance upper limit must be greater than 0')
+  }
+  const balanceMinQuota =
+    balanceMinValue === null ? null : parseQuotaFromDollars(balanceMinValue)
+  const balanceMaxQuota =
+    balanceMaxValue === null ? null : parseQuotaFromDollars(balanceMaxValue)
+  if (
+    balanceMaxQuota !== null &&
+    balanceMinQuota !== null &&
+    balanceMaxQuota <= balanceMinQuota
+  ) {
+    throw new Error('Balance upper limit must be greater than lower limit')
+  }
+
   const startTime = form.start_time.trim()
   const endTime = form.end_time.trim()
   if ((startTime && !endTime) || (!startTime && endTime)) {
@@ -252,6 +298,8 @@ function buildPayload(form: RuleFormState): DynamicRatioRulePayload {
     group,
     models,
     concurrency,
+    balance_min_quota: balanceMinQuota,
+    balance_max_quota: balanceMaxQuota,
     weekdays: form.weekdays.length > 0 ? JSON.stringify(form.weekdays) : '',
     start_time: startTime,
     end_time: endTime,
@@ -289,6 +337,18 @@ function formatModels(value: string, allModelsLabel: string): string {
   } catch {
     return value || allModelsLabel
   }
+}
+
+function formatBalanceRange(
+  min: number | null | undefined,
+  max: number | null | undefined,
+  unlimitedLabel: string
+): string {
+  if (min == null && max == null) return unlimitedLabel
+  if (min != null && max != null)
+    return `${formatQuota(min)} - ${formatQuota(max)}`
+  if (min != null) return `${formatQuota(min)}+`
+  return `< ${formatQuota(max!)}`
 }
 
 function ratioVariant(ratio: number) {
@@ -463,7 +523,7 @@ export function DynamicRatio() {
     try {
       saveRuleMutation.mutate(buildPayload(form))
     } catch (error) {
-      toast.error(mutationErrorMessage(error, t('Invalid form')))
+      toast.error(t(mutationErrorMessage(error, 'Invalid form')))
     }
   }
 
@@ -523,7 +583,7 @@ export function DynamicRatio() {
               </Alert>
             ) : null}
 
-            <div className='grid gap-3 md:grid-cols-4'>
+            <div className='grid gap-3 md:grid-cols-3 xl:grid-cols-6'>
               <StatCard
                 title={t('Status')}
                 value={globalEnabled ? t('Enabled') : t('Disabled')}
@@ -531,7 +591,27 @@ export function DynamicRatio() {
               <StatCard
                 title={t('Active ratio')}
                 value={formatRatio(statusQuery.data?.active_ratio)}
-                description={statusQuery.data?.active_group || undefined}
+                description={
+                  statusQuery.data?.active_rule_id
+                    ? `${statusQuery.data?.active_group || '-'} #${statusQuery.data.active_rule_id}`
+                    : statusQuery.data?.active_group || undefined
+                }
+              />
+              <StatCard
+                title={t('Current wallet balance')}
+                value={
+                  statusQuery.data?.balance_quota == null
+                    ? '-'
+                    : formatQuota(statusQuery.data.balance_quota)
+                }
+              />
+              <StatCard
+                title={t('Matched balance range')}
+                value={formatBalanceRange(
+                  statusQuery.data?.active_balance_min_quota,
+                  statusQuery.data?.active_balance_max_quota,
+                  t('Unlimited')
+                )}
               />
               <StatCard
                 title={t('Rules')}
@@ -562,6 +642,7 @@ export function DynamicRatio() {
                         <TableHead>{t('Group')}</TableHead>
                         <TableHead>{t('Models')}</TableHead>
                         <TableHead>{t('Concurrency')}</TableHead>
+                        <TableHead>{t('Balance range')}</TableHead>
                         <TableHead>{t('Weekdays')}</TableHead>
                         <TableHead>{t('Time Range')}</TableHead>
                         <TableHead>{t('Ratio')}</TableHead>
@@ -574,13 +655,13 @@ export function DynamicRatio() {
                     <TableBody>
                       {rulesQuery.isLoading ? (
                         <TableRow>
-                          <TableCell colSpan={9} className='h-32 text-center'>
+                          <TableCell colSpan={10} className='h-32 text-center'>
                             {t('Loading')}
                           </TableCell>
                         </TableRow>
                       ) : rules.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={9}>
+                          <TableCell colSpan={10}>
                             <Empty className='min-h-32 border-0'>
                               <EmptyHeader>
                                 <EmptyMedia variant='icon'>
@@ -627,6 +708,15 @@ export function DynamicRatio() {
                                   {t('Any')}
                                 </span>
                               )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant='outline'>
+                                {formatBalanceRange(
+                                  rule.balance_min_quota,
+                                  rule.balance_max_quota,
+                                  t('Unlimited')
+                                )}
+                              </Badge>
                             </TableCell>
                             <TableCell>
                               {formatWeekdays(rule.weekdays, t('Daily'), t)}
@@ -808,6 +898,58 @@ export function DynamicRatio() {
                 />
               </Field>
             </div>
+
+            <FieldSet>
+              <FieldLegend variant='label'>
+                {t('Wallet balance range')}
+              </FieldLegend>
+              <div className='grid gap-3 sm:grid-cols-2'>
+                <Field>
+                  <FieldLabel htmlFor='dynamic-ratio-balance-min'>
+                    {t('Minimum wallet balance')}
+                  </FieldLabel>
+                  <Input
+                    id='dynamic-ratio-balance-min'
+                    type='number'
+                    min='0'
+                    step='any'
+                    value={form.balance_min_quota}
+                    placeholder={t('Unlimited')}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        balance_min_quota: event.target.value,
+                      }))
+                    }
+                  />
+                  <FieldDescription>
+                    {t('Empty means no lower limit')}
+                  </FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor='dynamic-ratio-balance-max'>
+                    {t('Maximum wallet balance')}
+                  </FieldLabel>
+                  <Input
+                    id='dynamic-ratio-balance-max'
+                    type='number'
+                    min='0'
+                    step='any'
+                    value={form.balance_max_quota}
+                    placeholder={t('Unlimited')}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        balance_max_quota: event.target.value,
+                      }))
+                    }
+                  />
+                  <FieldDescription>
+                    {t('Empty means no upper limit')}
+                  </FieldDescription>
+                </Field>
+              </div>
+            </FieldSet>
 
             <div className='grid gap-3 sm:grid-cols-2'>
               <Field>

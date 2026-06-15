@@ -46,6 +46,7 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	if relayInfo.PriceData.GroupRatioInfo.DynamicRatio > 0 {
 		other["dynamic_ratio"] = relayInfo.PriceData.GroupRatioInfo.DynamicRatio
 		other["group_ratio"] = relayInfo.PriceData.GroupRatioInfo.GroupRatio / relayInfo.PriceData.GroupRatioInfo.DynamicRatio
+		appendDynamicRatioMatchInfo(other, relayInfo.PriceData.GroupRatioInfo)
 	}
 	other["frt"] = float64(relayInfo.FirstResponseTime.UnixMilli() - relayInfo.StartTime.UnixMilli())
 	if relayInfo.ReasoningEffort != "" {
@@ -84,6 +85,22 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	appendParamOverrideInfo(relayInfo, other)
 	appendStreamStatus(relayInfo, other)
 	return other
+}
+
+func appendDynamicRatioMatchInfo(other map[string]interface{}, info types.GroupRatioInfo) {
+	if other == nil || info.DynamicRatio <= 0 {
+		return
+	}
+	if info.DynamicRatioRuleId > 0 {
+		other["dynamic_ratio_rule_id"] = info.DynamicRatioRuleId
+	}
+	other["dynamic_ratio_balance_quota"] = info.DynamicRatioBalanceQuota
+	if info.DynamicRatioBalanceMinQuota != nil {
+		other["dynamic_ratio_balance_min_quota"] = info.DynamicRatioBalanceMinQuota
+	}
+	if info.DynamicRatioBalanceMaxQuota != nil {
+		other["dynamic_ratio_balance_max_quota"] = info.DynamicRatioBalanceMaxQuota
+	}
 }
 
 func appendParamOverrideInfo(relayInfo *relaycommon.RelayInfo, other map[string]interface{}) {
@@ -265,6 +282,7 @@ func GenerateMjOtherInfo(relayInfo *relaycommon.RelayInfo, priceData types.Price
 	if priceData.GroupRatioInfo.DynamicRatio > 0 {
 		other["dynamic_ratio"] = priceData.GroupRatioInfo.DynamicRatio
 		other["group_ratio"] = priceData.GroupRatioInfo.GroupRatio / priceData.GroupRatioInfo.DynamicRatio
+		appendDynamicRatioMatchInfo(other, priceData.GroupRatioInfo)
 	}
 	if priceData.GroupRatioInfo.HasSpecialRatio {
 		other["user_group_ratio"] = priceData.GroupRatioInfo.GroupSpecialRatio
