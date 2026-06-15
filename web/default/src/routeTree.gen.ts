@@ -50,9 +50,9 @@ import { Route as AuthenticatedPlaygroundIndexRouteImport } from './routes/_auth
 import { Route as AuthenticatedModelsIndexRouteImport } from './routes/_authenticated/models/index'
 import { Route as AuthenticatedModelHealthHourlyIndexRouteImport } from './routes/_authenticated/model-health-hourly/index'
 import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authenticated/keys/index'
+import { Route as AuthenticatedInviteCodesIndexRouteImport } from './routes/_authenticated/invite-codes/index'
 import { Route as AuthenticatedFingerprintsIndexRouteImport } from './routes/_authenticated/fingerprints/index'
 import { Route as AuthenticatedDynamicRatioIndexRouteImport } from './routes/_authenticated/dynamic-ratio/index'
-import { Route as AuthenticatedInviteCodesIndexRouteImport } from './routes/_authenticated/invite-codes/index'
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard/index'
 import { Route as AuthenticatedChannelsIndexRouteImport } from './routes/_authenticated/channels/index'
 import { Route as AuthenticatedBlackroomIndexRouteImport } from './routes/_authenticated/blackroom/index'
@@ -293,6 +293,12 @@ const AuthenticatedKeysIndexRoute = AuthenticatedKeysIndexRouteImport.update({
   path: '/keys/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedInviteCodesIndexRoute =
+  AuthenticatedInviteCodesIndexRouteImport.update({
+    id: '/invite-codes/',
+    path: '/invite-codes/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedFingerprintsIndexRoute =
   AuthenticatedFingerprintsIndexRouteImport.update({
     id: '/fingerprints/',
@@ -303,12 +309,6 @@ const AuthenticatedDynamicRatioIndexRoute =
   AuthenticatedDynamicRatioIndexRouteImport.update({
     id: '/dynamic-ratio/',
     path: '/dynamic-ratio/',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedInviteCodesIndexRoute =
-  AuthenticatedInviteCodesIndexRouteImport.update({
-    id: '/invite-codes/',
-    path: '/invite-codes/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedDashboardIndexRoute =
@@ -1180,18 +1180,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedKeysIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/fingerprints/': {
-      id: '/_authenticated/fingerprints/'
-      path: '/fingerprints'
-      fullPath: '/fingerprints/'
-      preLoaderRoute: typeof AuthenticatedFingerprintsIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/invite-codes/': {
       id: '/_authenticated/invite-codes/'
       path: '/invite-codes'
       fullPath: '/invite-codes/'
       preLoaderRoute: typeof AuthenticatedInviteCodesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/fingerprints/': {
+      id: '/_authenticated/fingerprints/'
+      path: '/fingerprints'
+      fullPath: '/fingerprints/'
+      preLoaderRoute: typeof AuthenticatedFingerprintsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dynamic-ratio/': {
