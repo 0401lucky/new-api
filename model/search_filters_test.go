@@ -57,6 +57,18 @@ func TestGetAllLogsFiltersByExactUserID(t *testing.T) {
 	require.Equal(t, 3, stat.Tpm)
 }
 
+func TestSumUsedQuotaEmptyResultReturnsZero(t *testing.T) {
+	truncateTables(t)
+	require.NoError(t, DB.Exec("DELETE FROM logs").Error)
+
+	now := common.GetTimestamp()
+	stat, err := SumUsedQuota(LogTypeUnknown, now+3600, now+7200, "", "", 0, "", 0, "")
+	require.NoError(t, err)
+	require.Equal(t, 0, stat.Quota)
+	require.Equal(t, 0, stat.Rpm)
+	require.Equal(t, 0, stat.Tpm)
+}
+
 func TestGetAllLogsFiltersNumericUsername(t *testing.T) {
 	truncateTables(t)
 
