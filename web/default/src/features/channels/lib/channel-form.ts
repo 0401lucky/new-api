@@ -79,10 +79,29 @@ function isOptionalStatusCodeMapping(value: string | undefined): boolean {
   }
 }
 
-function isCodexCredential(value: string | undefined): boolean {
+function isDefaultCodexBaseUrl(value: string | undefined): boolean {
+  const trimmed = value?.trim()
+  if (!trimmed) return true
   try {
+    const parsed = new URL(trimmed)
+    const host = parsed.hostname.toLowerCase()
+    return host === 'chatgpt.com' || host === 'www.chatgpt.com'
+  } catch {
+    return false
+  }
+}
+
+function isCodexCredential(
+  value: string | undefined,
+  baseUrl: string | undefined
+): boolean {
+  try {
+    const trimmed = value?.trim()
+    if (!trimmed) return true
+    if (!trimmed.startsWith('{')) {
+      return !isDefaultCodexBaseUrl(baseUrl)
+    }
     const parsed = parseOptionalJson(value)
-    if (parsed === undefined) return true
     return (
       isJsonObjectValue(parsed) &&
       typeof parsed.access_token === 'string' &&
@@ -225,11 +244,11 @@ export const channelFormSchema = z
           'Codex channels do not support batch creation'
         )
       }
-      if (data.key?.trim() && !isCodexCredential(data.key)) {
+      if (data.key?.trim() && !isCodexCredential(data.key, data.base_url)) {
         addRequiredIssue(
           ctx,
           'key',
-          'Codex credential must be a JSON object with access_token and account_id'
+          'Codex credential must be OAuth JSON, or a proxy API key with a custom Base URL'
         )
       }
     }

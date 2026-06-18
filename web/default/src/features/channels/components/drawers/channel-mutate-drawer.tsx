@@ -1984,7 +1984,7 @@ export function ChannelMutateDrawer({
                               </div>
                               <div className='text-muted-foreground text-xs'>
                                 {t(
-                                  'Codex channels use an OAuth JSON credential as the key.'
+                                  'Codex channels use OAuth JSON credentials, or proxy API keys with a custom Base URL.'
                                 )}
                               </div>
                             </div>

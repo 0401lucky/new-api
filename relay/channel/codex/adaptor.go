@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -19,6 +20,55 @@ import (
 )
 
 type Adaptor struct {
+}
+
+func isOAuthJSONKey(raw string) bool {
+	return strings.HasPrefix(strings.TrimSpace(raw), "{")
+}
+
+func isDefaultChatGPTBaseURL(raw string) bool {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return true
+	}
+	base, err := url.Parse(trimmed)
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(strings.TrimSpace(base.Hostname()))
+	return host == "chatgpt.com" || host == "www.chatgpt.com"
+}
+
+func joinProxyCodexURL(baseURL string, requestPath string) string {
+	base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	path := "/" + strings.TrimLeft(strings.TrimSpace(requestPath), "/")
+	if strings.HasSuffix(base, "/v1") && strings.HasPrefix(path, "/v1/") {
+		path = strings.TrimPrefix(path, "/v1")
+	}
+	return base + path
+}
+
+func copyCodexClientHeaders(c *gin.Context, req *http.Header) {
+	if c == nil || c.Request == nil || req == nil {
+		return
+	}
+	for _, name := range []string{
+		"User-Agent",
+		"Version",
+		"Originator",
+		"Session_id",
+		"Session-Id",
+		"session_id",
+		"X-Codex-Beta-Features",
+		"X-Codex-Turn-Metadata",
+		"X-Codex-Window-Id",
+		"X-Client-Request-Id",
+		"Thread-Id",
+	} {
+		if value := strings.TrimSpace(c.Request.Header.Get(name)); value != "" {
+			req.Set(name, value)
+		}
+	}
 }
 
 func (a *Adaptor) ConvertGeminiRequest(c *gin.Context, info *relaycommon.RelayInfo, request *dto.GeminiChatRequest) (any, error) {
@@ -138,6 +188,18 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 	if info.RelayMode != relayconstant.RelayModeResponses && info.RelayMode != relayconstant.RelayModeResponsesCompact {
 		return "", errors.New("codex channel: only /v1/responses and /v1/responses/compact are supported")
 	}
+
+	if info != nil && !isOAuthJSONKey(info.ApiKey) {
+		if isDefaultChatGPTBaseURL(info.ChannelBaseUrl) {
+			return "", errors.New("codex channel: non-JSON key requires a Codex-compatible proxy base_url")
+		}
+		path := "/v1/responses"
+		if info.RelayMode == relayconstant.RelayModeResponsesCompact {
+			path = "/v1/responses/compact"
+		}
+		return joinProxyCodexURL(info.ChannelBaseUrl, path), nil
+	}
+
 	path := "/backend-api/codex/responses"
 	if info.RelayMode == relayconstant.RelayModeResponsesCompact {
 		path = "/backend-api/codex/responses/compact"
@@ -149,8 +211,29 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *rel
 	channel.SetupApiRequestHeader(info, c, req)
 
 	key := strings.TrimSpace(info.ApiKey)
-	if !strings.HasPrefix(key, "{") {
-		return errors.New("codex channel: key must be a JSON object")
+	if !isOAuthJSONKey(key) {
+		if key == "" {
+			return errors.New("codex channel: key is required")
+		}
+		if isDefaultChatGPTBaseURL(info.ChannelBaseUrl) {
+			return errors.New("codex channel: non-JSON key requires a Codex-compatible proxy base_url")
+		}
+
+		copyCodexClientHeaders(c, req)
+		req.Set("Authorization", "Bearer "+key)
+		if req.Get("OpenAI-Beta") == "" {
+			req.Set("OpenAI-Beta", "responses=experimental")
+		}
+		if req.Get("originator") == "" {
+			req.Set("originator", "codex_cli_rs")
+		}
+		req.Set("Content-Type", "application/json")
+		if info.IsStream {
+			req.Set("Accept", "text/event-stream")
+		} else if req.Get("Accept") == "" {
+			req.Set("Accept", "application/json")
+		}
+		return nil
 	}
 
 	oauthKey, err := ParseOAuthKey(key)
