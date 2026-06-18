@@ -42,6 +42,41 @@ func GetQuotaDatesByUser(c *gin.Context) {
 	})
 }
 
+func GetUserModelUsageStats(c *gin.Context) {
+	userId, _ := strconv.Atoi(c.Query("user_id"))
+	if userId <= 0 {
+		common.ApiErrorMsg(c, "无效的用户ID")
+		return
+	}
+
+	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
+	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
+	limit, _ := strconv.Atoi(c.Query("limit"))
+
+	stats, err := model.GetUserModelUsageStats(userId, startTimestamp, endTimestamp, limit)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	var totalRequests, totalTokens, totalQuota int64
+	for _, stat := range stats {
+		totalRequests += stat.RequestCount
+		totalTokens += stat.TotalTokens
+		totalQuota += stat.Quota
+	}
+
+	common.ApiSuccess(c, gin.H{
+		"user_id":         userId,
+		"start_timestamp": startTimestamp,
+		"end_timestamp":   endTimestamp,
+		"models":          stats,
+		"total_requests":  totalRequests,
+		"total_tokens":    totalTokens,
+		"total_quota":     totalQuota,
+	})
+}
+
 func GetUserQuotaDates(c *gin.Context) {
 	userId := c.GetInt("id")
 	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)

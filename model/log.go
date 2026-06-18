@@ -495,6 +495,45 @@ type Stat struct {
 	Tpm   int `json:"tpm"`
 }
 
+type UserModelUsageStat struct {
+	ModelName    string `json:"model_name"`
+	RequestCount int64  `json:"request_count"`
+	TotalTokens  int64  `json:"total_tokens"`
+	Quota        int64  `json:"quota"`
+}
+
+func GetUserModelUsageStats(userId int, startTimestamp int64, endTimestamp int64, limit int) ([]UserModelUsageStat, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
+	var stats []UserModelUsageStat
+	query := LOG_DB.Table("logs").
+		Select("model_name, COUNT(*) AS request_count, COALESCE(SUM(prompt_tokens), 0) + COALESCE(SUM(completion_tokens), 0) AS total_tokens, COALESCE(SUM(quota), 0) AS quota").
+		Where("user_id = ? AND type = ?", userId, LogTypeConsume)
+
+	if startTimestamp != 0 {
+		query = query.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		query = query.Where("created_at <= ?", endTimestamp)
+	}
+
+	err := query.
+		Group("model_name").
+		Order("request_count desc, total_tokens desc").
+		Limit(limit).
+		Scan(&stats).Error
+	if err != nil {
+		common.SysError("failed to query user model usage stats: " + err.Error())
+		return nil, errors.New("查询用户模型统计失败")
+	}
+	return stats, nil
+}
+
 func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, userId int, tokenName string, channel int, group string) (stat Stat, err error) {
 	tx := LOG_DB.Table("logs").Select("sum(quota) quota")
 

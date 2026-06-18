@@ -33,6 +33,23 @@ export interface QuotaDataItem {
   quota?: number
 }
 
+export interface UserModelUsageItem {
+  model_name: string
+  request_count: number
+  total_tokens: number
+  quota: number
+}
+
+export interface UserModelUsageResponse {
+  user_id: number
+  start_timestamp: number
+  end_timestamp: number
+  models: UserModelUsageItem[]
+  total_requests: number
+  total_tokens: number
+  total_quota: number
+}
+
 // ============================================================================
 // Uptime Monitoring Types
 // ============================================================================
