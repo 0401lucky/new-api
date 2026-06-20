@@ -13,6 +13,8 @@ var (
 		"dall-e-3",
 		"dall-e-2",
 		"gpt-image-1",
+		"glm-image",
+		"cogview",
 		"prefix:imagen-",
 		"flux-",
 		"flux.1-",

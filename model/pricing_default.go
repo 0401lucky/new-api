@@ -17,6 +17,7 @@ var defaultVendorRules = map[string]string{
 	"kimi":     "Moonshot",
 	"chatglm":  "智谱",
 	"glm-":     "智谱",
+	"cogview":  "智谱",
 	"qwen":     "阿里巴巴",
 	"deepseek": "DeepSeek",
 	"abab":     "MiniMax",

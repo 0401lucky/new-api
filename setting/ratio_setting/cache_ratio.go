@@ -71,6 +71,28 @@ var defaultCacheRatio = map[string]float64{
 	"claude-opus-4-7-high":                0.1,
 	"claude-opus-4-7-medium":              0.1,
 	"claude-opus-4-7-low":                 0.1,
+	"claude-opus-4-8":                     0.1,
+	"claude-opus-4-8-thinking":            0.1,
+	"claude-opus-4-8-max":                 0.1,
+	"claude-opus-4-8-xhigh":               0.1,
+	"claude-opus-4-8-high":                0.1,
+	"claude-opus-4-8-medium":              0.1,
+	"claude-opus-4-8-low":                 0.1,
+	"glm-4.5":                             0.11 / 0.6,
+	"glm-4.5-x":                           0.45 / 2.2,
+	"glm-4.5-air":                         0.03 / 0.2,
+	"glm-4.5-airx":                        0.22 / 1.1,
+	"glm-4.5v":                            0.11 / 0.6,
+	"glm-4.6":                             0.11 / 0.6,
+	"glm-4.6v":                            0.05 / 0.3,
+	"glm-4.6v-flashx":                     0.004 / 0.04,
+	"glm-4.7":                             0.11 / 0.6,
+	"glm-4.7-flashx":                      0.01 / 0.07,
+	"glm-5":                               0.2 / 1.0,
+	"glm-5-turbo":                         0.24 / 1.2,
+	"glm-5.1":                             0.26 / 1.4,
+	"glm-5.2":                             0.26 / 1.4,
+	"glm-5v-turbo":                        0.24 / 1.2,
 }
 
 var defaultCreateCacheRatio = map[string]float64{
@@ -106,6 +128,13 @@ var defaultCreateCacheRatio = map[string]float64{
 	"claude-opus-4-7-high":                1.25,
 	"claude-opus-4-7-medium":              1.25,
 	"claude-opus-4-7-low":                 1.25,
+	"claude-opus-4-8":                     1.25,
+	"claude-opus-4-8-thinking":            1.25,
+	"claude-opus-4-8-max":                 1.25,
+	"claude-opus-4-8-xhigh":               1.25,
+	"claude-opus-4-8-high":                1.25,
+	"claude-opus-4-8-medium":              1.25,
+	"claude-opus-4-8-low":                 1.25,
 }
 
 //var defaultCreateCacheRatio = map[string]float64{}

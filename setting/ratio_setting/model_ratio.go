@@ -152,6 +152,12 @@ var defaultModelRatio = map[string]float64{
 	"claude-opus-4-7-high":                      2.5,
 	"claude-opus-4-7-medium":                    2.5,
 	"claude-opus-4-7-low":                       2.5,
+	"claude-opus-4-8":                           2.5,
+	"claude-opus-4-8-max":                       2.5,
+	"claude-opus-4-8-xhigh":                     2.5,
+	"claude-opus-4-8-high":                      2.5,
+	"claude-opus-4-8-medium":                    2.5,
+	"claude-opus-4-8-low":                       2.5,
 	"claude-3-opus-20240229":                    7.5, // $15 / 1M tokens
 	"claude-opus-4-20250514":                    7.5,
 	"claude-opus-4-1-20250805":                  7.5,
@@ -207,13 +213,33 @@ var defaultModelRatio = map[string]float64{
 	"glm-4-long":                                0.001 * RMB,
 	"glm-4-flash":                               0,
 	"glm-4v-plus":                               0.01 * RMB,
-	"qwen-turbo":                                0.8572, // ￥0.012 / 1k tokens
-	"qwen-plus":                                 10,     // ￥0.14 / 1k tokens
-	"text-embedding-v1":                         0.05,   // ￥0.0007 / 1k tokens
-	"SparkDesk-v1.1":                            1.2858, // ￥0.018 / 1k tokens
-	"SparkDesk-v2.1":                            1.2858, // ￥0.018 / 1k tokens
-	"SparkDesk-v3.1":                            1.2858, // ￥0.018 / 1k tokens
-	"SparkDesk-v3.5":                            1.2858, // ￥0.018 / 1k tokens
+	"glm-4-32b-0414-128k":                       0.1 / 2,  // $0.1 / 1M tokens
+	"glm-4.5":                                   0.6 / 2,  // $0.6 / 1M tokens
+	"glm-4.5-x":                                 2.2 / 2,  // $2.2 / 1M tokens
+	"glm-4.5-air":                               0.2 / 2,  // $0.2 / 1M tokens
+	"glm-4.5-airx":                              1.1 / 2,  // $1.1 / 1M tokens
+	"glm-4.5-flash":                             0,        // Free
+	"glm-4.5v":                                  0.6 / 2,  // $0.6 / 1M tokens
+	"glm-4.6":                                   0.6 / 2,  // $0.6 / 1M tokens
+	"glm-4.6v":                                  0.3 / 2,  // $0.3 / 1M tokens
+	"glm-4.6v-flash":                            0,        // Free
+	"glm-4.6v-flashx":                           0.04 / 2, // $0.04 / 1M tokens
+	"glm-4.7":                                   0.6 / 2,  // $0.6 / 1M tokens
+	"glm-4.7-flash":                             0,        // Free
+	"glm-4.7-flashx":                            0.07 / 2, // $0.07 / 1M tokens
+	"glm-5":                                     1.0 / 2,  // $1 / 1M tokens
+	"glm-5-turbo":                               1.2 / 2,  // $1.2 / 1M tokens
+	"glm-5.1":                                   1.4 / 2,  // $1.4 / 1M tokens
+	"glm-5.2":                                   1.4 / 2,  // $1.4 / 1M tokens
+	"glm-5v-turbo":                              1.2 / 2,  // $1.2 / 1M tokens
+	"glm-ocr":                                   0.03 / 2, // $0.03 / 1M tokens
+	"qwen-turbo":                                0.8572,   // ￥0.012 / 1k tokens
+	"qwen-plus":                                 10,       // ￥0.14 / 1k tokens
+	"text-embedding-v1":                         0.05,     // ￥0.0007 / 1k tokens
+	"SparkDesk-v1.1":                            1.2858,   // ￥0.018 / 1k tokens
+	"SparkDesk-v2.1":                            1.2858,   // ￥0.018 / 1k tokens
+	"SparkDesk-v3.1":                            1.2858,   // ￥0.018 / 1k tokens
+	"SparkDesk-v3.5":                            1.2858,   // ￥0.018 / 1k tokens
 	"SparkDesk-v4.0":                            1.2858,
 	"360GPT_S2_V9":                              0.8572, // ¥0.012 / 1k tokens
 	"360gpt-turbo":                              0.0858, // ¥0.0012 / 1k tokens
@@ -308,6 +334,8 @@ var defaultModelPrice = map[string]float64{
 	"veo-3.0-fast-generate-001":      0.15,
 	"veo-3.1-generate-preview":       0.4,
 	"veo-3.1-fast-generate-preview":  0.15,
+	"glm-image":                      0.015,
+	"cogview-4":                      0.01,
 }
 
 var defaultAudioRatio = map[string]float64{
@@ -333,10 +361,25 @@ var modelRatioMap = types.NewRWMap[string, float64]()
 var completionRatioMap = types.NewRWMap[string, float64]()
 
 var defaultCompletionRatio = map[string]float64{
-	"gpt-4-gizmo-*":  2,
-	"gpt-4o-gizmo-*": 3,
-	"gpt-4-all":      2,
-	"gpt-image-1":    8,
+	"gpt-4-gizmo-*":   2,
+	"gpt-4o-gizmo-*":  3,
+	"gpt-4-all":       2,
+	"gpt-image-1":     8,
+	"glm-4.5":         2.2 / 0.6,
+	"glm-4.5-x":       8.9 / 2.2,
+	"glm-4.5-air":     1.1 / 0.2,
+	"glm-4.5-airx":    4.5 / 1.1,
+	"glm-4.5v":        1.8 / 0.6,
+	"glm-4.6":         2.2 / 0.6,
+	"glm-4.6v":        0.9 / 0.3,
+	"glm-4.6v-flashx": 0.4 / 0.04,
+	"glm-4.7":         2.2 / 0.6,
+	"glm-4.7-flashx":  0.4 / 0.07,
+	"glm-5":           3.2 / 1.0,
+	"glm-5-turbo":     4.0 / 1.2,
+	"glm-5.1":         4.4 / 1.4,
+	"glm-5.2":         4.4 / 1.4,
+	"glm-5v-turbo":    4.0 / 1.2,
 }
 
 // InitRatioSettings initializes all model related settings maps
