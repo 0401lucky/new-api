@@ -59,6 +59,7 @@ import type {
 
 interface ModelsFilterProps {
   preferences: DashboardChartPreferences
+  appliedFilters: DashboardFilters
   onFilterChange: (filters: DashboardFilters) => void
   onReset: () => void
 }
@@ -77,6 +78,21 @@ const SectionDivider = ({ label }: { label: string }) => (
   </div>
 )
 
+function getSelectedPresetRange(filters: DashboardFilters): number | null {
+  if (!filters.start_timestamp || !filters.end_timestamp) return null
+
+  const durationMs =
+    filters.end_timestamp.getTime() - filters.start_timestamp.getTime()
+  const toleranceMs = 60 * 1000
+
+  return (
+    TIME_RANGE_PRESETS.find(
+      (range) =>
+        Math.abs(durationMs - range.days * 24 * 60 * 60 * 1000) <= toleranceMs
+    )?.days ?? null
+  )
+}
+
 export function ModelsFilter(props: ModelsFilterProps) {
   const { t } = useTranslation()
   // 使用已缓存的用户数据，避免重复调用 API
@@ -84,20 +100,20 @@ export function ModelsFilter(props: ModelsFilterProps) {
   const isAdmin = user?.role && user.role >= 10
 
   const [open, setOpen] = useState(false)
-  const [filters, setFilters] = useState<DashboardFilters>(() =>
-    buildDefaultDashboardFilters(props.preferences)
+  const [filters, setFilters] = useState<DashboardFilters>(
+    () => props.appliedFilters
   )
-  const [selectedRange, setSelectedRange] = useState<number | null>(
-    () => props.preferences.defaultTimeRangeDays
+  const [selectedRange, setSelectedRange] = useState<number | null>(() =>
+    getSelectedPresetRange(props.appliedFilters)
   )
 
-  const resetFiltersFromPreferences = () => {
-    setFilters(buildDefaultDashboardFilters(props.preferences))
-    setSelectedRange(props.preferences.defaultTimeRangeDays)
+  const resetFiltersFromAppliedFilters = () => {
+    setFilters(props.appliedFilters)
+    setSelectedRange(getSelectedPresetRange(props.appliedFilters))
   }
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (nextOpen) resetFiltersFromPreferences()
+    if (nextOpen) resetFiltersFromAppliedFilters()
     setOpen(nextOpen)
   }
 

@@ -212,6 +212,7 @@ export function Dashboard() {
         />
         <ModelsFilter
           preferences={chartPreferences}
+          appliedFilters={modelFilters}
           onFilterChange={handleFilterChange}
           onReset={handleResetFilters}
         />
