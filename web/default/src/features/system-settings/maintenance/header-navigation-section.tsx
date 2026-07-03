@@ -16,12 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useMemo } from 'react'
+import { type DragEvent, useEffect, useMemo, useState } from 'react'
 import * as z from 'zod'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ExternalLink, Plus, Trash2 } from 'lucide-react'
+import { ExternalLink, GripVertical, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -54,14 +55,9 @@ import {
 const customLinkSchema = z.object({
   id: z.string().optional(),
   title: z.string().trim().min(1).max(32),
-  href: z
-    .string()
-    .trim()
-    .min(1)
-    .max(512)
-    .refine(isAllowedHeaderNavHref, {
-      message: 'Use an http(s) URL or an internal path starting with /',
-    }),
+  href: z.string().trim().min(1).max(512).refine(isAllowedHeaderNavHref, {
+    message: 'Use an http(s) URL or an internal path starting with /',
+  }),
   enabled: z.boolean(),
   requireAuth: z.boolean(),
   openInNewTab: z.boolean(),
@@ -82,6 +78,8 @@ const headerNavSchema = z.object({
 })
 
 type HeaderNavFormValues = z.infer<typeof headerNavSchema>
+
+const CUSTOM_LINK_DRAG_TYPE = 'application/x-header-nav-custom-link'
 
 type HeaderNavigationSectionProps = {
   config: HeaderNavModulesConfig
@@ -142,6 +140,10 @@ export function HeaderNavigationSection({
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
   const formDefaults = useMemo(() => toFormValues(config), [config])
+  const [draggedLinkIndex, setDraggedLinkIndex] = useState<number | null>(null)
+  const [dragOverLinkIndex, setDragOverLinkIndex] = useState<number | null>(
+    null
+  )
 
   const form = useForm<HeaderNavFormValues>({
     resolver: zodResolver(headerNavSchema),
@@ -213,6 +215,51 @@ export function HeaderNavigationSection({
       requireAuth: false,
       openInNewTab: true,
     })
+  }
+
+  const clearDragState = () => {
+    setDraggedLinkIndex(null)
+    setDragOverLinkIndex(null)
+  }
+
+  const handleCustomLinkDragStart = (
+    event: DragEvent<HTMLButtonElement>,
+    index: number
+  ) => {
+    setDraggedLinkIndex(index)
+    setDragOverLinkIndex(index)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData(CUSTOM_LINK_DRAG_TYPE, String(index))
+  }
+
+  const handleCustomLinkDragOver = (
+    event: DragEvent<HTMLDivElement>,
+    index: number
+  ) => {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    setDragOverLinkIndex(index)
+  }
+
+  const handleCustomLinkDrop = (
+    event: DragEvent<HTMLDivElement>,
+    targetIndex: number
+  ) => {
+    event.preventDefault()
+    const rawSourceIndex = event.dataTransfer.getData(CUSTOM_LINK_DRAG_TYPE)
+    const sourceIndex =
+      draggedLinkIndex ?? (rawSourceIndex ? Number(rawSourceIndex) : NaN)
+
+    if (
+      Number.isInteger(sourceIndex) &&
+      sourceIndex >= 0 &&
+      sourceIndex < customLinks.fields.length &&
+      sourceIndex !== targetIndex
+    ) {
+      customLinks.move(sourceIndex, targetIndex)
+    }
+
+    clearDragState()
   }
 
   const simpleModules: Array<{
@@ -405,15 +452,42 @@ export function HeaderNavigationSection({
                 {t('No custom navigation links configured.')}
               </div>
             ) : (
-              <div className='space-y-3'>
+              <div className='flex flex-col gap-3'>
                 {customLinks.fields.map((field, index) => (
                   <div
                     key={field.fieldKey}
-                    className='bg-background rounded-lg border px-3 py-3'
+                    onDragOver={(event) =>
+                      handleCustomLinkDragOver(event, index)
+                    }
+                    onDragLeave={() => setDragOverLinkIndex(null)}
+                    onDrop={(event) => handleCustomLinkDrop(event, index)}
+                    className={cn(
+                      'bg-background rounded-lg border px-3 py-3 transition-[box-shadow,opacity]',
+                      draggedLinkIndex === index && 'opacity-60',
+                      dragOverLinkIndex === index &&
+                        draggedLinkIndex !== index &&
+                        'ring-ring ring-offset-background ring-2 ring-offset-2'
+                    )}
                   >
                     <div className='mb-3 flex items-center justify-between gap-2'>
-                      <div className='text-sm font-medium'>
-                        {t('Custom link')} {index + 1}
+                      <div className='flex min-w-0 items-center gap-2'>
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='icon-sm'
+                          draggable
+                          onDragStart={(event) =>
+                            handleCustomLinkDragStart(event, index)
+                          }
+                          onDragEnd={clearDragState}
+                          className='cursor-grab active:cursor-grabbing'
+                          aria-label={`${t('Custom link')} ${index + 1}`}
+                        >
+                          <GripVertical />
+                        </Button>
+                        <div className='truncate text-sm font-medium'>
+                          {t('Custom link')} {index + 1}
+                        </div>
                       </div>
                       <Button
                         type='button'
@@ -434,10 +508,7 @@ export function HeaderNavigationSection({
                           <FormItem>
                             <FormLabel>{t('Link title')}</FormLabel>
                             <FormControl>
-                              <Input
-                                placeholder={t('My store')}
-                                {...field}
-                              />
+                              <Input placeholder={t('My store')} {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
