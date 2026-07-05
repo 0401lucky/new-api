@@ -24,6 +24,7 @@ import type {
   SystemOptionsResponse,
   UpdateOptionRequest,
   UpdateOptionResponse,
+  PromptCheckRulesResponse,
   UpstreamChannelsResponse,
   UpstreamRatiosResponse,
 } from './types'
@@ -64,6 +65,11 @@ export async function getUpstreamChannels() {
   const res = await api.get<UpstreamChannelsResponse>(
     '/api/ratio_sync/channels'
   )
+  return res.data
+}
+
+export async function getPromptCheckRules() {
+  const res = await api.get<PromptCheckRulesResponse>('/api/prompt_check/rules')
   return res.data
 }
 

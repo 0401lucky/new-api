@@ -29,6 +29,7 @@ type PromptCheckMatch struct {
 	Weight   int    `json:"weight"`
 	Category string `json:"category,omitempty"`
 	Strict   bool   `json:"strict,omitempty"`
+	Matched  string `json:"matched,omitempty"`
 }
 
 type PromptCheckVerdict struct {
@@ -61,6 +62,15 @@ type promptCheckRule struct {
 type compiledPromptCheckRule struct {
 	promptCheckRule
 	re *regexp.Regexp
+}
+
+type PromptCheckRuleInfo struct {
+	Name     string `json:"name"`
+	Weight   int    `json:"weight"`
+	Category string `json:"category,omitempty"`
+	Strict   bool   `json:"strict,omitempty"`
+	Pattern  string `json:"pattern,omitempty"`
+	Enabled  bool   `json:"enabled"`
 }
 
 var promptCheckRules = []promptCheckRule{
@@ -211,6 +221,7 @@ func CheckPromptText(ctx context.Context, text string) PromptCheckVerdict {
 
 	scanText := normalizePromptCheckText(text)
 	matchesByName := make(map[string]PromptCheckMatch)
+	disabledRules := setting.PromptCheckDisabledRuleSet()
 	rawScore := 0
 	strictScore := 0
 
@@ -226,17 +237,22 @@ func CheckPromptText(ctx context.Context, text string) PromptCheckVerdict {
 				Weight:   100,
 				Category: "keyword",
 				Strict:   true,
+				Matched:  PromptCheckRedactedPreview(word, 160),
 			}
 		}
 	}
 
 	for _, rule := range compiledPromptCheckRules {
-		if rule.re.MatchString(scanText) {
+		if disabledRules[strings.ToLower(rule.Name)] {
+			continue
+		}
+		if matched := rule.re.FindString(scanText); matched != "" {
 			matchesByName[rule.Name] = PromptCheckMatch{
 				Name:     rule.Name,
 				Weight:   rule.Weight,
 				Category: rule.Category,
 				Strict:   rule.Strict,
+				Matched:  PromptCheckRedactedPreview(matched, 160),
 			}
 		}
 	}
@@ -289,6 +305,22 @@ func CheckPromptText(ctx context.Context, text string) PromptCheckVerdict {
 		verdict = applyPromptCheckReview(ctx, text, verdict)
 	}
 	return verdict
+}
+
+func PromptCheckRuleCatalog() []PromptCheckRuleInfo {
+	disabledRules := setting.PromptCheckDisabledRuleSet()
+	rules := make([]PromptCheckRuleInfo, 0, len(promptCheckRules))
+	for _, rule := range promptCheckRules {
+		rules = append(rules, PromptCheckRuleInfo{
+			Name:     rule.Name,
+			Weight:   rule.Weight,
+			Category: rule.Category,
+			Strict:   rule.Strict,
+			Pattern:  rule.Pattern,
+			Enabled:  !disabledRules[strings.ToLower(rule.Name)],
+		})
+	}
+	return rules
 }
 
 func shouldReviewPromptCheck(verdict PromptCheckVerdict) bool {

@@ -30,6 +30,11 @@ func SetApiRouter(router *gin.Engine) {
 			debugRoute.GET("/recent_calls", controller.GetRecentCalls)
 			debugRoute.GET("/recent_calls/:id", controller.GetRecentCallByID)
 		}
+		promptCheckRoute := apiRouter.Group("/prompt_check")
+		promptCheckRoute.Use(middleware.AdminAuth())
+		{
+			promptCheckRoute.GET("/rules", controller.GetPromptCheckRules)
+		}
 		apiRouter.GET("/notice", controller.GetNotice)
 		apiRouter.GET("/user-agreement", controller.GetUserAgreement)
 		apiRouter.GET("/privacy-policy", controller.GetPrivacyPolicy)

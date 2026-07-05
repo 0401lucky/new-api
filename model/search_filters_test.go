@@ -44,7 +44,7 @@ func TestGetAllLogsFiltersByExactUserID(t *testing.T) {
 		require.NoError(t, DB.Create(&logs[i]).Error)
 	}
 
-	matched, total, err := GetAllLogs(LogTypeUnknown, 0, 0, "", "", 3, "", 0, 20, 0, "", "", "")
+	matched, total, err := GetAllLogs(LogTypeUnknown, 0, 0, "", "", 3, "", 0, 20, 0, "", "", "", false)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), total)
 	require.Len(t, matched, 1)
@@ -81,9 +81,49 @@ func TestGetAllLogsFiltersNumericUsername(t *testing.T) {
 		require.NoError(t, DB.Create(&logs[i]).Error)
 	}
 
-	matched, total, err := GetAllLogs(LogTypeUnknown, 0, 0, "", "3", 0, "", 0, 20, 0, "", "", "")
+	matched, total, err := GetAllLogs(LogTypeUnknown, 0, 0, "", "3", 0, "", 0, 20, 0, "", "", "", false)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), total)
 	require.Len(t, matched, 1)
 	require.Equal(t, 13, matched[0].UserId)
+}
+
+func TestGetAllLogsFiltersPromptCheckEntries(t *testing.T) {
+	truncateTables(t)
+
+	now := common.GetTimestamp()
+	logs := []Log{
+		{
+			UserId:    3,
+			Username:  "target",
+			Type:      LogTypeError,
+			CreatedAt: now,
+			Content:   "prompt check block",
+			Other: common.MapToJsonStr(map[string]interface{}{
+				"prompt_check": map[string]interface{}{
+					"action": "block",
+					"score":  100,
+				},
+			}),
+		},
+		{
+			UserId:    3,
+			Username:  "target",
+			Type:      LogTypeError,
+			CreatedAt: now,
+			Content:   "other error",
+			Other: common.MapToJsonStr(map[string]interface{}{
+				"reject_reason": "upstream_error",
+			}),
+		},
+	}
+	for i := range logs {
+		require.NoError(t, DB.Create(&logs[i]).Error)
+	}
+
+	matched, total, err := GetAllLogs(LogTypeError, 0, 0, "", "", 0, "", 0, 20, 0, "", "", "", true)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), total)
+	require.Len(t, matched, 1)
+	require.Contains(t, matched[0].Other, "prompt_check")
 }

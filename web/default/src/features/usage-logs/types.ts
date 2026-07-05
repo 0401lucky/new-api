@@ -53,6 +53,7 @@ export interface CommonLogFilters extends CommonFilters {
   username?: string
   requestId?: string
   upstreamRequestId?: string
+  prompt_check?: boolean
 }
 
 /**
@@ -181,6 +182,27 @@ export interface LogOtherData {
   fee_quota?: number
   // Reject / intercept reason (admin)
   reject_reason?: string
+  prompt_check?: {
+    action?: string
+    mode?: string
+    score?: number
+    raw_score?: number
+    threshold?: number
+    strict_threshold?: number
+    strict_hit?: boolean
+    matches?: Array<{
+      name?: string
+      weight?: number
+      category?: string
+      strict?: boolean
+      matched?: string
+    }>
+    preview?: string
+    reviewed?: boolean
+    review_flagged?: boolean
+    review_model?: string
+    review_error?: string
+  }
   // Task-related fields (for refund logs, type=6)
   is_task?: boolean
   task_id?: string
@@ -275,6 +297,7 @@ export interface GetLogsParams {
   group?: string
   request_id?: string
   upstream_request_id?: string
+  prompt_check?: boolean
 }
 
 export interface GetLogsResponse {

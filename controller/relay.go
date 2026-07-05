@@ -150,15 +150,22 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	}
 
 	if needSensitiveCheck && meta != nil {
+		startRecentCallCaptureFromContext(c, relayInfo)
 		verdict := service.CheckPromptText(c.Request.Context(), meta.CombineText)
 		if len(verdict.Matches) > 0 {
 			logger.LogWarn(c, fmt.Sprintf("prompt check matched: action=%s, score=%d, reason=%s", verdict.Action, verdict.Score, verdict.Reason))
+			recentVerdict := verdict
+			if verdict.Mode == setting.PromptCheckModeMonitor && verdict.Action == service.PromptCheckActionAllow {
+				recentVerdict.Action = "monitor"
+			}
+			service.RecentCallsCache().UpsertPromptCheckByContext(c, recentVerdict)
 			recordPromptCheckLog(c, relayInfo, verdict)
 		}
 		if verdict.Action == service.PromptCheckActionWarn {
 			c.Header("X-Prompt-Check-Warning", verdict.Reason)
 		}
 		if verdict.Action == service.PromptCheckActionBlock {
+			service.RecentCallsCache().UpsertErrorByContext(c, verdict.Reason, "prompt_check", string(types.ErrorCodePromptBlocked), http.StatusBadRequest)
 			newAPIError = types.NewErrorWithStatusCode(
 				errors.New("request contains content blocked by prompt check"),
 				types.ErrorCodePromptBlocked,
@@ -313,6 +320,18 @@ func startRecentCallCapture(c *gin.Context, relayInfo *relaycommon.RelayInfo, bo
 	}
 	service.RecentCallsCache().BeginFromContext(c, relayInfo, bodyBytes)
 	service.AttachRecentCallResponseCapture(c)
+}
+
+func startRecentCallCaptureFromContext(c *gin.Context, relayInfo *relaycommon.RelayInfo) {
+	if c == nil || relayInfo == nil {
+		return
+	}
+	bodyStorage, err := common.GetBodyStorage(c)
+	if err != nil {
+		logger.LogWarn(c, "recent calls read request body failed: "+err.Error())
+		return
+	}
+	startRecentCallCapture(c, relayInfo, bodyStorage)
 }
 
 func fastTokenCountMetaForPricing(request dto.Request) *types.TokenCountMeta {

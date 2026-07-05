@@ -328,6 +328,7 @@ export type SecuritySettings = {
   PromptCheckModelScope: string
   PromptCheckGroupWhitelist: string
   PromptCheckChannelWhitelist: string
+  PromptCheckDisabledRules: string
   PromptCheckAPIReviewEnabled: boolean
   PromptCheckAPIReviewModel: string
   PromptCheckAPIReviewBaseURL: string
@@ -379,6 +380,21 @@ export type UpstreamChannelsResponse = {
   success: boolean
   message: string
   data: UpstreamChannel[]
+}
+
+export type PromptCheckRule = {
+  name: string
+  weight: number
+  category?: string
+  strict?: boolean
+  pattern?: string
+  enabled: boolean
+}
+
+export type PromptCheckRulesResponse = {
+  success: boolean
+  message: string
+  data: PromptCheckRule[]
 }
 
 export type UpstreamConfig = {

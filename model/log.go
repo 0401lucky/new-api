@@ -356,7 +356,7 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 	}
 }
 
-func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, userId int, tokenName string, startIdx int, num int, channel int, group string, requestId string, upstreamRequestId string) (logs []*Log, total int64, err error) {
+func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, userId int, tokenName string, startIdx int, num int, channel int, group string, requestId string, upstreamRequestId string, promptCheckOnly bool) (logs []*Log, total int64, err error) {
 	var tx *gorm.DB
 	if logType == LogTypeUnknown {
 		tx = LOG_DB
@@ -390,6 +390,9 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 	}
 	if group != "" {
 		tx = tx.Where("logs."+logGroupCol+" = ?", group)
+	}
+	if promptCheckOnly {
+		tx = tx.Where("logs.other LIKE ?", "%\"prompt_check\"%")
 	}
 	err = tx.Model(&Log{}).Count(&total).Error
 	if err != nil {

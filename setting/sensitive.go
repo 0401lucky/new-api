@@ -31,6 +31,7 @@ var PromptCheckMaxTextLength = 81920
 var PromptCheckModelScope = "gpt*\no*\nchatgpt*"
 var PromptCheckGroupWhitelist = ""
 var PromptCheckChannelWhitelist = ""
+var PromptCheckDisabledRules = ""
 var PromptCheckAPIReviewEnabled = false
 var PromptCheckAPIReviewModel = "omni-moderation-latest"
 var PromptCheckAPIReviewBaseURL = "https://api.openai.com"
@@ -137,6 +138,25 @@ func PromptCheckAPIReviewReady() bool {
 	return PromptCheckAPIReviewEnabled &&
 		strings.TrimSpace(PromptCheckAPIReviewKey) != "" &&
 		strings.TrimSpace(PromptCheckAPIReviewModel) != ""
+}
+
+func PromptCheckDisabledRuleSet() map[string]bool {
+	result := make(map[string]bool)
+	for _, item := range promptCheckList(PromptCheckDisabledRules) {
+		item = strings.ToLower(strings.TrimSpace(item))
+		if item != "" {
+			result[item] = true
+		}
+	}
+	return result
+}
+
+func IsPromptCheckRuleDisabled(name string) bool {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if name == "" {
+		return false
+	}
+	return PromptCheckDisabledRuleSet()[name]
 }
 
 func promptCheckList(raw string) []string {

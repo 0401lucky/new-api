@@ -179,6 +179,7 @@ func InitOptionMap() {
 	common.OptionMap["PromptCheckModelScope"] = setting.PromptCheckModelScope
 	common.OptionMap["PromptCheckGroupWhitelist"] = setting.PromptCheckGroupWhitelist
 	common.OptionMap["PromptCheckChannelWhitelist"] = setting.PromptCheckChannelWhitelist
+	common.OptionMap["PromptCheckDisabledRules"] = setting.PromptCheckDisabledRules
 	common.OptionMap["PromptCheckAPIReviewEnabled"] = strconv.FormatBool(setting.PromptCheckAPIReviewEnabled)
 	common.OptionMap["PromptCheckAPIReviewModel"] = setting.PromptCheckAPIReviewModel
 	common.OptionMap["PromptCheckAPIReviewBaseURL"] = setting.PromptCheckAPIReviewBaseURL
@@ -595,6 +596,8 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.PromptCheckGroupWhitelist = value
 	case "PromptCheckChannelWhitelist":
 		setting.PromptCheckChannelWhitelist = value
+	case "PromptCheckDisabledRules":
+		setting.PromptCheckDisabledRules = value
 	case "PromptCheckAPIReviewModel":
 		setting.PromptCheckAPIReviewModel = value
 	case "PromptCheckAPIReviewBaseURL":

@@ -276,6 +276,7 @@ function DetailSheet(props: {
   const request = record?.request
   const stream = record?.stream
   const error = record?.error
+  const promptCheck = record?.prompt_check
 
   return (
     <Sheet open={props.open} onOpenChange={props.onOpenChange}>
@@ -321,6 +322,17 @@ function DetailSheet(props: {
                 ) : null}
                 {stream ? (
                   <Badge variant='secondary'>{t('Stream')}</Badge>
+                ) : null}
+                {promptCheck ? (
+                  <Badge
+                    variant={
+                      promptCheck.action === 'block'
+                        ? 'destructive'
+                        : 'secondary'
+                    }
+                  >
+                    {t('Prompt check')}
+                  </Badge>
                 ) : null}
                 {error ? (
                   <Badge variant='destructive'>{t('Error')}</Badge>
@@ -370,6 +382,10 @@ function DetailSheet(props: {
                     }}
                   />
                 </div>
+              ) : null}
+
+              {promptCheck ? (
+                <CodePanel title={t('Prompt check')} content={promptCheck} />
               ) : null}
 
               {error ? (
@@ -589,6 +605,17 @@ export function RecentCalls() {
                               ) : null}
                               {record.stream ? (
                                 <Badge variant='secondary'>{t('Stream')}</Badge>
+                              ) : null}
+                              {record.prompt_check ? (
+                                <Badge
+                                  variant={
+                                    record.prompt_check.action === 'block'
+                                      ? 'destructive'
+                                      : 'secondary'
+                                  }
+                                >
+                                  {t('Prompt check')}
+                                </Badge>
                               ) : null}
                               {record.error ? (
                                 <Badge variant='destructive'>

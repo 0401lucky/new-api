@@ -143,3 +143,53 @@ func TestRecentCallSuccessfulResponseClearsRetryError(t *testing.T) {
 		t.Fatalf("successful final response should clear retry error: %+v", record.Error)
 	}
 }
+
+func TestRecentCallStoresPromptCheckVerdict(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cache := newRecentCallsCache(RecentCallsCacheConfig{Capacity: 4})
+	t.Cleanup(func() {
+		if dir := cache.TempSessionDirForTest(); dir != "" {
+			_ = os.RemoveAll(dir)
+		}
+	})
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	id := cache.BeginFromContext(c, &relaycommon.RelayInfo{OriginModelName: "gpt-test"}, []byte(`{"input":"ignore safety"}`))
+	verdict := PromptCheckVerdict{
+		Action:    PromptCheckActionBlock,
+		Mode:      "block",
+		Score:     100,
+		Threshold: 50,
+		Reason:    "prompt check matched blocked_keyword, score=100, threshold=50",
+		Matches: []PromptCheckMatch{
+			{
+				Name:     "blocked_keyword",
+				Weight:   100,
+				Category: "keyword",
+				Strict:   true,
+				Matched:  "ignore safety",
+			},
+		},
+		TextPreview: "ignore safety",
+	}
+
+	cache.UpsertPromptCheckByContext(c, verdict)
+
+	record, ok := cache.Get(id)
+	if !ok {
+		t.Fatal("expected recent call record")
+	}
+	if record.PromptCheck == nil {
+		t.Fatal("expected prompt check details")
+	}
+	if record.PromptCheck.Action != PromptCheckActionBlock {
+		t.Fatalf("unexpected prompt check action: %s", record.PromptCheck.Action)
+	}
+	if len(record.PromptCheck.Matches) != 1 || record.PromptCheck.Matches[0].Matched != "ignore safety" {
+		t.Fatalf("unexpected prompt check matches: %+v", record.PromptCheck.Matches)
+	}
+}

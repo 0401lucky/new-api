@@ -42,6 +42,7 @@ const defaultSecuritySettings: SecuritySettings = {
   PromptCheckModelScope: 'gpt*\no*\nchatgpt*',
   PromptCheckGroupWhitelist: '',
   PromptCheckChannelWhitelist: '',
+  PromptCheckDisabledRules: '',
   PromptCheckAPIReviewEnabled: false,
   PromptCheckAPIReviewModel: 'omni-moderation-latest',
   PromptCheckAPIReviewBaseURL: 'https://api.openai.com',

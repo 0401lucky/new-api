@@ -59,6 +59,7 @@ const SECURITY_SECTIONS = [
           PromptCheckModelScope: settings.PromptCheckModelScope,
           PromptCheckGroupWhitelist: settings.PromptCheckGroupWhitelist,
           PromptCheckChannelWhitelist: settings.PromptCheckChannelWhitelist,
+          PromptCheckDisabledRules: settings.PromptCheckDisabledRules,
           PromptCheckAPIReviewEnabled: settings.PromptCheckAPIReviewEnabled,
           PromptCheckAPIReviewModel: settings.PromptCheckAPIReviewModel,
           PromptCheckAPIReviewBaseURL: settings.PromptCheckAPIReviewBaseURL,

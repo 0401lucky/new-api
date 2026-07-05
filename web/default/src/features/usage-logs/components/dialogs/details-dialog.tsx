@@ -439,6 +439,103 @@ function TokenBreakdown(props: { log: UsageLog; other: LogOtherData }) {
   )
 }
 
+function PromptCheckDetails(props: { other: LogOtherData | null }) {
+  const { t } = useTranslation()
+  const promptCheck = props.other?.prompt_check
+  if (!promptCheck) return null
+
+  const action = promptCheck.action || '-'
+  const matches = promptCheck.matches || []
+  const statusVariant =
+    action === 'block' ? 'red' : action === 'warn' ? 'orange' : 'neutral'
+
+  return (
+    <DetailSection
+      icon={<AlertTriangle className='size-3.5' aria-hidden='true' />}
+      label={t('Prompt check')}
+      variant={action === 'block' ? 'danger' : 'default'}
+    >
+      <DetailRow
+        label={t('Action')}
+        value={
+          <StatusBadge
+            label={action}
+            variant={statusVariant}
+            size='sm'
+            copyable={false}
+          />
+        }
+      />
+      <DetailRow
+        label={t('Score')}
+        value={`${promptCheck.score ?? 0} / ${promptCheck.threshold ?? '-'}`}
+        mono
+      />
+      <DetailRow
+        label={t('Raw score')}
+        value={String(promptCheck.raw_score ?? promptCheck.score ?? 0)}
+        mono
+      />
+      <DetailRow
+        label={t('Strict hit')}
+        value={promptCheck.strict_hit ? t('Yes') : t('No')}
+      />
+      {promptCheck.reviewed && (
+        <DetailRow
+          label={t('Review result')}
+          value={
+            promptCheck.review_flagged
+              ? t('Flagged')
+              : promptCheck.review_error
+                ? promptCheck.review_error
+                : t('Cleared')
+          }
+        />
+      )}
+      {matches.length > 0 && (
+        <div className='flex min-w-0 flex-col gap-2 pt-1'>
+          <p className='text-muted-foreground text-xs font-medium'>
+            {t('Matched rules')}
+          </p>
+          {matches.map((match, idx) => (
+            <div
+              key={`${match.name || 'match'}-${idx}`}
+              className='bg-background/60 min-w-0 rounded border p-2'
+            >
+              <div className='flex min-w-0 flex-wrap items-center gap-1.5'>
+                <StatusBadge
+                  label={match.name || t('Unknown')}
+                  variant={match.strict ? 'red' : 'neutral'}
+                  size='sm'
+                  copyable={false}
+                />
+                {match.category && (
+                  <span className='text-muted-foreground text-xs'>
+                    {match.category}
+                  </span>
+                )}
+                {typeof match.weight === 'number' && (
+                  <span className='text-muted-foreground text-xs'>
+                    {t('Weight')}: {match.weight}
+                  </span>
+                )}
+              </div>
+              {match.matched && (
+                <div className='text-muted-foreground mt-1.5 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap'>
+                  {match.matched}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {promptCheck.preview && (
+        <DetailRow label={t('Prompt preview')} value={promptCheck.preview} />
+      )}
+    </DetailSection>
+  )
+}
+
 interface DetailsDialogProps {
   log: UsageLog
   isAdmin: boolean
@@ -716,6 +813,8 @@ export function DetailsDialog(props: DetailsDialogProps) {
                 <p className='text-xs break-words'>{other.reject_reason}</p>
               </DetailSection>
             )}
+
+            {props.isAdmin && <PromptCheckDetails other={other} />}
 
             {/* Violation fee info */}
             {isViolation && other && (

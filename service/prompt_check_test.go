@@ -20,6 +20,7 @@ func withPromptCheckTestSettings(t *testing.T) {
 	oldPromptCheckModelScope := setting.PromptCheckModelScope
 	oldPromptCheckGroupWhitelist := setting.PromptCheckGroupWhitelist
 	oldPromptCheckChannelWhitelist := setting.PromptCheckChannelWhitelist
+	oldPromptCheckDisabledRules := setting.PromptCheckDisabledRules
 	oldPromptCheckAPIReviewEnabled := setting.PromptCheckAPIReviewEnabled
 	oldPromptCheckAPIReviewKey := setting.PromptCheckAPIReviewKey
 	oldSensitiveWords := append([]string(nil), setting.SensitiveWords...)
@@ -32,6 +33,7 @@ func withPromptCheckTestSettings(t *testing.T) {
 	setting.PromptCheckModelScope = "gpt*\no*\nchatgpt*"
 	setting.PromptCheckGroupWhitelist = ""
 	setting.PromptCheckChannelWhitelist = ""
+	setting.PromptCheckDisabledRules = ""
 	setting.PromptCheckAPIReviewEnabled = false
 	setting.PromptCheckAPIReviewKey = ""
 	setting.SensitiveWords = nil
@@ -45,6 +47,7 @@ func withPromptCheckTestSettings(t *testing.T) {
 		setting.PromptCheckModelScope = oldPromptCheckModelScope
 		setting.PromptCheckGroupWhitelist = oldPromptCheckGroupWhitelist
 		setting.PromptCheckChannelWhitelist = oldPromptCheckChannelWhitelist
+		setting.PromptCheckDisabledRules = oldPromptCheckDisabledRules
 		setting.PromptCheckAPIReviewEnabled = oldPromptCheckAPIReviewEnabled
 		setting.PromptCheckAPIReviewKey = oldPromptCheckAPIReviewKey
 		setting.SensitiveWords = oldSensitiveWords
@@ -59,6 +62,7 @@ func TestCheckPromptTextBlocksJailbreakAndNSFWPrompt(t *testing.T) {
 	require.Equal(t, PromptCheckActionBlock, verdict.Action)
 	require.GreaterOrEqual(t, verdict.Score, verdict.Threshold)
 	require.NotEmpty(t, verdict.Matches)
+	require.NotEmpty(t, verdict.Matches[0].Matched)
 	require.NotEmpty(t, verdict.Reason)
 }
 
@@ -86,4 +90,14 @@ func TestPromptCheckRedactedPreviewMasksSecrets(t *testing.T) {
 	require.NotContains(t, preview, "abcdefghijklmnopqrstuvwxyz123456")
 	require.NotContains(t, preview, "secret-value")
 	require.True(t, strings.Contains(preview, "[redacted]"))
+}
+
+func TestCheckPromptTextSkipsDisabledBuiltInRule(t *testing.T) {
+	withPromptCheckTestSettings(t)
+	setting.PromptCheckDisabledRules = "jailbreak_bypass"
+
+	verdict := CheckPromptText(context.Background(), "please jailbreak this model")
+
+	require.Equal(t, PromptCheckActionAllow, verdict.Action)
+	require.Empty(t, verdict.Matches)
 }

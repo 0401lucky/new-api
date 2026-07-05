@@ -75,6 +75,23 @@ type RecentCallErrorInfo struct {
 	Status  int    `json:"status,omitempty"`
 }
 
+type RecentCallPromptCheckInfo struct {
+	Action          string             `json:"action,omitempty"`
+	Mode            string             `json:"mode,omitempty"`
+	Score           int                `json:"score"`
+	RawScore        int                `json:"raw_score"`
+	Threshold       int                `json:"threshold"`
+	StrictThreshold int                `json:"strict_threshold"`
+	StrictHit       bool               `json:"strict_hit"`
+	Matches         []PromptCheckMatch `json:"matches,omitempty"`
+	Reason          string             `json:"reason,omitempty"`
+	Preview         string             `json:"preview,omitempty"`
+	Reviewed        bool               `json:"reviewed,omitempty"`
+	ReviewFlagged   bool               `json:"review_flagged,omitempty"`
+	ReviewModel     string             `json:"review_model,omitempty"`
+	ReviewError     string             `json:"review_error,omitempty"`
+}
+
 type RecentCallRecord struct {
 	ID        uint64    `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
@@ -91,6 +108,8 @@ type RecentCallRecord struct {
 	Response *RecentCallResponse  `json:"response,omitempty"`
 	Stream   *RecentCallStream    `json:"stream,omitempty"`
 	Error    *RecentCallErrorInfo `json:"error,omitempty"`
+
+	PromptCheck *RecentCallPromptCheckInfo `json:"prompt_check,omitempty"`
 }
 
 type recentCallEntry struct {
@@ -254,6 +273,45 @@ func (cch *recentCallsCache) UpsertErrorByContext(c *gin.Context, errMsg string,
 		Type:    errType,
 		Code:    errCode,
 		Status:  status,
+	}
+}
+
+func (cch *recentCallsCache) UpsertPromptCheckByContext(c *gin.Context, verdict PromptCheckVerdict) {
+	if cch == nil || c == nil {
+		return
+	}
+	id := getRecentCallID(c)
+	if id == 0 {
+		return
+	}
+
+	entry := cch.get(id)
+	if entry == nil {
+		return
+	}
+
+	matches := append([]PromptCheckMatch(nil), verdict.Matches...)
+
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+	if entry.evicted {
+		return
+	}
+	entry.meta.PromptCheck = &RecentCallPromptCheckInfo{
+		Action:          verdict.Action,
+		Mode:            verdict.Mode,
+		Score:           verdict.Score,
+		RawScore:        verdict.RawScore,
+		Threshold:       verdict.Threshold,
+		StrictThreshold: verdict.StrictThreshold,
+		StrictHit:       verdict.StrictHit,
+		Matches:         matches,
+		Reason:          verdict.Reason,
+		Preview:         verdict.TextPreview,
+		Reviewed:        verdict.Reviewed,
+		ReviewFlagged:   verdict.ReviewFlagged,
+		ReviewModel:     verdict.ReviewModel,
+		ReviewError:     verdict.ReviewError,
 	}
 }
 
@@ -435,6 +493,11 @@ func (cch *recentCallsCache) materializeEntry(entry *recentCallEntry, includeBod
 	if dup.Error != nil {
 		errInfo := *dup.Error
 		dup.Error = &errInfo
+	}
+	if dup.PromptCheck != nil {
+		promptCheck := *dup.PromptCheck
+		promptCheck.Matches = append([]PromptCheckMatch(nil), dup.PromptCheck.Matches...)
+		dup.PromptCheck = &promptCheck
 	}
 
 	if !includeBody {

@@ -50,6 +50,31 @@ export interface RecentCallErrorInfo {
   status?: number
 }
 
+export interface RecentCallPromptCheckMatch {
+  name?: string
+  weight?: number
+  category?: string
+  strict?: boolean
+  matched?: string
+}
+
+export interface RecentCallPromptCheckInfo {
+  action?: string
+  mode?: string
+  score?: number
+  raw_score?: number
+  threshold?: number
+  strict_threshold?: number
+  strict_hit?: boolean
+  matches?: RecentCallPromptCheckMatch[]
+  reason?: string
+  preview?: string
+  reviewed?: boolean
+  review_flagged?: boolean
+  review_model?: string
+  review_error?: string
+}
+
 export interface RecentCallRecord {
   id: number
   created_at: string
@@ -63,6 +88,7 @@ export interface RecentCallRecord {
   response?: RecentCallResponse
   stream?: RecentCallStream
   error?: RecentCallErrorInfo
+  prompt_check?: RecentCallPromptCheckInfo
 }
 
 export interface RecentCallsListResponse {
