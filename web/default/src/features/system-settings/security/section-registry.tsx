@@ -44,13 +44,28 @@ const SECURITY_SECTIONS = [
   },
   {
     id: 'sensitive-words',
-    titleKey: 'Sensitive Words',
+    titleKey: 'Prompt Check',
     build: (settings: SecuritySettings) => (
       <SensitiveWordsSection
         defaultValues={{
           CheckSensitiveEnabled: settings.CheckSensitiveEnabled,
           CheckSensitiveOnPromptEnabled: settings.CheckSensitiveOnPromptEnabled,
           SensitiveWords: settings.SensitiveWords,
+          PromptCheckMode: settings.PromptCheckMode,
+          PromptCheckThreshold: settings.PromptCheckThreshold,
+          PromptCheckStrictThreshold: settings.PromptCheckStrictThreshold,
+          PromptCheckLogMatchesEnabled: settings.PromptCheckLogMatchesEnabled,
+          PromptCheckMaxTextLength: settings.PromptCheckMaxTextLength,
+          PromptCheckModelScope: settings.PromptCheckModelScope,
+          PromptCheckGroupWhitelist: settings.PromptCheckGroupWhitelist,
+          PromptCheckChannelWhitelist: settings.PromptCheckChannelWhitelist,
+          PromptCheckAPIReviewEnabled: settings.PromptCheckAPIReviewEnabled,
+          PromptCheckAPIReviewModel: settings.PromptCheckAPIReviewModel,
+          PromptCheckAPIReviewBaseURL: settings.PromptCheckAPIReviewBaseURL,
+          PromptCheckAPIReviewKey: settings.PromptCheckAPIReviewKey,
+          PromptCheckAPIReviewTimeoutMS: settings.PromptCheckAPIReviewTimeoutMS,
+          PromptCheckAPIReviewFailClosedEnabled:
+            settings.PromptCheckAPIReviewFailClosedEnabled,
         }}
       />
     ),

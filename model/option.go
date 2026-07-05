@@ -171,6 +171,20 @@ func InitOptionMap() {
 	common.OptionMap["CheckSensitiveOnPromptEnabled"] = strconv.FormatBool(setting.CheckSensitiveOnPromptEnabled)
 	common.OptionMap["StopOnSensitiveEnabled"] = strconv.FormatBool(setting.StopOnSensitiveEnabled)
 	common.OptionMap["SensitiveWords"] = setting.SensitiveWordsToString()
+	common.OptionMap["PromptCheckMode"] = setting.PromptCheckMode
+	common.OptionMap["PromptCheckThreshold"] = strconv.Itoa(setting.PromptCheckThreshold)
+	common.OptionMap["PromptCheckStrictThreshold"] = strconv.Itoa(setting.PromptCheckStrictThreshold)
+	common.OptionMap["PromptCheckLogMatchesEnabled"] = strconv.FormatBool(setting.PromptCheckLogMatchesEnabled)
+	common.OptionMap["PromptCheckMaxTextLength"] = strconv.Itoa(setting.PromptCheckMaxTextLength)
+	common.OptionMap["PromptCheckModelScope"] = setting.PromptCheckModelScope
+	common.OptionMap["PromptCheckGroupWhitelist"] = setting.PromptCheckGroupWhitelist
+	common.OptionMap["PromptCheckChannelWhitelist"] = setting.PromptCheckChannelWhitelist
+	common.OptionMap["PromptCheckAPIReviewEnabled"] = strconv.FormatBool(setting.PromptCheckAPIReviewEnabled)
+	common.OptionMap["PromptCheckAPIReviewModel"] = setting.PromptCheckAPIReviewModel
+	common.OptionMap["PromptCheckAPIReviewBaseURL"] = setting.PromptCheckAPIReviewBaseURL
+	common.OptionMap["PromptCheckAPIReviewKey"] = setting.PromptCheckAPIReviewKey
+	common.OptionMap["PromptCheckAPIReviewTimeoutMS"] = strconv.Itoa(setting.PromptCheckAPIReviewTimeoutMS)
+	common.OptionMap["PromptCheckAPIReviewFailClosedEnabled"] = strconv.FormatBool(setting.PromptCheckAPIReviewFailClosedEnabled)
 	common.OptionMap["StreamCacheQueueLength"] = strconv.Itoa(setting.StreamCacheQueueLength)
 	common.OptionMap["AutomaticDisableKeywords"] = operation_setting.AutomaticDisableKeywordsToString()
 	common.OptionMap["AutomaticDisableStatusCodes"] = operation_setting.AutomaticDisableStatusCodesToString()
@@ -355,6 +369,12 @@ func updateOptionMap(key string, value string) (err error) {
 			setting.ModelRequestRateLimitEnabled = boolValue
 		case "StopOnSensitiveEnabled":
 			setting.StopOnSensitiveEnabled = boolValue
+		case "PromptCheckLogMatchesEnabled":
+			setting.PromptCheckLogMatchesEnabled = boolValue
+		case "PromptCheckAPIReviewEnabled":
+			setting.PromptCheckAPIReviewEnabled = boolValue
+		case "PromptCheckAPIReviewFailClosedEnabled":
+			setting.PromptCheckAPIReviewFailClosedEnabled = boolValue
 		case "SMTPSSLEnabled":
 			common.SMTPSSLEnabled = boolValue
 		case "SMTPForceAuthLogin":
@@ -561,6 +581,28 @@ func updateOptionMap(key string, value string) (err error) {
 		common.QuotaPerUnit, _ = strconv.ParseFloat(value, 64)
 	case "SensitiveWords":
 		setting.SensitiveWordsFromString(value)
+	case "PromptCheckMode":
+		setting.PromptCheckMode = setting.NormalizePromptCheckMode(value)
+	case "PromptCheckThreshold":
+		setting.PromptCheckThreshold, _ = strconv.Atoi(value)
+	case "PromptCheckStrictThreshold":
+		setting.PromptCheckStrictThreshold, _ = strconv.Atoi(value)
+	case "PromptCheckMaxTextLength":
+		setting.PromptCheckMaxTextLength, _ = strconv.Atoi(value)
+	case "PromptCheckModelScope":
+		setting.PromptCheckModelScope = value
+	case "PromptCheckGroupWhitelist":
+		setting.PromptCheckGroupWhitelist = value
+	case "PromptCheckChannelWhitelist":
+		setting.PromptCheckChannelWhitelist = value
+	case "PromptCheckAPIReviewModel":
+		setting.PromptCheckAPIReviewModel = value
+	case "PromptCheckAPIReviewBaseURL":
+		setting.PromptCheckAPIReviewBaseURL = value
+	case "PromptCheckAPIReviewKey":
+		setting.PromptCheckAPIReviewKey = value
+	case "PromptCheckAPIReviewTimeoutMS":
+		setting.PromptCheckAPIReviewTimeoutMS, _ = strconv.Atoi(value)
 	case "AutomaticDisableKeywords":
 		operation_setting.AutomaticDisableKeywordsFromString(value)
 	case "AutomaticDisableStatusCodes":

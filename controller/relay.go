@@ -134,7 +134,12 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		return
 	}
 
-	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
+	channelID := common.GetContextKeyInt(c, constant.ContextKeyChannelId)
+	usingGroup := common.GetContextKeyString(c, constant.ContextKeyUsingGroup)
+	if usingGroup == "" {
+		usingGroup = c.GetString("group")
+	}
+	needSensitiveCheck := setting.ShouldCheckPromptForRequest(relayInfo.OriginModelName, usingGroup, channelID)
 	needCountToken := constant.CountToken
 	// Avoid building huge CombineText (strings.Join) when token counting and sensitive check are both disabled.
 	var meta *types.TokenCountMeta
@@ -145,10 +150,21 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	}
 
 	if needSensitiveCheck && meta != nil {
-		contains, words := service.CheckSensitiveText(meta.CombineText)
-		if contains {
-			logger.LogWarn(c, fmt.Sprintf("user sensitive words detected: %s", strings.Join(words, ", ")))
-			newAPIError = types.NewError(err, types.ErrorCodeSensitiveWordsDetected)
+		verdict := service.CheckPromptText(c.Request.Context(), meta.CombineText)
+		if len(verdict.Matches) > 0 {
+			logger.LogWarn(c, fmt.Sprintf("prompt check matched: action=%s, score=%d, reason=%s", verdict.Action, verdict.Score, verdict.Reason))
+			recordPromptCheckLog(c, relayInfo, verdict)
+		}
+		if verdict.Action == service.PromptCheckActionWarn {
+			c.Header("X-Prompt-Check-Warning", verdict.Reason)
+		}
+		if verdict.Action == service.PromptCheckActionBlock {
+			newAPIError = types.NewErrorWithStatusCode(
+				errors.New("request contains content blocked by prompt check"),
+				types.ErrorCodePromptBlocked,
+				http.StatusBadRequest,
+				types.ErrOptionWithSkipRetry(),
+			)
 			return
 		}
 	}
@@ -377,6 +393,72 @@ func recordLeakProtectionBlockedLog(c *gin.Context, reason string) {
 		c.GetString("original_model"),
 		c.GetString("token_name"),
 		"leak protection blocked request: "+reason,
+		c.GetInt("token_id"),
+		useTimeSeconds,
+		common.GetContextKeyBool(c, constant.ContextKeyIsStream),
+		c.GetString("group"),
+		other,
+	)
+}
+
+func recordPromptCheckLog(c *gin.Context, relayInfo *relaycommon.RelayInfo, verdict service.PromptCheckVerdict) {
+	if !constant.ErrorLogEnabled || !setting.PromptCheckLogMatchesEnabled || len(verdict.Matches) == 0 || c == nil {
+		return
+	}
+	userId := c.GetInt("id")
+	if userId <= 0 {
+		return
+	}
+
+	action := verdict.Action
+	if verdict.Mode == setting.PromptCheckModeMonitor && verdict.Action == service.PromptCheckActionAllow {
+		action = "monitor"
+	}
+	other := map[string]interface{}{
+		"prompt_check": map[string]interface{}{
+			"action":           action,
+			"mode":             verdict.Mode,
+			"score":            verdict.Score,
+			"raw_score":        verdict.RawScore,
+			"threshold":        verdict.Threshold,
+			"strict_threshold": verdict.StrictThreshold,
+			"strict_hit":       verdict.StrictHit,
+			"matches":          verdict.Matches,
+			"preview":          verdict.TextPreview,
+			"reviewed":         verdict.Reviewed,
+			"review_flagged":   verdict.ReviewFlagged,
+			"review_model":     verdict.ReviewModel,
+			"review_error":     verdict.ReviewError,
+		},
+	}
+	if verdict.Action == service.PromptCheckActionBlock {
+		other["reject_reason"] = "prompt_check"
+	}
+	if c.Request != nil && c.Request.URL != nil {
+		other["request_path"] = c.Request.URL.Path
+	}
+
+	useTimeSeconds := 0
+	startTime := common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)
+	if !startTime.IsZero() {
+		useTimeSeconds = int(time.Since(startTime).Seconds())
+	}
+
+	modelName := c.GetString("original_model")
+	if relayInfo != nil && relayInfo.OriginModelName != "" {
+		modelName = relayInfo.OriginModelName
+	}
+	reason := verdict.Reason
+	if reason == "" {
+		reason = "prompt check matched"
+	}
+	model.RecordErrorLog(
+		c,
+		userId,
+		common.GetContextKeyInt(c, constant.ContextKeyChannelId),
+		modelName,
+		c.GetString("token_name"),
+		fmt.Sprintf("prompt check %s: %s", action, reason),
 		c.GetInt("token_id"),
 		useTimeSeconds,
 		common.GetContextKeyBool(c, constant.ContextKeyIsStream),
