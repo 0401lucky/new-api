@@ -76,13 +76,13 @@ type PromptCheckRuleInfo struct {
 var promptCheckRules = []promptCheckRule{
 	{
 		Name:     "prompt_injection_override",
-		Pattern:  `(?i)\b(ignore|disregard|forget|override)\b.{0,80}\b(previous|above|system|developer|policy|safety|instruction|rules?)\b|忽略.{0,50}(之前|上面|系统|开发者|安全|规则|限制|指令)|覆盖.{0,40}(系统|开发者|安全|规则|限制|指令)`,
+		Pattern:  `(?i)\b(ignore|disregard|forget|override)\b.{0,80}\b(previous|above|system|developer|policy|safety|instruction|rules?)\b|忽略.{0,50}(之前|上面|以上|系统|开发者|安全|规则|限制|指令)|(?:覆盖|改写|替换).{0,30}(之前|上面|以上|原有|已有|现有|默认|所有|全部|系统|开发者).{0,50}(系统|开发者|安全|规则|限制|指令)|(?:覆盖|改写|替换).{0,30}(系统|开发者).{0,30}(指令|消息|规则)`,
 		Weight:   45,
 		Category: "prompt_injection",
 	},
 	{
 		Name:     "jailbreak_bypass",
-		Pattern:  `(?i)\b(jailbreak|dan mode|developer mode|god mode|uncensored|unfiltered|no restrictions|bypass (?:policy|safety|guardrails)|break policy)\b|破限|越狱|绕过.{0,20}(安全|限制|审查|策略|规则)|无视.{0,20}(安全|限制|审查|策略|规则)`,
+		Pattern:  `(?i)\b(jailbreak|dan mode|god mode|uncensored|unfiltered|no restrictions|bypass (?:policy|safety|guardrails)|break policy)\b|\b(?:enable|activate|enter|switch\s+(?:in\s+)?to|turn\s+on|pretend|simulate|act\s+as|run\s+in)\b.{0,40}\bdeveloper mode\b|破限|越狱|绕过.{0,20}(安全|限制|审查|策略|规则)|无视.{0,20}(安全|限制|审查|策略|规则)`,
 		Weight:   70,
 		Category: "prompt_injection",
 		Strict:   true,
