@@ -42,6 +42,11 @@ func isPositiveOptionValue(value string) bool {
 	return err == nil && floatValue > 0
 }
 
+func isIntegerOptionValueInRange(value string, minValue, maxValue int) bool {
+	intValue, err := strconv.Atoi(strings.TrimSpace(value))
+	return err == nil && intValue >= minValue && intValue <= maxValue
+}
+
 func collectModelNamesFromOptionValue(raw string, modelNames map[string]struct{}) {
 	if strings.TrimSpace(raw) == "" {
 		return
@@ -220,6 +225,22 @@ func UpdateOption(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
 				"message": "无效的主题值，可选值：default（新版前端）、classic（经典前端）",
+			})
+			return
+		}
+	case "ModelRequestRateLimitDurationMinutes", "ModelRequestRateLimitCount", "ModelRequestRateLimitConcurrencyCount":
+		if !isIntegerOptionValueInRange(option.Value.(string), 0, 2147483647) {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "模型请求限流配置必须是 0 到 2147483647 之间的整数",
+			})
+			return
+		}
+	case "ModelRequestRateLimitSuccessCount":
+		if !isIntegerOptionValueInRange(option.Value.(string), 1, 2147483647) {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "模型请求成功数限制必须是 1 到 2147483647 之间的整数",
 			})
 			return
 		}

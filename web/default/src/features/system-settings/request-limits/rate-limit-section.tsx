@@ -53,10 +53,25 @@ const isValidJSON = (value: string | undefined) => {
       return false
     }
     for (const [, val] of Object.entries(parsed)) {
-      if (!Array.isArray(val) || val.length !== 2) return false
-      if (typeof val[0] !== 'number' || typeof val[1] !== 'number') return false
-      if (val[0] < 0 || val[1] < 1) return false
-      if (val[0] > 2147483647 || val[1] > 2147483647) return false
+      if (!Array.isArray(val) || (val.length !== 2 && val.length !== 3)) {
+        return false
+      }
+      if (
+        typeof val[0] !== 'number' ||
+        typeof val[1] !== 'number' ||
+        (val.length === 3 && typeof val[2] !== 'number')
+      ) {
+        return false
+      }
+      const maxConcurrency = val.length === 3 ? val[2] : 0
+      if (val[0] < 0 || val[1] < 1 || maxConcurrency < 0) return false
+      if (
+        val[0] > 2147483647 ||
+        val[1] > 2147483647 ||
+        maxConcurrency > 2147483647
+      ) {
+        return false
+      }
     }
     return true
   } catch {
@@ -78,6 +93,7 @@ const createRateLimitSchema = (t: (key: string) => string) =>
     ModelRequestRateLimitDurationMinutes: z.number().min(0),
     ModelRequestRateLimitCount: z.number().min(0).max(100000000),
     ModelRequestRateLimitSuccessCount: z.number().min(1).max(100000000),
+    ModelRequestRateLimitConcurrencyCount: z.number().min(0).max(100000000),
     ModelRequestRateLimitGroup: z
       .string()
       .optional()
@@ -158,7 +174,7 @@ export function RateLimitSection({ defaultValues }: RateLimitSectionProps) {
             )}
           />
 
-          <div className='grid gap-4 md:grid-cols-3'>
+          <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
             <FormField
               control={form.control}
               name='ModelRequestRateLimitDurationMinutes'
@@ -250,6 +266,37 @@ export function RateLimitSection({ defaultValues }: RateLimitSectionProps) {
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name='ModelRequestRateLimitConcurrencyCount'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Max concurrent requests')}</FormLabel>
+                  <FormControl>
+                    <div className='flex items-center gap-2'>
+                      <Input
+                        type='number'
+                        min={0}
+                        max={100000000}
+                        step={1}
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(parseInt(e.target.value) || 0)
+                        }
+                      />
+                      <span className='text-muted-foreground text-sm'>
+                        {t('requests')}
+                      </span>
+                    </div>
+                  </FormControl>
+                  <FormDescription>
+                    {t('In-flight requests at the same time, 0 = unlimited')}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
 
           <FormField
@@ -287,7 +334,7 @@ export function RateLimitSection({ defaultValues }: RateLimitSectionProps) {
                   ) : (
                     <Textarea
                       rows={8}
-                      placeholder={`{\n  "default": [200, 100],\n  "vip": [0, 1000]\n}`}
+                      placeholder={`{\n  "default": [30, 20, 3],\n  "vip": [60, 50, 5]\n}`}
                       className='font-mono text-sm'
                       {...field}
                     />
@@ -300,15 +347,20 @@ export function RateLimitSection({ defaultValues }: RateLimitSectionProps) {
                       <ul className='list-inside list-disc space-y-0.5 pl-2'>
                         <li>
                           {t('JSON object:')}{' '}
-                          {`{"groupName": [maxRequests, maxSuccess]}`}
+                          {`{"groupName": [maxRequests, maxSuccess, maxConcurrency]}`}
                         </li>
                         <li>
                           {t('Example:')}{' '}
-                          {`{"default": [200, 100], "vip": [0, 1000]}`}
+                          {`{"default": [30, 20, 3], "vip": [60, 50, 5]}`}
                         </li>
                         <li>
                           {t(
-                            'maxRequests ≥ 0, maxSuccess ≥ 1, both ≤ 2,147,483,647'
+                            'maxRequests ≥ 0, maxSuccess ≥ 1, maxConcurrency ≥ 0, all ≤ 2,147,483,647'
+                          )}
+                        </li>
+                        <li>
+                          {t(
+                            'Two-value entries are still supported and default maxConcurrency to 0.'
                           )}
                         </li>
                         <li>
@@ -341,7 +393,7 @@ export function RateLimitSection({ defaultValues }: RateLimitSectionProps) {
                 </FormControl>
                 <FormDescription>
                   {t(
-                    'Comma, space, or newline separated user IDs. These users bypass model request RPM limits.'
+                    'Comma, space, or newline separated user IDs. These users bypass model request RPM and concurrency limits.'
                   )}
                 </FormDescription>
                 <FormMessage />

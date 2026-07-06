@@ -63,14 +63,16 @@ export function RateLimitVisualEditor({
       .map(([groupName, limits]) => {
         if (
           Array.isArray(limits) &&
-          limits.length === 2 &&
+          (limits.length === 2 || limits.length === 3) &&
           typeof limits[0] === 'number' &&
-          typeof limits[1] === 'number'
+          typeof limits[1] === 'number' &&
+          (limits.length === 2 || typeof limits[2] === 'number')
         ) {
           return {
             groupName,
             maxRequests: limits[0],
             maxSuccess: limits[1],
+            maxConcurrency: limits.length === 3 ? limits[2] : 0,
           }
         }
         return null
@@ -97,7 +99,11 @@ export function RateLimitVisualEditor({
       delete parsed[editData.groupName]
     }
 
-    parsed[data.groupName] = [data.maxRequests, data.maxSuccess]
+    parsed[data.groupName] = [
+      data.maxRequests,
+      data.maxSuccess,
+      data.maxConcurrency,
+    ]
 
     onChange(JSON.stringify(parsed, null, 2))
   }
@@ -160,6 +166,9 @@ export function RateLimitVisualEditor({
                   {t('Max Requests (incl. failures)')}
                 </TableHead>
                 <TableHead className='text-right'>{t('Max Success')}</TableHead>
+                <TableHead className='text-right'>
+                  {t('Max Concurrency')}
+                </TableHead>
                 <TableHead className='text-right'>{t('Actions')}</TableHead>
               </TableRow>
             </TableHeader>
@@ -179,6 +188,13 @@ export function RateLimitVisualEditor({
                   <TableCell className='text-right'>
                     <span className='font-mono'>
                       {limit.maxSuccess.toLocaleString()}
+                    </span>
+                  </TableCell>
+                  <TableCell className='text-right'>
+                    <span className='font-mono'>
+                      {limit.maxConcurrency === 0
+                        ? t('Unlimited')
+                        : limit.maxConcurrency.toLocaleString()}
                     </span>
                   </TableCell>
                   <TableCell className='text-right'>

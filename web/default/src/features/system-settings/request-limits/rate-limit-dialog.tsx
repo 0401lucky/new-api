@@ -51,6 +51,10 @@ const rateLimitDialogSchema = z.object({
     .number()
     .min(1, 'Must be ≥ 1')
     .max(2147483647, 'Must be ≤ 2,147,483,647'),
+  maxConcurrency: z
+    .number()
+    .min(0, 'Must be ≥ 0')
+    .max(2147483647, 'Must be ≤ 2,147,483,647'),
 })
 
 type RateLimitDialogFormValues = z.infer<typeof rateLimitDialogSchema>
@@ -59,6 +63,7 @@ export type RateLimitEntryData = {
   groupName: string
   maxRequests: number
   maxSuccess: number
+  maxConcurrency: number
 }
 
 type RateLimitDialogProps = {
@@ -83,6 +88,7 @@ export function RateLimitDialog({
       groupName: '',
       maxRequests: 0,
       maxSuccess: 1,
+      maxConcurrency: 0,
     },
   })
 
@@ -94,6 +100,7 @@ export function RateLimitDialog({
         groupName: '',
         maxRequests: 0,
         maxSuccess: 1,
+        maxConcurrency: 0,
       })
     }
   }, [editData, form, open])
@@ -204,6 +211,37 @@ export function RateLimitDialog({
                   </FormControl>
                   <FormDescription>
                     {t('Only successful requests count toward this limit.')}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name='maxConcurrency'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Max Concurrent Requests')}</FormLabel>
+                  <FormControl>
+                    <div className='flex items-center gap-2'>
+                      <Input
+                        type='number'
+                        min={0}
+                        max={2147483647}
+                        step={1}
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(parseInt(e.target.value) || 0)
+                        }
+                      />
+                      <span className='text-muted-foreground text-sm'>
+                        {t('requests')}
+                      </span>
+                    </div>
+                  </FormControl>
+                  <FormDescription>
+                    {t('In-flight requests at the same time. 0 = unlimited.')}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

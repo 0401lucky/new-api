@@ -314,6 +314,7 @@ export type SecuritySettings = {
   ModelRequestRateLimitEnabled: boolean
   ModelRequestRateLimitCount: number
   ModelRequestRateLimitSuccessCount: number
+  ModelRequestRateLimitConcurrencyCount: number
   ModelRequestRateLimitDurationMinutes: number
   ModelRequestRateLimitGroup: string
   ModelRequestRateLimitExemptUserIDs: string
