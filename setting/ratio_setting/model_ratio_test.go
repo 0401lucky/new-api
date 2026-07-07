@@ -21,7 +21,7 @@ func TestDefaultZhipuLatestPricing(t *testing.T) {
 	assertFloatEqual(t, "cogview-4 price", defaultModelPrice["cogview-4"], 0.01)
 }
 
-func TestGetCompletionRatio_CustomConfigOverridesHardcodedLockedRatio(t *testing.T) {
+func TestGetCompletionRatio_CustomConfigOverridesUnlockedHardcodedRatio(t *testing.T) {
 	completionRatioMap.Clear()
 	t.Cleanup(func() {
 		completionRatioMap.Clear()
@@ -32,8 +32,8 @@ func TestGetCompletionRatio_CustomConfigOverridesHardcodedLockedRatio(t *testing
 	if got := GetCompletionRatio(modelName); got != 6 {
 		t.Fatalf("default completion ratio = %v, want 6", got)
 	}
-	if info := GetCompletionRatioInfo(modelName); info.Ratio != 6 || !info.Locked {
-		t.Fatalf("default completion info = %+v, want ratio 6 locked true", info)
+	if info := GetCompletionRatioInfo(modelName); info.Ratio != 6 || info.Locked {
+		t.Fatalf("default completion info = %+v, want ratio 6 locked false", info)
 	}
 
 	completionRatioMap.Set(modelName, 8)
