@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+
 import {
   SettingsControlChildren,
   SettingsForm,
@@ -400,7 +401,7 @@ export function HeaderNavigationSection({
                   name={module.requireAuthKey}
                   render={({ field }) => (
                     <SettingsControlChildren>
-                      <SettingsSwitchItem className='border-b-0 py-2'>
+                      <SettingsSwitchItem className='py-2'>
                         <SettingsSwitchContent>
                           <FormLabel>{module.requireAuthTitle}</FormLabel>
                           <FormDescription>

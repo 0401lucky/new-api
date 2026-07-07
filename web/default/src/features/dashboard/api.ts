@@ -17,7 +17,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
+
 import type {
+  FlowQuotaDataItem,
   QuotaDataItem,
   UptimeGroupResult,
   UserModelUsageResponse,
@@ -76,6 +78,24 @@ export async function getUserModelUsageStats(params: {
     message?: string
     data: UserModelUsageResponse
   }>('/api/data/user_model_usage', { params })
+  return res.data
+}
+
+export async function getFlowQuotaDates(
+  params: {
+    start_timestamp: number
+    end_timestamp: number
+    default_time?: string
+    username?: string
+  },
+  isAdmin = false
+) {
+  const endpoint = isAdmin ? '/api/data/flow' : '/api/data/flow/self'
+  const res = await api.get<{
+    success: boolean
+    data?: FlowQuotaDataItem[]
+    message?: string
+  }>(endpoint, { params })
   return res.data
 }
 

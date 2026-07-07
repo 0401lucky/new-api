@@ -24,7 +24,6 @@ import { useTranslation } from 'react-i18next'
 import { formatNumber, formatQuota } from '@/lib/format'
 import { getRollingDateRange, type TimeGranularity } from '@/lib/time'
 import { VCHART_OPTION } from '@/lib/vchart'
-import { useThemeCustomization } from '@/context/theme-customization-provider'
 import { useTheme } from '@/context/theme-provider'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -63,13 +62,13 @@ import {
 } from '@/features/dashboard/constants'
 import {
   getDefaultDays,
-  getSavedGranularity,
   saveGranularity,
   processUserChartData,
 } from '@/features/dashboard/lib'
 import type {
   ProcessedUserChartData,
   QuotaDataItem,
+  UserChartsFilters,
   UserModelUsageResponse,
 } from '@/features/dashboard/types'
 
@@ -332,10 +331,14 @@ function UserModelUsageSheet(props: {
   )
 }
 
-export function UserCharts() {
+interface UserChartsProps {
+  filters: UserChartsFilters
+  onFiltersChange: (filters: UserChartsFilters) => void
+}
+
+export function UserCharts(props: UserChartsProps) {
   const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
-  const { customization } = useThemeCustomization()
   const [themeReady, setThemeReady] = useState(false)
   const [selectedUser, setSelectedUser] = useState<SelectedUser | null>(null)
   const [usageOpen, setUsageOpen] = useState(false)
@@ -343,41 +346,45 @@ export function UserCharts() {
     (typeof import('@visactor/vchart'))['ThemeManager'] | null
   >(null)
 
-  const [timeGranularity, setTimeGranularity] = useState<TimeGranularity>(() =>
-    getSavedGranularity()
-  )
-  const [selectedRange, setSelectedRange] = useState<number>(() =>
-    getDefaultDays(timeGranularity)
-  )
-  const [topUserLimit, setTopUserLimit] = useState(10)
-  const [timeRange, setTimeRange] = useState(() => {
-    const days = getDefaultDays(timeGranularity)
-    const { start, end } = getRollingDateRange(days)
+  // The selection is owned by the dashboard parent so it persists across
+  // sub-section switches; the rolling window is derived from the chosen range.
+  const timeGranularity = props.filters.timeGranularity
+  const selectedRange = props.filters.selectedRange
+  const topUserLimit = props.filters.topUserLimit
+  const onFiltersChange = props.onFiltersChange
+
+  const timeRange = useMemo(() => {
+    const { start, end } = getRollingDateRange(selectedRange)
     return {
       start_timestamp: Math.floor(start.getTime() / 1000),
       end_timestamp: Math.floor(end.getTime() / 1000),
     }
-  })
+  }, [selectedRange])
 
-  const handleRangeChange = useCallback((days: number) => {
-    setSelectedRange(days)
-    const { start, end } = getRollingDateRange(days)
-    setTimeRange({
-      start_timestamp: Math.floor(start.getTime() / 1000),
-      end_timestamp: Math.floor(end.getTime() / 1000),
-    })
-  }, [])
+  const handleRangeChange = useCallback(
+    (days: number) => {
+      onFiltersChange({ ...props.filters, selectedRange: days })
+    },
+    [onFiltersChange, props.filters]
+  )
 
   const handleGranularityChange = useCallback(
     (g: TimeGranularity) => {
-      setTimeGranularity(g)
       saveGranularity(g)
-      const days = getDefaultDays(g)
-      if (days !== selectedRange) {
-        handleRangeChange(days)
-      }
+      onFiltersChange({
+        ...props.filters,
+        timeGranularity: g,
+        selectedRange: getDefaultDays(g),
+      })
     },
-    [selectedRange, handleRangeChange]
+    [onFiltersChange, props.filters]
+  )
+
+  const handleTopUserLimitChange = useCallback(
+    (limit: number) => {
+      onFiltersChange({ ...props.filters, topUserLimit: limit })
+    },
+    [onFiltersChange, props.filters]
   )
 
   useEffect(() => {
@@ -409,18 +416,9 @@ export function UserCharts() {
         isLoading ? [] : (userData ?? []),
         timeGranularity,
         t,
-        topUserLimit,
-        customization.preset
+        topUserLimit
       ),
-    [
-      userData,
-      isLoading,
-      timeGranularity,
-      t,
-      topUserLimit,
-      customization.preset,
-      customization.radius,
-    ]
+    [userData, isLoading, timeGranularity, t, topUserLimit]
   )
 
   const userIndex = useMemo(() => {
@@ -497,7 +495,7 @@ export function UserCharts() {
 
           <Tabs
             value={String(topUserLimit)}
-            onValueChange={(value) => setTopUserLimit(Number(value))}
+            onValueChange={(value) => handleTopUserLimitChange(Number(value))}
             className='shrink-0'
           >
             <TabsList>
@@ -544,7 +542,7 @@ export function UserCharts() {
                     themeReady &&
                     spec && (
                       <VChart
-                        key={`user-${chart.value}-${topUserLimit}-${resolvedTheme}-${customization.preset}`}
+                        key={`user-${chart.value}-${topUserLimit}-${resolvedTheme}`}
                         spec={{
                           ...spec,
                           theme: resolvedTheme === 'dark' ? 'dark' : 'light',
