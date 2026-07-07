@@ -505,6 +505,21 @@ type UserModelUsageStat struct {
 	Quota        int64  `json:"quota"`
 }
 
+type FlowQuotaData struct {
+	UserID      int    `json:"user_id" gorm:"column:user_id"`
+	Username    string `json:"username" gorm:"column:username"`
+	NodeName    string `json:"node_name" gorm:"column:node_name"`
+	UseGroup    string `json:"use_group" gorm:"column:use_group"`
+	TokenID     int    `json:"token_id" gorm:"column:token_id"`
+	TokenName   string `json:"token_name" gorm:"column:token_name"`
+	ChannelID   int    `json:"channel_id" gorm:"column:channel_id"`
+	ChannelName string `json:"channel_name" gorm:"-"`
+	ModelName   string `json:"model_name" gorm:"column:model_name"`
+	TokenUsed   int64  `json:"token_used" gorm:"column:token_used"`
+	Count       int64  `json:"count" gorm:"column:count"`
+	Quota       int64  `json:"quota" gorm:"column:quota"`
+}
+
 func GetUserModelUsageStats(userId int, startTimestamp int64, endTimestamp int64, limit int) ([]UserModelUsageStat, error) {
 	if limit <= 0 {
 		limit = 200
@@ -535,6 +550,101 @@ func GetUserModelUsageStats(userId int, startTimestamp int64, endTimestamp int64
 		return nil, errors.New("查询用户模型统计失败")
 	}
 	return stats, nil
+}
+
+func fillFlowQuotaChannelNames(rows []FlowQuotaData) error {
+	channelIds := types.NewSet[int]()
+	for _, row := range rows {
+		if row.ChannelID > 0 {
+			channelIds.Add(row.ChannelID)
+		}
+	}
+	if channelIds.Len() == 0 {
+		return nil
+	}
+
+	var channels []struct {
+		Id   int    `gorm:"column:id"`
+		Name string `gorm:"column:name"`
+	}
+	queryChannelIds := channelIds.Items()
+	if common.MemoryCacheEnabled {
+		queryChannelIds = make([]int, 0, channelIds.Len())
+		for _, channelId := range channelIds.Items() {
+			if cacheChannel, err := CacheGetChannel(channelId); err == nil {
+				channels = append(channels, struct {
+					Id   int    `gorm:"column:id"`
+					Name string `gorm:"column:name"`
+				}{
+					Id:   channelId,
+					Name: cacheChannel.Name,
+				})
+			} else {
+				queryChannelIds = append(queryChannelIds, channelId)
+			}
+		}
+	}
+	if len(queryChannelIds) > 0 {
+		var dbChannels []struct {
+			Id   int    `gorm:"column:id"`
+			Name string `gorm:"column:name"`
+		}
+		if err := DB.Table("channels").
+			Select("id, name").
+			Where("id IN ?", queryChannelIds).
+			Find(&dbChannels).Error; err != nil {
+			return err
+		}
+		channels = append(channels, dbChannels...)
+	}
+
+	channelNames := make(map[int]string, len(channels))
+	for _, channel := range channels {
+		channelNames[channel.Id] = channel.Name
+	}
+	for i := range rows {
+		rows[i].ChannelName = channelNames[rows[i].ChannelID]
+	}
+	return nil
+}
+
+func GetFlowQuotaData(startTimestamp int64, endTimestamp int64, username string, userId int) ([]FlowQuotaData, error) {
+	query := LOG_DB.Table("logs").
+		Select(
+			"logs.user_id, logs.username, logs."+logGroupCol+" AS use_group, logs.token_id, logs.token_name, logs.channel_id, logs.model_name, COUNT(*) AS count, COALESCE(SUM(logs.prompt_tokens), 0) + COALESCE(SUM(logs.completion_tokens), 0) AS token_used, COALESCE(SUM(logs.quota), 0) AS quota",
+		).
+		Where("logs.type = ?", LogTypeConsume)
+
+	var err error
+	if query, err = applyLogUserFilter(query, "logs.username", "logs.user_id", username, userId); err != nil {
+		return nil, err
+	}
+	if startTimestamp != 0 {
+		query = query.Where("logs.created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		query = query.Where("logs.created_at <= ?", endTimestamp)
+	}
+
+	var rows []FlowQuotaData
+	if err = query.
+		Group("logs.user_id, logs.username, logs." + logGroupCol + ", logs.token_id, logs.token_name, logs.channel_id, logs.model_name").
+		Order("quota desc, count desc").
+		Scan(&rows).Error; err != nil {
+		common.SysError("failed to query flow quota data: " + err.Error())
+		return nil, errors.New("查询分流数据失败")
+	}
+
+	if common.NodeName != "" {
+		for i := range rows {
+			rows[i].NodeName = common.NodeName
+		}
+	}
+	if err = fillFlowQuotaChannelNames(rows); err != nil {
+		common.SysError("failed to query flow quota channel names: " + err.Error())
+		return nil, errors.New("查询分流渠道名称失败")
+	}
+	return rows, nil
 }
 
 func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, userId int, tokenName string, channel int, group string) (stat Stat, err error) {

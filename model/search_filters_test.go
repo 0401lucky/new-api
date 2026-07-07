@@ -127,3 +127,88 @@ func TestGetAllLogsFiltersPromptCheckEntries(t *testing.T) {
 	require.Len(t, matched, 1)
 	require.Contains(t, matched[0].Other, "prompt_check")
 }
+
+func TestGetFlowQuotaDataAggregatesConsumeLogs(t *testing.T) {
+	truncateTables(t)
+
+	oldNodeName := common.NodeName
+	oldMemoryCacheEnabled := common.MemoryCacheEnabled
+	common.NodeName = "node-a"
+	common.MemoryCacheEnabled = false
+	t.Cleanup(func() {
+		common.NodeName = oldNodeName
+		common.MemoryCacheEnabled = oldMemoryCacheEnabled
+	})
+
+	require.NoError(t, DB.Create(&Channel{
+		Id:    7,
+		Name:  "primary-channel",
+		Key:   "sk-test",
+		Group: "vip",
+	}).Error)
+
+	now := common.GetTimestamp()
+	logs := []Log{
+		{
+			UserId:           3,
+			Username:         "target",
+			Type:             LogTypeConsume,
+			CreatedAt:        now,
+			TokenId:          11,
+			TokenName:        "main-key",
+			Group:            "vip",
+			ModelName:        "gpt-test",
+			ChannelId:        7,
+			PromptTokens:     1,
+			CompletionTokens: 2,
+			Quota:            10,
+		},
+		{
+			UserId:           3,
+			Username:         "target",
+			Type:             LogTypeConsume,
+			CreatedAt:        now + 1,
+			TokenId:          11,
+			TokenName:        "main-key",
+			Group:            "vip",
+			ModelName:        "gpt-test",
+			ChannelId:        7,
+			PromptTokens:     3,
+			CompletionTokens: 4,
+			Quota:            20,
+		},
+		{
+			UserId:    3,
+			Username:  "target",
+			Type:      LogTypeError,
+			CreatedAt: now,
+			TokenId:   11,
+			TokenName: "main-key",
+			Group:     "vip",
+			ModelName: "gpt-test",
+			ChannelId: 7,
+			Quota:     999,
+		},
+	}
+	for i := range logs {
+		require.NoError(t, DB.Create(&logs[i]).Error)
+	}
+
+	rows, err := GetFlowQuotaData(now-10, now+10, "", 3)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+
+	row := rows[0]
+	require.Equal(t, 3, row.UserID)
+	require.Equal(t, "target", row.Username)
+	require.Equal(t, "node-a", row.NodeName)
+	require.Equal(t, "vip", row.UseGroup)
+	require.Equal(t, 11, row.TokenID)
+	require.Equal(t, "main-key", row.TokenName)
+	require.Equal(t, 7, row.ChannelID)
+	require.Equal(t, "primary-channel", row.ChannelName)
+	require.Equal(t, "gpt-test", row.ModelName)
+	require.Equal(t, int64(10), row.TokenUsed)
+	require.Equal(t, int64(2), row.Count)
+	require.Equal(t, int64(30), row.Quota)
+}
