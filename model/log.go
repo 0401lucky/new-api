@@ -757,6 +757,23 @@ func DeleteOldLogBatch(ctx context.Context, targetTimestamp int64, limit int) (i
 	if limit <= 0 {
 		limit = 100
 	}
-	result := LOG_DB.WithContext(ctx).Where("created_at < ?", targetTimestamp).Limit(limit).Delete(&Log{})
+	if common.UsingMySQL {
+		// MySQL 支持 DELETE ... LIMIT，且不允许 DELETE 时子查询同一张表
+		result := LOG_DB.WithContext(ctx).Where("created_at < ?", targetTimestamp).Limit(limit).Delete(&Log{})
+		return result.RowsAffected, result.Error
+	}
+	// PostgreSQL/SQLite 的 DELETE 不支持 LIMIT，先取一批主键再删除
+	var ids []int
+	if err := LOG_DB.WithContext(ctx).Model(&Log{}).
+		Where("created_at < ?", targetTimestamp).
+		Order("id asc").
+		Limit(limit).
+		Pluck("id", &ids).Error; err != nil {
+		return 0, err
+	}
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	result := LOG_DB.WithContext(ctx).Where("id IN ?", ids).Delete(&Log{})
 	return result.RowsAffected, result.Error
 }

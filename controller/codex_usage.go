@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -102,6 +103,9 @@ func refreshCodexWhamToken(c *gin.Context, wham *codexWhamContext) bool {
 	return true
 }
 
+// 记录每个渠道+方法已探测成功的 wham 端点，避免对非幂等的 POST 反复多端点试探
+var codexWhamEndpointCache sync.Map
+
 func fetchCodexWhamWithRefresh(
 	c *gin.Context,
 	method string,
@@ -114,6 +118,13 @@ func fetchCodexWhamWithRefresh(
 	wham, err := newCodexWhamContext(channelId)
 	if err != nil {
 		return 0, nil, err
+	}
+
+	cacheKey := fmt.Sprintf("%d:%s:%s", channelId, method, endpoints[0])
+	cachedOnly := false
+	if cached, ok := codexWhamEndpointCache.Load(cacheKey); ok {
+		endpoints = []string{cached.(string)}
+		cachedOnly = true
 	}
 
 	refreshed := false
@@ -153,7 +164,15 @@ func fetchCodexWhamWithRefresh(
 			}
 		}
 
+		if statusCode == http.StatusNotFound && cachedOnly {
+			// 缓存的端点已失效，清除后由下次调用重新探测
+			codexWhamEndpointCache.Delete(cacheKey)
+			return statusCode, body, nil
+		}
 		if statusCode != http.StatusNotFound || index == len(endpoints)-1 {
+			if statusCode != http.StatusNotFound {
+				codexWhamEndpointCache.Store(cacheKey, endpoint)
+			}
 			return statusCode, body, nil
 		}
 	}

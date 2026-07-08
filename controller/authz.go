@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"net/http"
+
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
@@ -120,6 +122,36 @@ func getUserAdminPermissionMatrix(user *model.User) dto.AdminPermissionMatrix {
 		return defaultAdminPermissionMatrix(user.Role)
 	}
 	return normalizeAdminPermissionMatrix(user.Role, settings.AdminPermissions)
+}
+
+// RequireAdminPermission 按管理员细粒度权限矩阵拒绝请求；root 直接放行。
+// 必须挂在 middleware.AdminAuth() 之后（依赖上下文中的 id/role）。
+func RequireAdminPermission(resource string, action string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.GetInt("role") >= common.RoleRootUser {
+			c.Next()
+			return
+		}
+		user, err := model.GetUserById(c.GetInt("id"), false)
+		if err != nil {
+			c.JSON(http.StatusForbidden, gin.H{
+				"success": false,
+				"message": "无法校验管理员权限",
+			})
+			c.Abort()
+			return
+		}
+		matrix := getUserAdminPermissionMatrix(user)
+		if !matrix[resource][action] {
+			c.JSON(http.StatusForbidden, gin.H{
+				"success": false,
+				"message": "无权执行该操作",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
 }
 
 func fillUserAdminPermissions(user *model.User) {

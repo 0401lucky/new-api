@@ -13,6 +13,7 @@ import (
 	"github.com/samber/hot"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // Subscription duration units
@@ -1302,9 +1303,12 @@ func ResetActiveSubscriptionsByPlan(planId int, userId int, advanceResetTime boo
 		subID := sub.Id
 		err := DB.Transaction(func(tx *gorm.DB) error {
 			var locked UserSubscription
-			if err := tx.Set("gorm:query_option", "FOR UPDATE").
-				Where("id = ? AND status = ? AND end_time > ?", subID, "active", now).
-				First(&locked).Error; err != nil {
+			lockQuery := tx.Where("id = ? AND status = ? AND end_time > ?", subID, "active", now)
+			if !common.UsingSQLite {
+				// SQLite 不支持 FOR UPDATE（事务本身即独占写）；MySQL/PG 需行锁防止与消费扣减并发
+				lockQuery = lockQuery.Clauses(clause.Locking{Strength: "UPDATE"})
+			}
+			if err := lockQuery.First(&locked).Error; err != nil {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return nil
 				}
