@@ -35,6 +35,7 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			promptCheckRoute.GET("/rules", controller.GetPromptCheckRules)
 		}
+		apiRouter.GET("/authz/catalog", middleware.AdminAuth(), controller.GetAuthzCatalog)
 		apiRouter.GET("/notice", controller.GetNotice)
 		apiRouter.GET("/user-agreement", controller.GetUserAgreement)
 		apiRouter.GET("/privacy-policy", controller.GetPrivacyPolicy)
@@ -204,6 +205,23 @@ func SetApiRouter(router *gin.Engine) {
 			activeTaskRoute.GET("/user_token_usage", controller.GetUserTokenUsage24hAPI)
 		}
 
+		systemInfoRoute := apiRouter.Group("/system-info")
+		systemInfoRoute.Use(middleware.AdminAuth())
+		{
+			systemInfoRoute.GET("/instances", controller.ListSystemInstances)
+			systemInfoRoute.DELETE("/stale-instances", controller.DeleteStaleSystemInstances)
+			systemInfoRoute.DELETE("/instances/:node_name", controller.DeleteStaleSystemInstance)
+		}
+
+		systemTaskRoute := apiRouter.Group("/system-task")
+		systemTaskRoute.Use(middleware.AdminAuth())
+		{
+			systemTaskRoute.POST("/log-cleanup", controller.StartLogCleanupTask)
+			systemTaskRoute.GET("/current", controller.GetCurrentSystemTask)
+			systemTaskRoute.GET("/list", controller.ListSystemTasks)
+			systemTaskRoute.GET("/:task_id", controller.GetSystemTask)
+		}
+
 		// Subscription billing (plans, purchase, admin management)
 		subscriptionRoute := apiRouter.Group("/subscription")
 		subscriptionRoute.Use(middleware.UserAuth())
@@ -229,6 +247,8 @@ func SetApiRouter(router *gin.Engine) {
 			// User subscription management (admin)
 			subscriptionAdminRoute.GET("/users/:id/subscriptions", controller.AdminListUserSubscriptions)
 			subscriptionAdminRoute.POST("/users/:id/subscriptions", controller.AdminCreateUserSubscription)
+			subscriptionAdminRoute.POST("/users/:id/subscriptions/reset", controller.AdminResetUserSubscriptionsByPlan)
+			subscriptionAdminRoute.POST("/plans/:id/subscriptions/reset", controller.AdminResetPlanSubscriptions)
 			subscriptionAdminRoute.POST("/user_subscriptions/:id/invalidate", controller.AdminInvalidateUserSubscription)
 			subscriptionAdminRoute.DELETE("/user_subscriptions/:id", controller.AdminDeleteUserSubscription)
 		}
@@ -289,6 +309,7 @@ func SetApiRouter(router *gin.Engine) {
 			channelRoute.GET("/search", controller.SearchChannels)
 			channelRoute.GET("/models", controller.ChannelListModels)
 			channelRoute.GET("/models_enabled", controller.EnabledListModels)
+			channelRoute.GET("/ops", controller.GetChannelOps)
 			channelRoute.GET("/:id", controller.GetChannel)
 			channelRoute.POST("/:id/key", middleware.RootAuth(), middleware.CriticalRateLimit(), middleware.DisableCache(), middleware.SecureVerificationRequired(), controller.GetChannelKey)
 			channelRoute.GET("/test", controller.TestAllChannels)
@@ -297,6 +318,8 @@ func SetApiRouter(router *gin.Engine) {
 			channelRoute.GET("/update_balance/:id", controller.UpdateChannelBalance)
 			channelRoute.POST("/", controller.AddChannel)
 			channelRoute.PUT("/", controller.UpdateChannel)
+			channelRoute.POST("/:id/status", controller.UpdateChannelStatus)
+			channelRoute.POST("/status/batch", controller.BatchUpdateChannelStatus)
 			channelRoute.DELETE("/disabled", controller.DeleteDisabledChannel)
 			channelRoute.POST("/tag/disabled", controller.DisableTagChannels)
 			channelRoute.POST("/tag/enabled", controller.EnableTagChannels)
@@ -312,6 +335,8 @@ func SetApiRouter(router *gin.Engine) {
 			channelRoute.POST("/:id/codex/oauth/complete", controller.CompleteCodexOAuthForChannel)
 			channelRoute.POST("/:id/codex/refresh", controller.RefreshCodexChannelCredential)
 			channelRoute.GET("/:id/codex/usage", controller.GetCodexChannelUsage)
+			channelRoute.GET("/:id/codex/usage/reset-credits", controller.GetCodexUsageResetCredits)
+			channelRoute.POST("/:id/codex/usage/reset", controller.ResetCodexChannelUsage)
 			channelRoute.POST("/ollama/pull", controller.OllamaPullModel)
 			channelRoute.POST("/ollama/pull/stream", controller.OllamaPullModelStream)
 			channelRoute.DELETE("/ollama/delete", controller.OllamaDeleteModel)

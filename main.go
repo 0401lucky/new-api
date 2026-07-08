@@ -75,6 +75,7 @@ func main() {
 		// for compatibility with old versions
 		common.MemoryCacheEnabled = true
 	}
+	model.StartSystemInstanceHeartbeat()
 	if common.MemoryCacheEnabled {
 		common.SysLog("memory cache enabled")
 		common.SysLog(fmt.Sprintf("sync frequency: %d seconds", common.SyncFrequency))

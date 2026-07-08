@@ -439,3 +439,50 @@ func AdminDeleteUserSubscription(c *gin.Context) {
 	}
 	common.ApiSuccess(c, nil)
 }
+
+type AdminResetUserSubscriptionsRequest struct {
+	PlanId           int  `json:"plan_id"`
+	AdvanceResetTime bool `json:"advance_reset_time"`
+}
+
+type AdminResetPlanSubscriptionsRequest struct {
+	AdvanceResetTime bool `json:"advance_reset_time"`
+}
+
+func AdminResetUserSubscriptionsByPlan(c *gin.Context) {
+	userId, _ := strconv.Atoi(c.Param("id"))
+	if userId <= 0 {
+		common.ApiErrorMsg(c, "无效的用户ID")
+		return
+	}
+	var req AdminResetUserSubscriptionsRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.PlanId <= 0 {
+		common.ApiErrorMsg(c, "参数错误")
+		return
+	}
+	result, err := model.ResetActiveSubscriptionsByPlan(req.PlanId, userId, req.AdvanceResetTime)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, result)
+}
+
+func AdminResetPlanSubscriptions(c *gin.Context) {
+	planId, _ := strconv.Atoi(c.Param("id"))
+	if planId <= 0 {
+		common.ApiErrorMsg(c, "无效的套餐ID")
+		return
+	}
+	var req AdminResetPlanSubscriptionsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.ApiErrorMsg(c, "参数错误")
+		return
+	}
+	result, err := model.ResetActiveSubscriptionsByPlan(planId, 0, req.AdvanceResetTime)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, result)
+}

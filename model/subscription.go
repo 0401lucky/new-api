@@ -1254,6 +1254,77 @@ func ResetDueSubscriptions(limit int) (int, error) {
 	return resetCount, nil
 }
 
+type SubscriptionResetResult struct {
+	PlanId           int   `json:"plan_id"`
+	MatchedCount     int64 `json:"matched_count"`
+	ResetCount       int64 `json:"reset_count"`
+	UserCount        int64 `json:"user_count"`
+	AdvanceResetTime bool  `json:"advance_reset_time"`
+}
+
+func ResetActiveSubscriptionsByPlan(planId int, userId int, advanceResetTime bool) (*SubscriptionResetResult, error) {
+	if planId <= 0 {
+		return nil, errors.New("invalid plan id")
+	}
+	plan, err := GetSubscriptionPlanById(planId)
+	if err != nil {
+		return nil, err
+	}
+	now := GetDBTimestamp()
+	resetQuery := func() *gorm.DB {
+		query := DB.Model(&UserSubscription{}).
+			Where("plan_id = ? AND status = ? AND end_time > ?", planId, "active", now)
+		if userId > 0 {
+			query = query.Where("user_id = ?", userId)
+		}
+		return query
+	}
+
+	result := &SubscriptionResetResult{
+		PlanId:           planId,
+		AdvanceResetTime: advanceResetTime,
+	}
+	if err := resetQuery().Count(&result.MatchedCount).Error; err != nil {
+		return nil, err
+	}
+	if err := resetQuery().Distinct("user_id").Count(&result.UserCount).Error; err != nil {
+		return nil, err
+	}
+	if result.MatchedCount == 0 {
+		return result, nil
+	}
+
+	var subs []UserSubscription
+	if err := resetQuery().Order("id asc").Find(&subs).Error; err != nil {
+		return nil, err
+	}
+	for _, sub := range subs {
+		subID := sub.Id
+		err := DB.Transaction(func(tx *gorm.DB) error {
+			var locked UserSubscription
+			if err := tx.Set("gorm:query_option", "FOR UPDATE").
+				Where("id = ? AND status = ? AND end_time > ?", subID, "active", now).
+				First(&locked).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return nil
+				}
+				return err
+			}
+			locked.AmountUsed = 0
+			if advanceResetTime {
+				locked.LastResetTime = now
+				locked.NextResetTime = calcNextResetTime(time.Unix(now, 0), plan, locked.EndTime)
+			}
+			return tx.Save(&locked).Error
+		})
+		if err != nil {
+			return result, err
+		}
+		result.ResetCount++
+	}
+	return result, nil
+}
+
 // CleanupSubscriptionPreConsumeRecords removes old idempotency records to keep table small.
 func CleanupSubscriptionPreConsumeRecords(olderThanSeconds int64) (int64, error) {
 	if olderThanSeconds <= 0 {

@@ -8,12 +8,14 @@ import (
 	"strings"
 )
 
-func FetchCodexWhamUsage(
+func FetchCodexWham(
 	ctx context.Context,
 	client *http.Client,
 	baseURL string,
 	accessToken string,
 	accountID string,
+	method string,
+	endpoint string,
 ) (statusCode int, body []byte, err error) {
 	if client == nil {
 		return 0, nil, fmt.Errorf("nil http client")
@@ -30,14 +32,29 @@ func FetchCodexWhamUsage(
 	if aid == "" {
 		return 0, nil, fmt.Errorf("empty accountID")
 	}
+	method = strings.ToUpper(strings.TrimSpace(method))
+	if method == "" {
+		method = http.MethodGet
+	}
+	endpoint = strings.TrimLeft(strings.TrimSpace(endpoint), "/")
+	if endpoint == "" {
+		return 0, nil, fmt.Errorf("empty endpoint")
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, bu+"/backend-api/wham/usage", nil)
+	var requestBody io.Reader
+	if method != http.MethodGet {
+		requestBody = strings.NewReader("{}")
+	}
+	req, err := http.NewRequestWithContext(ctx, method, bu+"/backend-api/wham/"+endpoint, requestBody)
 	if err != nil {
 		return 0, nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+at)
 	req.Header.Set("chatgpt-account-id", aid)
 	req.Header.Set("Accept", "application/json")
+	if method != http.MethodGet {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	if req.Header.Get("originator") == "" {
 		req.Header.Set("originator", "codex_cli_rs")
 	}
@@ -53,4 +70,14 @@ func FetchCodexWhamUsage(
 		return resp.StatusCode, nil, err
 	}
 	return resp.StatusCode, body, nil
+}
+
+func FetchCodexWhamUsage(
+	ctx context.Context,
+	client *http.Client,
+	baseURL string,
+	accessToken string,
+	accountID string,
+) (statusCode int, body []byte, err error) {
+	return FetchCodexWham(ctx, client, baseURL, accessToken, accountID, http.MethodGet, "usage")
 }

@@ -314,6 +314,7 @@ func GetUser(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserNoPermissionSameLevel)
 		return
 	}
+	fillUserAdminPermissions(user)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
@@ -423,6 +424,7 @@ func GetSelf(c *gin.Context) {
 
 	// 计算用户权限信息
 	permissions := calculateUserPermissions(userRole)
+	permissions["admin_permissions"] = getUserAdminPermissionMatrix(user)
 
 	// 获取用户设置并提取sidebar_modules
 	userSetting := user.GetSetting()
@@ -624,6 +626,12 @@ func UpdateUser(c *gin.Context) {
 	if err := updatedUser.Edit(updatePassword); err != nil {
 		common.ApiError(c, err)
 		return
+	}
+	if myRole == common.RoleRootUser && len(updatedUser.AdminPermissions) > 0 {
+		if err := saveUserAdminPermissions(updatedUser.Id, originUser.Role, updatedUser.AdminPermissions); err != nil {
+			common.ApiError(c, err)
+			return
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -881,6 +889,12 @@ func CreateUser(c *gin.Context) {
 	if err := cleanUser.Insert(0); err != nil {
 		common.ApiError(c, err)
 		return
+	}
+	if myRole == common.RoleRootUser && len(user.AdminPermissions) > 0 {
+		if err := saveUserAdminPermissions(cleanUser.Id, cleanUser.Role, user.AdminPermissions); err != nil {
+			common.ApiError(c, err)
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
