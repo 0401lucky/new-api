@@ -50,12 +50,16 @@ export type ModelPricingSnapshot = {
   hasConflict: boolean
 }
 
+export type ChannelModelStatus = 'in_channel' | 'not_in_channel' | 'unpriced'
+
 export type ModelRow = ModelPricingSnapshot & {
   saved?: ModelPricingSnapshot
   draft?: ModelPricingSnapshot
   isDraftChanged: boolean
   isDraftDeleted: boolean
   isDraftNew: boolean
+  channelStatus?: ChannelModelStatus
+  isUnpriced?: boolean
 }
 
 export const hasPricingValue = (value?: string) =>

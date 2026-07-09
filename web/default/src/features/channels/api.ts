@@ -601,6 +601,20 @@ export async function getEnabledModels(): Promise<{
   return res.data
 }
 
+/**
+ * Get models across all channels (including disabled ones)
+ */
+export async function getAllChannelModels(): Promise<{
+  success: boolean
+  message?: string
+  data?: string[]
+}> {
+  const res = await api.get('/api/channel/models_enabled', {
+    params: { scope: 'all' },
+  })
+  return res.data
+}
+
 // ============================================================================
 // Ollama Utilities
 // ============================================================================
