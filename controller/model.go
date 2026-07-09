@@ -330,9 +330,15 @@ func DashboardListModels(c *gin.Context) {
 }
 
 func EnabledListModels(c *gin.Context) {
+	var data []string
+	if c.Query("scope") == "all" {
+		data = model.GetAllChannelModels()
+	} else {
+		data = model.GetEnabledModels()
+	}
 	c.JSON(200, gin.H{
 		"success": true,
-		"data":    model.GetEnabledModels(),
+		"data":    data,
 	})
 }
 

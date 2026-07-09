@@ -52,6 +52,13 @@ func GetEnabledModels() []string {
 	return models
 }
 
+func GetAllChannelModels() []string {
+	var models []string
+	// 含禁用渠道：定价配置对暂时停用的渠道也应保留
+	DB.Table("abilities").Distinct("model").Pluck("model", &models)
+	return models
+}
+
 func GetAllEnableAbilities() []Ability {
 	var abilities []Ability
 	DB.Find(&abilities, "enabled = ?", true)
