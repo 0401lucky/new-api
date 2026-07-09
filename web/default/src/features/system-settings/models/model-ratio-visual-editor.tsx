@@ -131,7 +131,8 @@ const ModelRatioVisualEditorComponent = forwardRef<
   ref
 ) {
   const { t } = useTranslation()
-  const isMobile = useMediaQuery('(max-width: 767px)')
+  // 1280px 以下（含垂直标签页等窄视口）表格占满整行，编辑面板走抽屉
+  const isCompact = useMediaQuery('(max-width: 1279px)')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editorOpen, setEditorOpen] = useState(false)
   const [editData, setEditData] = useState<ModelRatioData | null>(null)
@@ -355,16 +356,16 @@ const ModelRatioVisualEditorComponent = forwardRef<
         requestRuleExpr: editableModel.requestRuleExpr,
       })
       setEditorOpen(true)
-      if (isMobile) setSheetOpen(true)
+      if (isCompact) setSheetOpen(true)
     },
-    [isMobile]
+    [isCompact]
   )
 
   const handleAdd = useCallback(() => {
     setEditData(null)
     setEditorOpen(true)
-    if (isMobile) setSheetOpen(true)
-  }, [isMobile])
+    if (isCompact) setSheetOpen(true)
+  }, [isCompact])
 
   const handleGlobalFilterChange = useCallback<OnChangeFn<string>>(
     (updater) => {
@@ -689,7 +690,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
 
   return (
     <div className='flex flex-col gap-4'>
-      <div className='grid h-[clamp(720px,calc(100vh-12rem),900px)] min-h-0 gap-4 md:grid-cols-[minmax(300px,0.72fr)_minmax(520px,1.28fr)] xl:grid-cols-[minmax(320px,0.68fr)_minmax(640px,1.32fr)]'>
+      <div className='grid h-[clamp(720px,calc(100vh-12rem),900px)] min-h-0 gap-4 xl:grid-cols-[minmax(320px,0.68fr)_minmax(640px,1.32fr)]'>
         <div className='flex min-h-0 min-w-0 flex-col gap-3'>
           <DataTableToolbar
             table={table}
@@ -810,7 +811,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
           {hasRows && <DataTablePagination table={table} />}
         </div>
 
-        <div className='hidden min-h-0 min-w-0 md:block'>
+        <div className='hidden min-h-0 min-w-0 xl:block'>
           {editorOpen ? (
             <ModelPricingEditorPanel
               ref={editorPanelRef}
@@ -847,7 +848,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
         </Button>
       </DataTableBulkActions>
 
-      {isMobile && (
+      {isCompact && (
         <ModelPricingSheet
           ref={editorPanelRef}
           open={sheetOpen}
