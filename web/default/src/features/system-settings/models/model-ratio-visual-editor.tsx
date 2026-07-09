@@ -51,6 +51,7 @@ import { Button } from '@/components/ui/button'
 import { getAllChannelModels } from '@/features/channels/api'
 import { combineBillingExpr } from '@/features/pricing/lib/billing-expr'
 import { useMediaQuery } from '@/hooks'
+import { cn } from '@/lib/utils'
 
 import { safeJsonParse } from '../utils/json-parser'
 import {
@@ -366,6 +367,11 @@ const ModelRatioVisualEditorComponent = forwardRef<
     setEditorOpen(true)
     if (isCompact) setSheetOpen(true)
   }, [isCompact])
+
+  const handleCloseEditor = useCallback(() => {
+    setEditorOpen(false)
+    setEditData(null)
+  }, [])
 
   const handleGlobalFilterChange = useCallback<OnChangeFn<string>>(
     (updater) => {
@@ -690,7 +696,13 @@ const ModelRatioVisualEditorComponent = forwardRef<
 
   return (
     <div className='flex flex-col gap-4'>
-      <div className='grid h-[clamp(720px,calc(100vh-12rem),900px)] min-h-0 gap-4 xl:grid-cols-[minmax(320px,0.68fr)_minmax(640px,1.32fr)]'>
+      <div
+        className={cn(
+          'grid h-[clamp(720px,calc(100vh-12rem),900px)] min-h-0 gap-4',
+          editorOpen &&
+            'xl:grid-cols-[minmax(320px,0.68fr)_minmax(640px,1.32fr)]'
+        )}
+      >
         <div className='flex min-h-0 min-w-0 flex-col gap-3'>
           <DataTableToolbar
             table={table}
@@ -811,32 +823,18 @@ const ModelRatioVisualEditorComponent = forwardRef<
           {hasRows && <DataTablePagination table={table} />}
         </div>
 
-        <div className='hidden min-h-0 min-w-0 xl:block'>
-          {editorOpen ? (
+        {editorOpen && (
+          <div className='hidden min-h-0 min-w-0 xl:block'>
             <ModelPricingEditorPanel
               ref={editorPanelRef}
               editData={editData}
               onSave={onSave}
               isSaving={isSaving}
+              onClose={handleCloseEditor}
               className='h-full min-h-0'
             />
-          ) : (
-            <div className='bg-card text-muted-foreground flex h-full min-h-0 flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-6 text-center'>
-              <div className='text-foreground text-base font-medium'>
-                {t('Select a model to edit pricing')}
-              </div>
-              <p className='max-w-sm text-sm'>
-                {t(
-                  'Use the full-width table to scan prices, then select a row to edit it here.'
-                )}
-              </p>
-              <Button variant='outline' onClick={handleAdd}>
-                <Plus data-icon='inline-start' />
-                {t('Add model')}
-              </Button>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <DataTableBulkActions table={table} entityName={t('model')}>

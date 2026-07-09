@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AlertTriangle, Save } from 'lucide-react'
+import { AlertTriangle, Save, X } from 'lucide-react'
 import {
   forwardRef,
   useCallback,
@@ -98,6 +98,7 @@ type ModelPricingEditorPanelProps = Omit<
   'open' | 'onOpenChange'
 > & {
   className?: string
+  onClose?: () => void
 }
 
 export type ModelPricingEditorPanelHandle = {
@@ -141,7 +142,7 @@ export const ModelPricingEditorPanel = forwardRef<
   ModelPricingEditorPanelHandle,
   ModelPricingEditorPanelProps
 >(function ModelPricingEditorPanel(
-  { editData, className, onSave, isSaving },
+  { editData, className, onSave, isSaving, onClose },
   ref
 ) {
   const { t } = useTranslation()
@@ -491,6 +492,16 @@ export const ModelPricingEditorPanel = forwardRef<
               {isEditMode ? t('Edit model pricing') : t('Add model pricing')}
             </h3>
           </div>
+          {onClose && (
+            <Button
+              variant='ghost'
+              size='icon'
+              aria-label={t('Close')}
+              onClick={onClose}
+            >
+              <X />
+            </Button>
+          )}
         </div>
       </div>
 
