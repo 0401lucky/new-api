@@ -5518,6 +5518,9 @@
     "When enabled, Midjourney callbacks are accepted (reveals server IP).": "启用时，接受 Midjourney 回调 (会泄露服务器 IP)。",
     "When enabled, review API errors block matched requests instead of allowing them.": "启用后，审核 API 出错时会拦截命中的请求，而不是放行。",
     "Window": "窗口",
-    "Writes matched prompt check summaries to error logs for audit and manual review.": "将命中的 Prompt 检查摘要写入错误日志，便于审计和人工复核。"
+    "Writes matched prompt check summaries to error logs for audit and manual review.": "将命中的 Prompt 检查摘要写入错误日志，便于审计和人工复核。",
+    "In channel": "渠道有",
+    "Not in channel": "渠道无",
+    "Add pricing": "添加定价"
   }
 }

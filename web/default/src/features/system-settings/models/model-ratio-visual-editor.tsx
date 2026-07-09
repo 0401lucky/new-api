@@ -24,6 +24,7 @@ import {
   type VisibilityState,
   type SortingState,
 } from '@tanstack/react-table'
+import { useQuery } from '@tanstack/react-query'
 import { Copy, Plus } from 'lucide-react'
 import {
   useState,
@@ -47,6 +48,7 @@ import {
   useDataTable,
 } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
+import { getAllChannelModels } from '@/features/channels/api'
 import { combineBillingExpr } from '@/features/pricing/lib/billing-expr'
 import { useMediaQuery } from '@/hooks'
 
@@ -60,6 +62,7 @@ import {
 import {
   buildModelSnapshots,
   getSnapshotSignature,
+  type ChannelModelStatus,
   type ModelRow,
 } from './model-pricing-snapshots'
 import { buildModelRatioColumns } from './model-ratio-table-columns'
@@ -180,6 +183,17 @@ const ModelRatioVisualEditorComponent = forwardRef<
     localStorage.setItem(STORAGE_KEY, JSON.stringify(columnVisibility))
   }, [columnVisibility])
 
+  const { data: channelModelsData } = useQuery({
+    queryKey: ['all-channel-models'],
+    queryFn: getAllChannelModels,
+    staleTime: 60 * 1000,
+  })
+  const channelModelSet = useMemo(() => {
+    if (!channelModelsData?.success || !channelModelsData.data) return null
+    return new Set(channelModelsData.data)
+  }, [channelModelsData])
+  const channelModelsReady = channelModelSet !== null
+
   const models = useMemo(() => {
     const savedRows = buildModelSnapshots({
       modelPrice: savedModelPrice,
@@ -210,13 +224,19 @@ const ModelRatioVisualEditorComponent = forwardRef<
     const draftByName = new Map(draftRows.map((row) => [row.name, row]))
     const modelNames = new Set([...savedByName.keys(), ...draftByName.keys()])
 
-    return Array.from(modelNames)
+    const pricedRows: ModelRow[] = Array.from(modelNames)
       .map((name) => {
         const saved = savedByName.get(name)
         const draft = draftByName.get(name)
         const displayed = saved ?? draft
         const savedSignature = getSnapshotSignature(saved)
         const draftSignature = getSnapshotSignature(draft)
+        let channelStatus: ChannelModelStatus | undefined
+        if (channelModelSet) {
+          channelStatus = channelModelSet.has(name)
+            ? 'in_channel'
+            : 'not_in_channel'
+        }
 
         return {
           ...displayed!,
@@ -225,10 +245,31 @@ const ModelRatioVisualEditorComponent = forwardRef<
           isDraftChanged: savedSignature !== draftSignature,
           isDraftDeleted: Boolean(saved && !draft),
           isDraftNew: Boolean(!saved && draft),
+          channelStatus,
         }
       })
       .filter((row) => !row.isDraftDeleted)
-      .sort((a, b) => a.name.localeCompare(b.name))
+
+    const unpricedRows: ModelRow[] = channelModelSet
+      ? [...channelModelSet]
+          .filter((name) => !modelNames.has(name))
+          .map((name) => ({
+            name,
+            billingMode: undefined,
+            hasConflict: false,
+            saved: undefined,
+            draft: undefined,
+            isDraftChanged: false,
+            isDraftDeleted: false,
+            isDraftNew: false,
+            channelStatus: 'unpriced' as const,
+            isUnpriced: true,
+          }))
+      : []
+
+    return [...pricedRows, ...unpricedRows].sort((a, b) =>
+      a.name.localeCompare(b.name)
+    )
   }, [
     savedModelPrice,
     savedModelRatio,
@@ -250,12 +291,14 @@ const ModelRatioVisualEditorComponent = forwardRef<
     audioCompletionRatio,
     billingMode,
     billingExpr,
+    channelModelSet,
   ])
 
   const modeCounts = useMemo(
     () =>
       models.reduce(
         (acc, model) => {
+          if (model.isUnpriced) return acc
           const mode =
             model.billingMode === 'per-request' ||
             model.billingMode === 'tiered_expr'
@@ -269,6 +312,22 @@ const ModelRatioVisualEditorComponent = forwardRef<
           'per-request': 0,
           tiered_expr: 0,
         } as Record<'per-token' | 'per-request' | 'tiered_expr', number>
+      ),
+    [models]
+  )
+
+  const channelStatusCounts = useMemo(
+    () =>
+      models.reduce(
+        (acc, model) => {
+          if (model.channelStatus) acc[model.channelStatus] += 1
+          return acc
+        },
+        {
+          in_channel: 0,
+          not_in_channel: 0,
+          unpriced: 0,
+        } as Record<ChannelModelStatus, number>
       ),
     [models]
   )
@@ -423,9 +482,10 @@ const ModelRatioVisualEditorComponent = forwardRef<
       buildModelRatioColumns({
         onDelete: handleDelete,
         onEdit: handleEdit,
+        showChannelStatus: channelModelsReady,
         t,
       }),
-    [handleEdit, handleDelete, t]
+    [handleEdit, handleDelete, channelModelsReady, t]
   )
 
   const { table } = useDataTable({
@@ -437,7 +497,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     columnVisibility,
     pagination,
     rowSelection,
-    enableRowSelection: true,
+    enableRowSelection: (row) => !row.original.isUnpriced,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: handleGlobalFilterChange,
@@ -656,6 +716,31 @@ const ModelRatioVisualEditorComponent = forwardRef<
                   },
                 ],
               },
+              ...(channelModelsReady
+                ? [
+                    {
+                      columnId: 'channelStatus',
+                      title: t('Channel'),
+                      options: [
+                        {
+                          label: t('In channel'),
+                          value: 'in_channel',
+                          count: channelStatusCounts.in_channel,
+                        },
+                        {
+                          label: t('Unpriced'),
+                          value: 'unpriced',
+                          count: channelStatusCounts.unpriced,
+                        },
+                        {
+                          label: t('Not in channel'),
+                          value: 'not_in_channel',
+                          count: channelStatusCounts.not_in_channel,
+                        },
+                      ],
+                    },
+                  ]
+                : []),
             ]}
             preActions={
               <Button onClick={handleAdd}>
@@ -692,6 +777,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
                   <col className='w-9' />
                   <col className='w-[300px]' />
                   <col className='w-[120px]' />
+                  {channelModelsReady && <col className='w-[110px]' />}
                   <col className='w-[300px]' />
                   <col className='w-auto' />
                 </colgroup>

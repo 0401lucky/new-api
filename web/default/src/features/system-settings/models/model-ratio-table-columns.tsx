@@ -17,10 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { ColumnDef } from '@tanstack/react-table'
+import { Plus } from 'lucide-react'
 
 import { DataTableColumnHeader } from '@/components/data-table/core/column-header'
 import { StaticRowActions } from '@/components/data-table/static/static-row-actions'
 import { StatusBadge } from '@/components/status-badge'
+import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 
 import {
@@ -28,6 +30,7 @@ import {
   getModeVariant,
   getPriceDetail,
   getPriceSummary,
+  type ChannelModelStatus,
   type ModelRow,
 } from './model-pricing-snapshots'
 
@@ -39,15 +42,26 @@ const filterBySelectedValues = (
   return filterValue.includes(String(rowValue))
 }
 
+const CHANNEL_STATUS_META: Record<
+  ChannelModelStatus,
+  { label: string; variant: 'success' | 'warning' | 'neutral' }
+> = {
+  in_channel: { label: 'In channel', variant: 'success' },
+  unpriced: { label: 'Unpriced', variant: 'warning' },
+  not_in_channel: { label: 'Not in channel', variant: 'neutral' },
+}
+
 type BuildModelRatioColumnsOptions = {
   onDelete: (name: string) => void
   onEdit: (model: ModelRow) => void
+  showChannelStatus: boolean
   t: (key: string) => string
 }
 
 export function buildModelRatioColumns({
   onDelete,
   onEdit,
+  showChannelStatus,
   t,
 }: BuildModelRatioColumnsOptions): ColumnDef<ModelRow>[] {
   return [
@@ -62,14 +76,15 @@ export function buildModelRatioColumns({
           className='translate-y-[2px]'
         />
       ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label={t('Select row')}
-          className='translate-y-[2px]'
-        />
-      ),
+      cell: ({ row }) =>
+        row.original.isUnpriced ? null : (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label={t('Select row')}
+            className='translate-y-[2px]'
+          />
+        ),
       enableSorting: false,
       enableHiding: false,
       size: 40,
@@ -107,34 +122,65 @@ export function buildModelRatioColumns({
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t('Mode')} />
       ),
-      cell: ({ row }) => (
-        <StatusBadge
-          label={t(getModeLabel(row.original.billingMode))}
-          variant={getModeVariant(row.original.billingMode)}
-          copyable={false}
-          showDot={false}
-          className='-ml-1.5 px-0'
-        />
-      ),
+      cell: ({ row }) =>
+        row.original.isUnpriced ? null : (
+          <StatusBadge
+            label={t(getModeLabel(row.original.billingMode))}
+            variant={getModeVariant(row.original.billingMode)}
+            copyable={false}
+            showDot={false}
+            className='-ml-1.5 px-0'
+          />
+        ),
       filterFn: (row, id, value) =>
         filterBySelectedValues(row.getValue(id), value),
       meta: { label: t('Mode') },
     },
+    ...(showChannelStatus
+      ? [
+          {
+            accessorKey: 'channelStatus',
+            header: ({ column }) => (
+              <DataTableColumnHeader column={column} title={t('Channel')} />
+            ),
+            cell: ({ row }) => {
+              const status = row.original.channelStatus
+              if (!status) return null
+              const meta = CHANNEL_STATUS_META[status]
+              return (
+                <StatusBadge
+                  label={t(meta.label)}
+                  variant={meta.variant}
+                  copyable={false}
+                  showDot={false}
+                  className='-ml-1.5 px-0'
+                />
+              )
+            },
+            filterFn: (row, id, value) =>
+              filterBySelectedValues(row.getValue(id), value),
+            meta: { label: t('Channel') },
+          } as ColumnDef<ModelRow>,
+        ]
+      : []),
     {
       id: 'priceSummary',
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t('Price summary')} />
       ),
-      cell: ({ row }) => (
-        <div className='flex min-w-0 flex-col gap-1'>
-          <span className='truncate font-medium'>
-            {getPriceSummary(row.original, t)}
-          </span>
-          <span className='text-muted-foreground truncate text-xs'>
-            {getPriceDetail(row.original, t)}
-          </span>
-        </div>
-      ),
+      cell: ({ row }) =>
+        row.original.isUnpriced ? (
+          <span className='text-muted-foreground'>—</span>
+        ) : (
+          <div className='flex min-w-0 flex-col gap-1'>
+            <span className='truncate font-medium'>
+              {getPriceSummary(row.original, t)}
+            </span>
+            <span className='text-muted-foreground truncate text-xs'>
+              {getPriceDetail(row.original, t)}
+            </span>
+          </div>
+        ),
       sortingFn: (rowA, rowB) =>
         getPriceSummary(rowA.original, t).localeCompare(
           getPriceSummary(rowB.original, t)
@@ -144,15 +190,25 @@ export function buildModelRatioColumns({
     {
       id: 'actions',
       header: () => <div>{t('Actions')}</div>,
-      cell: ({ row }) => (
-        <StaticRowActions
-          editLabel={t('Edit')}
-          deleteLabel={t('Delete')}
-          menuLabel={t('Open menu')}
-          onEdit={() => onEdit(row.original)}
-          onDelete={() => onDelete(row.original.name)}
-        />
-      ),
+      cell: ({ row }) =>
+        row.original.isUnpriced ? (
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => onEdit(row.original)}
+          >
+            <Plus data-icon='inline-start' />
+            {t('Add pricing')}
+          </Button>
+        ) : (
+          <StaticRowActions
+            editLabel={t('Edit')}
+            deleteLabel={t('Delete')}
+            menuLabel={t('Open menu')}
+            onEdit={() => onEdit(row.original)}
+            onDelete={() => onDelete(row.original.name)}
+          />
+        ),
       enableHiding: false,
     },
   ]

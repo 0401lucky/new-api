@@ -5518,6 +5518,9 @@
     "When enabled, Midjourney callbacks are accepted (reveals server IP).": "有効にすると、Midjourney のコールバックを受け入れます (サーバーの IP を公開します)。",
     "When enabled, review API errors block matched requests instead of allowing them.": "有効にすると、レビュー API エラー時に一致リクエストを許可せずブロックします。",
     "Window": "ウィンドウ",
-    "Writes matched prompt check summaries to error logs for audit and manual review.": "一致したプロンプト検査の要約をエラーログへ書き込み、監査と手動確認に使います。"
+    "Writes matched prompt check summaries to error logs for audit and manual review.": "一致したプロンプト検査の要約をエラーログへ書き込み、監査と手動確認に使います。",
+    "In channel": "In channel",
+    "Not in channel": "Not in channel",
+    "Add pricing": "Add pricing"
   }
 }

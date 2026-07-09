@@ -5518,6 +5518,9 @@
     "When enabled, Midjourney callbacks are accepted (reveals server IP).": "Lorsque activé, les callbacks Midjourney sont acceptés (révèle l'IP du serveur).",
     "When enabled, review API errors block matched requests instead of allowing them.": "Si active, les erreurs de l'API d'examen bloquent les requetes correspondantes au lieu de les autoriser.",
     "Window": "Fenêtre",
-    "Writes matched prompt check summaries to error logs for audit and manual review.": "Ecrit les resumes de verification des prompts dans les journaux d'erreurs pour audit et revue manuelle."
+    "Writes matched prompt check summaries to error logs for audit and manual review.": "Ecrit les resumes de verification des prompts dans les journaux d'erreurs pour audit et revue manuelle.",
+    "In channel": "In channel",
+    "Not in channel": "Not in channel",
+    "Add pricing": "Add pricing"
   }
 }

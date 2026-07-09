@@ -5518,6 +5518,9 @@
     "When enabled, Midjourney callbacks are accepted (reveals server IP).": "При включении принимаются обратные вызовы Midjourney (раскрывает IP сервера).",
     "When enabled, review API errors block matched requests instead of allowing them.": "Если включено, ошибки API проверки блокируют совпавшие запросы вместо разрешения.",
     "Window": "Окно",
-    "Writes matched prompt check summaries to error logs for audit and manual review.": "Записывает сводки совпадений проверки prompt в журналы ошибок для аудита и ручной проверки."
+    "Writes matched prompt check summaries to error logs for audit and manual review.": "Записывает сводки совпадений проверки prompt в журналы ошибок для аудита и ручной проверки.",
+    "In channel": "In channel",
+    "Not in channel": "Not in channel",
+    "Add pricing": "Add pricing"
   }
 }

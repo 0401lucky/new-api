@@ -5518,6 +5518,9 @@
     "When enabled, Midjourney callbacks are accepted (reveals server IP).": "Khi được bật, các callback của Midjourney được chấp nhận (lộ IP máy chủ).",
     "When enabled, review API errors block matched requests instead of allowing them.": "Khi bat, loi API xem xet se chan yeu cau da khop thay vi cho phep.",
     "Window": "Cửa sổ",
-    "Writes matched prompt check summaries to error logs for audit and manual review.": "Ghi tom tat kiem tra prompt da khop vao log loi de kiem toan va xem xet thu cong."
+    "Writes matched prompt check summaries to error logs for audit and manual review.": "Ghi tom tat kiem tra prompt da khop vao log loi de kiem toan va xem xet thu cong.",
+    "In channel": "In channel",
+    "Not in channel": "Not in channel",
+    "Add pricing": "Add pricing"
   }
 }
