@@ -108,6 +108,7 @@ export const ERROR_MESSAGES = {
   UPDATE_FAILED: 'Failed to update redemption code',
   DELETE_FAILED: 'Failed to delete redemption code',
   DELETE_INVALID_FAILED: 'Failed to delete invalid redemption codes',
+  DELETE_VALID_FAILED: 'Failed to delete valid redemption codes',
   STATUS_UPDATE_FAILED: 'Failed to update redemption code status',
   NAME_LENGTH_INVALID: 'Name must be between {{min}} and {{max}} characters',
   COUNT_INVALID: 'Count must be between {{min}} and {{max}}',

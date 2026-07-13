@@ -196,3 +196,16 @@ func DeleteInvalidInvitationCodes(c *gin.Context) {
 		"data":    rows,
 	})
 }
+
+func DeleteValidInvitationCodes(c *gin.Context) {
+	rows, err := model.DeleteValidInvitationCodes()
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    rows,
+	})
+}

@@ -10,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/shopspring/decimal"
+	"github.com/stretchr/testify/require"
 )
 
 // Claude Sonnet-style tiered expression: standard vs long-context
@@ -486,6 +487,80 @@ func TestBuildTieredTokenParams_GPT_NoCacheVar(t *testing.T) {
 	if math.Abs(got-want) > 0.01 {
 		t.Fatalf("quota = %f, want %f", got, want)
 	}
+}
+
+func TestBuildTieredTokenParams_OpenAICacheWrite(t *testing.T) {
+	t.Run("表达式使用 cc 时从 p 排除缓存写入", func(t *testing.T) {
+		usage := &dto.Usage{
+			PromptTokens:     1473,
+			CompletionTokens: 19,
+			PromptTokensDetails: dto.InputTokenDetails{
+				CacheWriteTokens: 1470,
+			},
+		}
+		usedVars := billingexpr.UsedVars(`tier("base", p * 2.5 + c * 15 + cc * 3.125)`)
+
+		params := BuildTieredTokenParams(usage, false, usedVars)
+
+		require.Equal(t, float64(3), params.P)
+		require.Equal(t, float64(1470), params.CC)
+		require.Equal(t, float64(1473), params.Len)
+	})
+
+	t.Run("表达式未使用 cc 时缓存写入保留在 p", func(t *testing.T) {
+		usage := &dto.Usage{
+			PromptTokens: 1473,
+			PromptTokensDetails: dto.InputTokenDetails{
+				CacheWriteTokens: 1470,
+			},
+		}
+		usedVars := billingexpr.UsedVars(`tier("base", p * 2.5 + c * 15)`)
+
+		params := BuildTieredTokenParams(usage, false, usedVars)
+
+		require.Equal(t, float64(1473), params.P)
+		require.Equal(t, float64(1470), params.CC)
+		require.Equal(t, float64(1473), params.Len)
+	})
+
+	t.Run("缓存读取与写入重叠时 p 钳制为零且 len 不变", func(t *testing.T) {
+		usage := &dto.Usage{
+			PromptTokens: 3619,
+			PromptTokensDetails: dto.InputTokenDetails{
+				CachedTokens:     2921,
+				CacheWriteTokens: 3616,
+			},
+		}
+		usedVars := billingexpr.UsedVars(`tier("base", p * 2.5 + cr * 0.25 + cc * 3.125)`)
+
+		params := BuildTieredTokenParams(usage, false, usedVars)
+
+		require.Zero(t, params.P)
+		require.Equal(t, float64(2921), params.CR)
+		require.Equal(t, float64(3616), params.CC)
+		require.Equal(t, float64(3619), params.Len)
+	})
+
+	t.Run("Claude 继续使用 5m 和 1h 拆分字段", func(t *testing.T) {
+		usage := &dto.Usage{
+			PromptTokens:  100,
+			UsageSemantic: "anthropic",
+			PromptTokensDetails: dto.InputTokenDetails{
+				CachedTokens:     30,
+				CacheWriteTokens: 999,
+			},
+			ClaudeCacheCreation5mTokens: 10,
+			ClaudeCacheCreation1hTokens: 20,
+		}
+		usedVars := billingexpr.UsedVars(`tier("base", p * 3 + cr * 0.3 + cc * 3.75 + cc1h * 6)`)
+
+		params := BuildTieredTokenParams(usage, true, usedVars)
+
+		require.Equal(t, float64(100), params.P)
+		require.Equal(t, float64(10), params.CC)
+		require.Equal(t, float64(20), params.CC1h)
+		require.Equal(t, float64(160), params.Len)
+	})
 }
 
 func TestBuildTieredTokenParams_GPT_WithImage(t *testing.T) {

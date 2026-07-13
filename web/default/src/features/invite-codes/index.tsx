@@ -121,6 +121,7 @@ import {
   createInviteCode,
   deleteInvalidInviteCodes,
   deleteInviteCode,
+  deleteValidInviteCodes,
   getInviteCode,
   getInviteCodes,
   searchInviteCodes,
@@ -563,15 +564,10 @@ function InviteCodeRowActions({
 
 function InviteCodesBulkActions<TData>({
   table,
-  onRefresh,
 }: {
   table: Table<TData>
-  onRefresh: () => void
 }) {
   const { t } = useTranslation()
-  const [showDeleteInvalidConfirm, setShowDeleteInvalidConfirm] =
-    useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
   const selectedRows = table.getFilteredSelectedRowModel().rows
 
   const contentToCopy = useMemo(() => {
@@ -582,76 +578,138 @@ function InviteCodesBulkActions<TData>({
     return selectedCodes.join('\n')
   }, [selectedRows])
 
+  return (
+    <BulkActionsToolbar table={table} entityName={t('invite code')}>
+      <CopyButton
+        value={contentToCopy}
+        variant='outline'
+        size='icon'
+        className='size-8'
+        tooltip={t('Copy selected codes')}
+        successTooltip={t('Codes copied!')}
+        aria-label={t('Copy selected codes')}
+      />
+    </BulkActionsToolbar>
+  )
+}
+
+function InviteCodesCleanupActions({ onRefresh }: { onRefresh: () => void }) {
+  const { t } = useTranslation()
+  const [showDeleteInvalidConfirm, setShowDeleteInvalidConfirm] =
+    useState(false)
+  const [showDeleteValidConfirm, setShowDeleteValidConfirm] = useState(false)
+  const [isDeletingInvalid, setIsDeletingInvalid] = useState(false)
+  const [isDeletingValid, setIsDeletingValid] = useState(false)
+
   const handleDeleteInvalid = async () => {
-    setIsDeleting(true)
+    setIsDeletingInvalid(true)
     try {
       const result = await deleteInvalidInviteCodes()
       if (result.success) {
-        const count = result.data || 0
+        const count = result.data ?? 0
         toast.success(
           t('Successfully deleted {{count}} invalid invite codes', { count })
         )
-        table.resetRowSelection()
-        onRefresh()
         setShowDeleteInvalidConfirm(false)
+        onRefresh()
+      } else {
+        toast.error(
+          result.message || t('Failed to delete invalid invite codes')
+        )
       }
     } finally {
-      setIsDeleting(false)
+      setIsDeletingInvalid(false)
     }
   }
 
+  const handleDeleteValid = async () => {
+    setIsDeletingValid(true)
+    try {
+      const result = await deleteValidInviteCodes()
+      if (result.success) {
+        const count = result.data ?? 0
+        toast.success(
+          t('Successfully deleted {{count}} valid invite codes', { count })
+        )
+        setShowDeleteValidConfirm(false)
+        onRefresh()
+      } else {
+        toast.error(result.message || t('Failed to delete valid invite codes'))
+      }
+    } finally {
+      setIsDeletingValid(false)
+    }
+  }
+
+  const globalScopeNotice = t(
+    'This action applies to all matching invite codes in the database and is not limited by current selection, filters, or pagination.'
+  )
+
   return (
     <>
-      <BulkActionsToolbar table={table} entityName={t('invite code')}>
-        <CopyButton
-          value={contentToCopy}
-          variant='outline'
-          size='icon'
-          className='size-8'
-          tooltip={t('Copy selected codes')}
-          successTooltip={t('Codes copied!')}
-          aria-label={t('Copy selected codes')}
-        />
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant='destructive'
-                size='icon'
-                onClick={() => setShowDeleteInvalidConfirm(true)}
-                className='size-8'
-                aria-label={t('Delete invalid invite codes')}
-                title={t('Delete invalid invite codes')}
-              />
-            }
-          >
-            <Trash2 />
-            <span className='sr-only'>{t('Delete invalid codes')}</span>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{t('Delete invalid codes (used/disabled/expired)')}</p>
-          </TooltipContent>
-        </Tooltip>
-      </BulkActionsToolbar>
+      <Button
+        variant='outline'
+        size='sm'
+        onClick={() => setShowDeleteInvalidConfirm(true)}
+        disabled={isDeletingInvalid || isDeletingValid}
+        aria-label={t('Delete invalid invite codes')}
+      >
+        <Trash2 data-icon='inline-start' />
+        {isDeletingInvalid ? t('Deleting...') : t('Delete Invalid')}
+      </Button>
+      <Button
+        variant='destructive'
+        size='sm'
+        onClick={() => setShowDeleteValidConfirm(true)}
+        disabled={isDeletingInvalid || isDeletingValid}
+        aria-label={t('Delete valid invite codes')}
+      >
+        <Trash2 data-icon='inline-start' />
+        {isDeletingValid ? t('Deleting...') : t('Delete Valid')}
+      </Button>
 
       <ConfirmDialog
         destructive
         open={showDeleteInvalidConfirm}
         onOpenChange={setShowDeleteInvalidConfirm}
         handleConfirm={handleDeleteInvalid}
-        isLoading={isDeleting}
+        isLoading={isDeletingInvalid}
         className='max-w-md'
         title={t('Delete Invalid Invite Codes?')}
         desc={
           <>
-            {t('This will delete all')} <strong>{t('used')}</strong>,{' '}
-            <strong>{t('disabled')}</strong>
-            {t(', and')} <strong>{t('expired')}</strong> {t('invite codes.')}
+            {t(
+              'This will permanently delete all used, disabled, or expired invite codes.'
+            )}
+            <br />
+            {globalScopeNotice}
             <br />
             {t('This action cannot be undone.')}
           </>
         }
         confirmText={t('Delete Invalid')}
+      />
+
+      <ConfirmDialog
+        destructive
+        open={showDeleteValidConfirm}
+        onOpenChange={setShowDeleteValidConfirm}
+        handleConfirm={handleDeleteValid}
+        isLoading={isDeletingValid}
+        className='max-w-md'
+        title={t('Delete Valid Invite Codes?')}
+        desc={
+          <>
+            {t(
+              'This will permanently delete all valid invite codes, including codes that never expire.'
+            )}
+            <br />
+            {globalScopeNotice}
+            <br />
+            {t('This action cannot be undone.')}
+          </>
+        }
+        confirmText={t('Delete Valid')}
       />
     </>
   )
@@ -795,7 +853,7 @@ function InviteCodesTable({
           : undefined
       }
       bulkActions={
-        <InviteCodesBulkActions table={table} onRefresh={onRefresh} />
+        <InviteCodesBulkActions table={table} />
       }
     />
   )
@@ -1141,8 +1199,9 @@ export function InviteCodes() {
       <SectionPageLayout>
         <SectionPageLayout.Title>{t('Invite Codes')}</SectionPageLayout.Title>
         <SectionPageLayout.Actions>
+          <InviteCodesCleanupActions onRefresh={triggerRefresh} />
           <Button size='sm' onClick={() => handleOpenChange('create')}>
-            <Plus className='h-4 w-4' />
+            <Plus data-icon='inline-start' />
             {t('Create Code')}
           </Button>
         </SectionPageLayout.Actions>

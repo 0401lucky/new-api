@@ -24,7 +24,7 @@ import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
 
-import { deleteInvalidRedemptions } from '../api'
+import { deleteInvalidRedemptions, deleteValidRedemptions } from '../api'
 import { ERROR_MESSAGES } from '../constants'
 import { useRedemptions } from './redemptions-provider'
 
@@ -33,10 +33,12 @@ export function RedemptionsPrimaryButtons() {
   const { setOpen, triggerRefresh } = useRedemptions()
   const [showDeleteInvalidConfirm, setShowDeleteInvalidConfirm] =
     useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
+  const [showDeleteValidConfirm, setShowDeleteValidConfirm] = useState(false)
+  const [isDeletingInvalid, setIsDeletingInvalid] = useState(false)
+  const [isDeletingValid, setIsDeletingValid] = useState(false)
 
   const handleDeleteInvalid = async () => {
-    setIsDeleting(true)
+    setIsDeletingInvalid(true)
     try {
       const result = await deleteInvalidRedemptions()
       if (result.success) {
@@ -52,7 +54,28 @@ export function RedemptionsPrimaryButtons() {
         toast.error(result.message || t(ERROR_MESSAGES.DELETE_INVALID_FAILED))
       }
     } finally {
-      setIsDeleting(false)
+      setIsDeletingInvalid(false)
+    }
+  }
+
+  const handleDeleteValid = async () => {
+    setIsDeletingValid(true)
+    try {
+      const result = await deleteValidRedemptions()
+      if (result.success) {
+        const count = result.data || 0
+        toast.success(
+          t('Successfully deleted {{count}} valid redemption codes', {
+            count,
+          })
+        )
+        triggerRefresh()
+        setShowDeleteValidConfirm(false)
+      } else {
+        toast.error(result.message || t(ERROR_MESSAGES.DELETE_VALID_FAILED))
+      }
+    } finally {
+      setIsDeletingValid(false)
     }
   }
 
@@ -63,12 +86,22 @@ export function RedemptionsPrimaryButtons() {
           size='sm'
           variant='outline'
           onClick={() => setShowDeleteInvalidConfirm(true)}
+          disabled={isDeletingInvalid || isDeletingValid}
         >
-          <Trash2 className='text-destructive h-4 w-4' />
+          <Trash2 data-icon='inline-start' />
           {t('Delete Invalid')}
         </Button>
+        <Button
+          size='sm'
+          variant='destructive'
+          onClick={() => setShowDeleteValidConfirm(true)}
+          disabled={isDeletingInvalid || isDeletingValid}
+        >
+          <Trash2 data-icon='inline-start' />
+          {t('Delete Valid')}
+        </Button>
         <Button size='sm' onClick={() => setOpen('create')}>
-          <Plus className='h-4 w-4' />
+          <Plus data-icon='inline-start' />
           {t('Create Code')}
         </Button>
       </div>
@@ -78,7 +111,7 @@ export function RedemptionsPrimaryButtons() {
         open={showDeleteInvalidConfirm}
         onOpenChange={setShowDeleteInvalidConfirm}
         handleConfirm={handleDeleteInvalid}
-        isLoading={isDeleting}
+        isLoading={isDeletingInvalid}
         className='max-w-md'
         title={t('Delete Invalid Redemption Codes?')}
         desc={
@@ -92,6 +125,30 @@ export function RedemptionsPrimaryButtons() {
           </>
         }
         confirmText={t('Delete Invalid')}
+      />
+
+      <ConfirmDialog
+        destructive
+        open={showDeleteValidConfirm}
+        onOpenChange={setShowDeleteValidConfirm}
+        handleConfirm={handleDeleteValid}
+        isLoading={isDeletingValid}
+        className='max-w-md'
+        title={t('Delete Valid Redemption Codes?')}
+        desc={
+          <>
+            {t(
+              'This will delete all enabled redemption codes that have not expired, including codes that never expire.'
+            )}
+            <br />
+            {t(
+              'This applies to all matching redemption codes and is not limited by the current search or page.'
+            )}
+            <br />
+            {t('This action cannot be undone.')}
+          </>
+        }
+        confirmText={t('Delete Valid')}
       />
     </>
   )

@@ -387,6 +387,7 @@ func SetApiRouter(router *gin.Engine) {
 			redemptionRoute.POST("/", controller.AddRedemption)
 			redemptionRoute.PUT("/", controller.UpdateRedemption)
 			redemptionRoute.DELETE("/invalid", controller.DeleteInvalidRedemption)
+			redemptionRoute.DELETE("/valid", controller.DeleteValidRedemptions)
 			redemptionRoute.DELETE("/:id", controller.DeleteRedemption)
 		}
 		invitationRoute := apiRouter.Group("/invitation")
@@ -398,6 +399,7 @@ func SetApiRouter(router *gin.Engine) {
 			invitationRoute.POST("/", controller.AddInvitationCode)
 			invitationRoute.PUT("/", controller.UpdateInvitationCode)
 			invitationRoute.DELETE("/invalid", controller.DeleteInvalidInvitationCodes)
+			invitationRoute.DELETE("/valid", controller.DeleteValidInvitationCodes)
 			invitationRoute.DELETE("/:id", controller.DeleteInvitationCode)
 		}
 		logRoute := apiRouter.Group("/log")

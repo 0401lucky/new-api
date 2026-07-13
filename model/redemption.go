@@ -192,7 +192,24 @@ func DeleteRedemptionById(id int) (err error) {
 }
 
 func DeleteInvalidRedemptions() (int64, error) {
-	now := common.GetTimestamp()
+	return deleteInvalidRedemptionsAt(common.GetTimestamp())
+}
+
+func deleteInvalidRedemptionsAt(now int64) (int64, error) {
 	result := DB.Where("status IN ? OR (status = ? AND expired_time != 0 AND expired_time < ?)", []int{common.RedemptionCodeStatusUsed, common.RedemptionCodeStatusDisabled}, common.RedemptionCodeStatusEnabled, now).Delete(&Redemption{})
+	return result.RowsAffected, result.Error
+}
+
+func DeleteValidRedemptions() (int64, error) {
+	return deleteValidRedemptionsAt(common.GetTimestamp())
+}
+
+func deleteValidRedemptionsAt(now int64) (int64, error) {
+	result := DB.Where(
+		"status = ? AND (expired_time = ? OR expired_time >= ?)",
+		common.RedemptionCodeStatusEnabled,
+		0,
+		now,
+	).Delete(&Redemption{})
 	return result.RowsAffected, result.Error
 }

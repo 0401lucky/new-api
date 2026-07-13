@@ -18,12 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import axios from 'axios'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import * as z from 'zod'
 
+import { CopyButton } from '@/components/copy-button'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   Form,
   FormControl,
@@ -47,6 +49,10 @@ import {
 import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
+import {
+  buildOAuthCallbackUrl,
+  resolveOAuthSiteUrl,
+} from './oauth-callback-url'
 
 /**
  * react-hook-form 7 treats dotted `name` strings as nested paths. To keep
@@ -117,6 +123,53 @@ type FlatOAuthDefaults = {
 const oauthTabContentClassName =
   'grid min-w-0 gap-x-5 gap-y-6 lg:grid-cols-2 [&>[data-slot=form-item]]:min-w-0 lg:[&>[data-slot=form-item]:has([data-slot=switch])]:col-span-2'
 
+type OAuthSetupGuideRow = {
+  label: ReactNode
+  value: string
+  copyLabel: string
+}
+
+type OAuthSetupGuideProps = {
+  title: string
+  description: ReactNode
+  rows: OAuthSetupGuideRow[]
+}
+
+function OAuthSetupGuide(props: OAuthSetupGuideProps) {
+  return (
+    <Alert className='lg:col-span-2'>
+      <AlertTitle>{props.title}</AlertTitle>
+      <AlertDescription className='flex flex-col gap-3 text-sm'>
+        <div>{props.description}</div>
+        <div className='flex flex-col gap-2'>
+          {props.rows.map((row) => (
+            <div
+              key={row.value}
+              className='flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between'
+            >
+              <span className='text-muted-foreground shrink-0'>
+                {row.label}
+              </span>
+              <span className='flex min-w-0 items-center gap-2'>
+                <code className='bg-muted text-foreground min-w-0 rounded px-1.5 py-0.5 text-xs break-all'>
+                  {row.value}
+                </code>
+                <CopyButton
+                  value={row.value}
+                  size='icon'
+                  className='size-7'
+                  tooltip={row.copyLabel}
+                  aria-label={row.copyLabel}
+                />
+              </span>
+            </div>
+          ))}
+        </div>
+      </AlertDescription>
+    </Alert>
+  )
+}
+
 const buildFormDefaults = (defaults: FlatOAuthDefaults): OAuthFormValues => ({
   GitHubOAuthEnabled: defaults.GitHubOAuthEnabled,
   GitHubClientId: defaults.GitHubClientId ?? '',
@@ -177,12 +230,32 @@ const normalizeFormValues = (values: OAuthFormValues): FlatOAuthDefaults => ({
 
 type OAuthSectionProps = {
   defaultValues: FlatOAuthDefaults
+  serverAddress: string
 }
 
 export function OAuthSection(props: OAuthSectionProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
   const [activeTab, setActiveTab] = useState('github')
+  const fallbackSiteUrl =
+    typeof window === 'undefined' ? t('Site URL') : window.location.origin
+  const siteUrl = resolveOAuthSiteUrl(props.serverAddress, fallbackSiteUrl)
+  const githubCallbackUrl = buildOAuthCallbackUrl(
+    props.serverAddress,
+    'github',
+    fallbackSiteUrl
+  )
+  const discordCallbackUrl = buildOAuthCallbackUrl(
+    props.serverAddress,
+    'discord',
+    fallbackSiteUrl
+  )
+  const oidcCallbackUrl = buildOAuthCallbackUrl(
+    props.serverAddress,
+    'oidc',
+    fallbackSiteUrl
+  )
+  const linuxDOCallbackUrl = `${siteUrl}/api/oauth/linuxdo`
 
   const formDefaults = useMemo(
     () => buildFormDefaults(props.defaultValues),
@@ -306,6 +379,25 @@ export function OAuthSection(props: OAuthSectionProps) {
               </TabsList>
 
               <TabsContent value='github' className={oauthTabContentClassName}>
+                <OAuthSetupGuide
+                  title={t('Setup guide')}
+                  description={t(
+                    'Set these values in the provider application before enabling login.'
+                  )}
+                  rows={[
+                    {
+                      label: t('Homepage URL'),
+                      value: siteUrl,
+                      copyLabel: t('Copy homepage URL'),
+                    },
+                    {
+                      label: t('Authorization callback URL'),
+                      value: githubCallbackUrl,
+                      copyLabel: t('Copy callback URL'),
+                    },
+                  ]}
+                />
+
                 <FormField
                   control={form.control}
                   name='GitHubOAuthEnabled'
@@ -378,6 +470,25 @@ export function OAuthSection(props: OAuthSectionProps) {
               </TabsContent>
 
               <TabsContent value='discord' className={oauthTabContentClassName}>
+                <OAuthSetupGuide
+                  title={t('Setup guide')}
+                  description={t(
+                    'Set these values in the provider application before enabling login.'
+                  )}
+                  rows={[
+                    {
+                      label: t('Homepage URL'),
+                      value: siteUrl,
+                      copyLabel: t('Copy homepage URL'),
+                    },
+                    {
+                      label: t('Authorization callback URL'),
+                      value: discordCallbackUrl,
+                      copyLabel: t('Copy callback URL'),
+                    },
+                  ]}
+                />
+
                 <FormField
                   control={form.control}
                   name='discord.enabled'
@@ -450,6 +561,36 @@ export function OAuthSection(props: OAuthSectionProps) {
               </TabsContent>
 
               <TabsContent value='oidc' className={oauthTabContentClassName}>
+                <OAuthSetupGuide
+                  title={t('Setup guide')}
+                  description={
+                    <div className='flex flex-col gap-1'>
+                      <p>
+                        {t(
+                          'Set these values in the provider application before enabling login.'
+                        )}
+                      </p>
+                      <p>
+                        {t(
+                          'OIDC discovery can fill the endpoint fields automatically when the provider supports it.'
+                        )}
+                      </p>
+                    </div>
+                  }
+                  rows={[
+                    {
+                      label: t('Homepage URL'),
+                      value: siteUrl,
+                      copyLabel: t('Copy homepage URL'),
+                    },
+                    {
+                      label: t('Redirect URL'),
+                      value: oidcCallbackUrl,
+                      copyLabel: t('Copy redirect URL'),
+                    },
+                  ]}
+                />
+
                 <FormField
                   control={form.control}
                   name='oidc.enabled'
@@ -702,6 +843,20 @@ export function OAuthSection(props: OAuthSectionProps) {
               </TabsContent>
 
               <TabsContent value='linuxdo' className={oauthTabContentClassName}>
+                <OAuthSetupGuide
+                  title={t('Setup guide')}
+                  description={t(
+                    'Set these values in the provider application before enabling login.'
+                  )}
+                  rows={[
+                    {
+                      label: t('Authorization callback URL'),
+                      value: linuxDOCallbackUrl,
+                      copyLabel: t('Copy callback URL'),
+                    },
+                  ]}
+                />
+
                 <FormField
                   control={form.control}
                   name='LinuxDOOAuthEnabled'

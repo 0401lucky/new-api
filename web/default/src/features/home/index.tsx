@@ -72,12 +72,16 @@ export function Home() {
     if (isUrl) {
       return (
         <PublicLayout showMainContainer={false}>
+          {/*
+            自定义首页由管理员配置；仅允许用户主动点击时导航顶层页面，
+            不开放 allow-same-origin，避免 iframe 获取同源访问能力。
+          */}
           <iframe
             ref={iframeRef}
             src={content}
             className='h-screen w-full border-none'
             title={t('Custom Home Page')}
-            sandbox='allow-forms allow-popups allow-popups-to-escape-sandbox allow-scripts'
+            sandbox='allow-forms allow-popups allow-popups-to-escape-sandbox allow-scripts allow-top-navigation-by-user-activation'
             onLoad={syncIframePreferences}
           />
         </PublicLayout>

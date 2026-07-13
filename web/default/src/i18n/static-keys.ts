@@ -200,6 +200,7 @@ export const STATIC_I18N_KEYS = [
   'Failed to update redemption code',
   'Failed to delete redemption code',
   'Failed to delete invalid redemption codes',
+  'Failed to delete valid redemption codes',
   'Failed to update redemption code status',
   'Name must be between {{min}} and {{max}} characters',
   'Count must be between {{min}} and {{max}}',

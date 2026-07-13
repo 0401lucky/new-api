@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/stretchr/testify/require"
 )
 
@@ -206,6 +207,9 @@ func TestBuildOpenAIStyleUsageFromClaudeUsage(t *testing.T) {
 	if openAIUsage.UsageSource != "anthropic" {
 		t.Fatalf("UsageSource = %s, want anthropic", openAIUsage.UsageSource)
 	}
+	if openAIUsage.PromptTokensDetails.CacheWriteTokens != 50 {
+		t.Fatalf("CacheWriteTokens = %d, want 50", openAIUsage.PromptTokensDetails.CacheWriteTokens)
+	}
 }
 
 func TestBuildOpenAIStyleUsageFromClaudeUsagePreservesCacheCreationRemainder(t *testing.T) {
@@ -273,6 +277,34 @@ func TestBuildOpenAIStyleUsageFromClaudeUsageDefaultsAggregateCacheCreationTo5m(
 
 	require.Equal(t, 50, openAIUsage.ClaudeCacheCreation5mTokens)
 	require.Equal(t, 0, openAIUsage.ClaudeCacheCreation1hTokens)
+	require.Equal(t, 50, openAIUsage.PromptTokensDetails.CacheWriteTokens)
+}
+
+func TestClaudeOpenAIUsageRoundTripPreservesCacheCreation(t *testing.T) {
+	openAIUsage := buildOpenAIStyleUsageFromClaudeUsage(&dto.Usage{
+		PromptTokens:     100,
+		CompletionTokens: 20,
+		PromptTokensDetails: dto.InputTokenDetails{
+			CachedTokens:         30,
+			CachedCreationTokens: 50,
+		},
+		ClaudeCacheCreation5mTokens: 10,
+		ClaudeCacheCreation1hTokens: 20,
+		UsageSemantic:               "anthropic",
+	})
+
+	claudeResponse := service.ResponseOpenAI2Claude(&dto.OpenAITextResponse{
+		Usage: openAIUsage,
+	}, nil)
+
+	require.NotNil(t, claudeResponse)
+	require.NotNil(t, claudeResponse.Usage)
+	require.Equal(t, 100, claudeResponse.Usage.InputTokens)
+	require.Equal(t, 30, claudeResponse.Usage.CacheReadInputTokens)
+	require.Equal(t, 50, claudeResponse.Usage.CacheCreationInputTokens)
+	require.NotNil(t, claudeResponse.Usage.CacheCreation)
+	require.Equal(t, 30, claudeResponse.Usage.CacheCreation.Ephemeral5mInputTokens)
+	require.Equal(t, 20, claudeResponse.Usage.CacheCreation.Ephemeral1hInputTokens)
 }
 
 func TestRequestOpenAI2ClaudeMessage_IgnoresUnsupportedFileContent(t *testing.T) {

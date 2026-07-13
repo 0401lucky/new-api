@@ -85,3 +85,8 @@ export async function deleteInvalidInviteCodes(): Promise<ApiResponse<number>> {
   const res = await api.delete('/api/invitation/invalid')
   return res.data
 }
+
+export async function deleteValidInviteCodes(): Promise<ApiResponse<number>> {
+  const res = await api.delete('/api/invitation/valid')
+  return res.data
+}

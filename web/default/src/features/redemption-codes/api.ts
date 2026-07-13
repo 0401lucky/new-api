@@ -98,3 +98,9 @@ export async function deleteInvalidRedemptions(): Promise<ApiResponse<number>> {
   const res = await api.delete('/api/redemption/invalid')
   return res.data
 }
+
+// 删除有效兑换码（启用且未过期，包括永不过期）
+export async function deleteValidRedemptions(): Promise<ApiResponse<number>> {
+  const res = await api.delete('/api/redemption/valid')
+  return res.data
+}

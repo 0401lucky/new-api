@@ -116,11 +116,28 @@ func DeleteInvitationCodeById(id int) error {
 }
 
 func DeleteInvalidInvitationCodes() (int64, error) {
-	now := common.GetTimestamp()
+	return deleteInvalidInvitationCodesAt(common.GetTimestamp())
+}
+
+func deleteInvalidInvitationCodesAt(now int64) (int64, error) {
 	result := DB.Where(
 		"status IN ? OR (status = ? AND expired_time != 0 AND expired_time < ?)",
 		[]int{common.InvitationCodeStatusUsed, common.InvitationCodeStatusDisabled},
 		common.InvitationCodeStatusEnabled,
+		now,
+	).Delete(&InvitationCode{})
+	return result.RowsAffected, result.Error
+}
+
+func DeleteValidInvitationCodes() (int64, error) {
+	return deleteValidInvitationCodesAt(common.GetTimestamp())
+}
+
+func deleteValidInvitationCodesAt(now int64) (int64, error) {
+	result := DB.Where(
+		"status = ? AND (expired_time = ? OR expired_time >= ?)",
+		common.InvitationCodeStatusEnabled,
+		0,
 		now,
 	).Delete(&InvitationCode{})
 	return result.RowsAffected, result.Error
