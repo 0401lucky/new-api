@@ -106,7 +106,7 @@ func Distribute() func(c *gin.Context) {
 					pathMismatch := false
 					preferred, err := model.CacheGetChannel(preferredChannelID)
 					if err == nil && preferred != nil && preferred.Status == common.ChannelStatusEnabled {
-						pathMismatch = !channelSupportsRequestPath(preferred, c.Request.URL.Path)
+						pathMismatch = !channelSupportsRequestPath(preferred, c.Request.URL.Path, modelRequest.Model)
 					}
 					if err == nil && preferred != nil && preferred.Status == common.ChannelStatusEnabled && !pathMismatch {
 						if usingGroup == "auto" {
@@ -176,8 +176,10 @@ func Distribute() func(c *gin.Context) {
 	}
 }
 
-// channelSupportsRequestPath 仅对 Advanced Custom 渠道执行请求路径匹配。
-func channelSupportsRequestPath(channel *model.Channel, requestPath string) bool {
+// channelSupportsRequestPath reports whether a channel can serve the request path.
+// Only Advanced Custom (type 58) channels are path-checked; all other channel types
+// always pass. A type-58 channel is usable only when one of its routes matches.
+func channelSupportsRequestPath(channel *model.Channel, requestPath string, requestModel string) bool {
 	if channel == nil {
 		return false
 	}
@@ -185,7 +187,7 @@ func channelSupportsRequestPath(channel *model.Channel, requestPath string) bool
 		return true
 	}
 	config := channel.GetOtherSettings().AdvancedCustom
-	return config != nil && config.SupportsPath(requestPath)
+	return config != nil && config.SupportsPathForModel(requestPath, requestModel)
 }
 
 // getModelFromRequest 从请求中读取模型信息

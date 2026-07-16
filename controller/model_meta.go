@@ -26,6 +26,7 @@ func GetAllModelsMeta(c *gin.Context) {
 	}
 	// 批量填充附加字段，提升列表接口性能
 	enrichModels(modelsMeta)
+
 	// 统计供应商计数（全部数据，不受分页影响）
 	vendorCounts, _ := model.GetVendorModelCounts()
 
@@ -57,6 +58,8 @@ func SearchModelsMeta(c *gin.Context) {
 	// 批量填充附加字段，提升列表接口性能
 	enrichModels(modelsMeta)
 	vendorCounts, _ := model.GetVendorModelCounts()
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(modelsMeta)
 	common.ApiSuccess(c, gin.H{
 		"items":         modelsMeta,
 		"total":         total,

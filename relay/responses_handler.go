@@ -24,7 +24,7 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 	info.InitChannelMeta(c)
 	if info.RelayMode == relayconstant.RelayModeResponsesCompact {
 		switch info.ApiType {
-		case appconstant.APITypeOpenAI, appconstant.APITypeCodex:
+		case appconstant.APITypeOpenAI, appconstant.APITypeCodex, appconstant.APITypeAdvancedCustom:
 		default:
 			return types.NewErrorWithStatusCode(
 				fmt.Errorf("unsupported endpoint %q for api type %d", "/v1/responses/compact", info.ApiType),
@@ -161,11 +161,21 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 }
 
 func responsesRequestFromCompaction(req *dto.OpenAIResponsesCompactionRequest) *dto.OpenAIResponsesRequest {
+	if req == nil {
+		return nil
+	}
 	return &dto.OpenAIResponsesRequest{
-		Model:              req.Model,
-		Input:              req.Input,
-		Instructions:       req.Instructions,
-		PreviousResponseID: req.PreviousResponseID,
-		PromptCacheKey:     req.PromptCacheKey,
+		Model:                req.Model,
+		Input:                req.Input,
+		Instructions:         req.Instructions,
+		PreviousResponseID:   req.PreviousResponseID,
+		Tools:                req.Tools,
+		ParallelToolCalls:    req.ParallelToolCalls,
+		Reasoning:            req.Reasoning,
+		ServiceTier:          req.ServiceTier,
+		PromptCacheKey:       req.PromptCacheKey,
+		PromptCacheOptions:   req.PromptCacheOptions,
+		PromptCacheRetention: req.PromptCacheRetention,
+		Text:                 req.Text,
 	}
 }

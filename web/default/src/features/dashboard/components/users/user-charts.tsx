@@ -16,11 +16,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+  useCallback,
+  type ReactNode,
+} from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { VChart } from '@visactor/react-vchart'
 import { Users, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+
+import { IconBadge } from '@/components/ui/icon-badge'
 import { formatNumber, formatQuota } from '@/lib/format'
 import { getRollingDateRange, type TimeGranularity } from '@/lib/time'
 import { VCHART_OPTION } from '@/lib/vchart'
@@ -189,6 +198,85 @@ function UserModelUsageSheet(props: {
     0
   )
 
+  let tableRows: ReactNode
+  if (query.isFetching && rows.length === 0) {
+    tableRows = [
+      'model-loading-1',
+      'model-loading-2',
+      'model-loading-3',
+      'model-loading-4',
+      'model-loading-5',
+      'model-loading-6',
+    ].map((key) => (
+      <TableRow key={key}>
+        <TableCell>
+          <Skeleton className='h-4 w-56' />
+          <Skeleton className='mt-2 h-1.5 w-full' />
+        </TableCell>
+        <TableCell>
+          <Skeleton className='ml-auto h-4 w-16' />
+        </TableCell>
+        <TableCell>
+          <Skeleton className='ml-auto h-4 w-20' />
+        </TableCell>
+        <TableCell>
+          <Skeleton className='ml-auto h-4 w-20' />
+        </TableCell>
+      </TableRow>
+    ))
+  } else if (rows.length === 0) {
+    tableRows = (
+      <TableRow>
+        <TableCell colSpan={4}>
+          <Empty className='min-h-56 border-0'>
+            <EmptyHeader>
+              <EmptyTitle>{t('No data')}</EmptyTitle>
+            </EmptyHeader>
+          </Empty>
+        </TableCell>
+      </TableRow>
+    )
+  } else {
+    tableRows = rows.map((row) => {
+      const requests = Number(row.request_count) || 0
+      const percent =
+        maxRequests > 0
+          ? Math.max(4, Math.round((requests / maxRequests) * 100))
+          : 0
+      return (
+        <TableRow key={row.model_name || 'unknown'}>
+          <TableCell className='max-w-[28rem]'>
+            <div className='flex min-w-0 flex-col gap-2'>
+              <div className='flex min-w-0 items-center gap-2'>
+                <span className='truncate font-medium'>
+                  {row.model_name || '-'}
+                </span>
+                {requests === maxRequests && maxRequests > 0 ? (
+                  <Badge variant='secondary'>{t('Top')}</Badge>
+                ) : null}
+              </div>
+              <div className='bg-muted h-1.5 overflow-hidden rounded-full'>
+                <div
+                  className='bg-primary h-full rounded-full'
+                  style={{ width: `${percent}%` }}
+                />
+              </div>
+            </div>
+          </TableCell>
+          <TableCell className='text-right font-medium'>
+            {formatNumber(row.request_count)}
+          </TableCell>
+          <TableCell className='text-right'>
+            {formatNumber(row.total_tokens)}
+          </TableCell>
+          <TableCell className='text-right'>
+            {formatQuota(Number(row.quota) || 0)}
+          </TableCell>
+        </TableRow>
+      )
+    })
+  }
+
   return (
     <Sheet open={props.open} onOpenChange={props.onOpenChange}>
       <SheetContent className={sideDrawerContentClassName('sm:max-w-4xl')}>
@@ -249,79 +337,7 @@ function UserModelUsageSheet(props: {
                     </TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {query.isFetching && rows.length === 0 ? (
-                    Array.from({ length: 6 }).map((_, index) => (
-                      <TableRow key={index}>
-                        <TableCell>
-                          <Skeleton className='h-4 w-56' />
-                          <Skeleton className='mt-2 h-1.5 w-full' />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className='ml-auto h-4 w-16' />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className='ml-auto h-4 w-20' />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className='ml-auto h-4 w-20' />
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : rows.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4}>
-                        <Empty className='min-h-56 border-0'>
-                          <EmptyHeader>
-                            <EmptyTitle>{t('No data')}</EmptyTitle>
-                          </EmptyHeader>
-                        </Empty>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    rows.map((row) => {
-                      const requests = Number(row.request_count) || 0
-                      const percent =
-                        maxRequests > 0
-                          ? Math.max(
-                              4,
-                              Math.round((requests / maxRequests) * 100)
-                            )
-                          : 0
-                      return (
-                        <TableRow key={row.model_name || 'unknown'}>
-                          <TableCell className='max-w-[28rem]'>
-                            <div className='flex min-w-0 flex-col gap-2'>
-                              <div className='flex min-w-0 items-center gap-2'>
-                                <span className='truncate font-medium'>
-                                  {row.model_name || '-'}
-                                </span>
-                                {requests === maxRequests && maxRequests > 0 ? (
-                                  <Badge variant='secondary'>{t('Top')}</Badge>
-                                ) : null}
-                              </div>
-                              <div className='bg-muted h-1.5 overflow-hidden rounded-full'>
-                                <div
-                                  className='bg-primary h-full rounded-full'
-                                  style={{ width: `${percent}%` }}
-                                />
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className='text-right font-medium'>
-                            {formatNumber(row.request_count)}
-                          </TableCell>
-                          <TableCell className='text-right'>
-                            {formatNumber(row.total_tokens)}
-                          </TableCell>
-                          <TableCell className='text-right'>
-                            {formatQuota(Number(row.quota) || 0)}
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })
-                  )}
-                </TableBody>
+                <TableBody>{tableRows}</TableBody>
               </Table>
             </CardContent>
           </Card>
@@ -529,7 +545,9 @@ export function UserCharts(props: UserChartsProps) {
                 className='overflow-hidden rounded-lg border'
               >
                 <div className='flex w-full items-center gap-2 border-b px-3 py-2 sm:px-5 sm:py-3'>
-                  <Users className='text-muted-foreground/60 size-4' />
+                  <IconBadge tone='info' size='sm'>
+                    <Users />
+                  </IconBadge>
                   <div className='text-sm font-semibold'>
                     {t(chart.labelKey)}
                   </div>

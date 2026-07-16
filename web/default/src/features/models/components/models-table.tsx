@@ -110,6 +110,7 @@ export function ModelsTable() {
       ? syncFilter[0]
       : undefined
 
+  // Use search API whenever any filter is active so status/sync are applied server-side
   const shouldSearch = Boolean(
     globalFilter?.trim() ||
       activeVendorFilter ||
@@ -145,7 +146,6 @@ export function ModelsTable() {
         })
       }
     },
-    placeholderData: (previousData) => previousData,
   })
 
   const models = data?.data?.items || []

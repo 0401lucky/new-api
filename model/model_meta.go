@@ -105,8 +105,7 @@ func GetVendorModelCounts() (map[int64]int64, error) {
 }
 
 func GetAllModels(offset int, limit int) ([]*Model, error) {
-	var models []*Model
-	err := DB.Order("id DESC").Offset(offset).Limit(limit).Find(&models).Error
+	models, _, err := SearchModels("", "", "", "", offset, limit)
 	return models, err
 }
 
@@ -222,7 +221,9 @@ func SearchModels(keyword string, vendor string, status string, syncOfficial str
 	return models, total, nil
 }
 
-func parseModelStatusFilter(status string) (int, bool) {
+// parseModelStatusFilter maps UI/API status values to the models.status column.
+// Returns ok=false when no status filter should be applied.
+func parseModelStatusFilter(status string) (value int, ok bool) {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "", "all":
 		return 0, false
@@ -231,11 +232,17 @@ func parseModelStatusFilter(status string) (int, bool) {
 	case "disabled", "0":
 		return 0, true
 	default:
-		return 0, false
+		n, err := strconv.Atoi(status)
+		if err != nil {
+			return 0, false
+		}
+		return n, true
 	}
 }
 
-func parseModelSyncFilter(syncOfficial string) (int, bool) {
+// parseModelSyncFilter maps UI/API sync values to the models.sync_official column.
+// Returns ok=false when no sync filter should be applied.
+func parseModelSyncFilter(syncOfficial string) (value int, ok bool) {
 	switch strings.ToLower(strings.TrimSpace(syncOfficial)) {
 	case "", "all":
 		return 0, false
@@ -244,6 +251,10 @@ func parseModelSyncFilter(syncOfficial string) (int, bool) {
 	case "no", "0":
 		return 0, true
 	default:
-		return 0, false
+		n, err := strconv.Atoi(syncOfficial)
+		if err != nil {
+			return 0, false
+		}
+		return n, true
 	}
 }
