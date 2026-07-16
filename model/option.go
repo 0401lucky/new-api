@@ -20,6 +20,14 @@ type Option struct {
 	Value string `json:"value"`
 }
 
+// WithOptionKey 使用 GORM 结构化条件查询 Option.key，确保 key 作为
+// MySQL/PostgreSQL 保留字时由对应方言正确引用；切片值会生成 IN 条件。
+func WithOptionKey(value any) func(*gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		return db.Where(map[string]any{"key": value})
+	}
+}
+
 func AllOption() ([]*Option, error) {
 	var options []*Option
 	var err error

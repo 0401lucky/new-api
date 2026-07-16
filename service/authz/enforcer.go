@@ -75,7 +75,7 @@ func migrateLegacyAdminPermissions(db *gorm.DB) error {
 	}
 	const migrationKey = "AuthzLegacyAdminPermissionsMigratedV1"
 	var marker model.Option
-	if err := db.Where("key = ?", migrationKey).First(&marker).Error; err == nil {
+	if err := db.Scopes(model.WithOptionKey(migrationKey)).First(&marker).Error; err == nil {
 		return nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
