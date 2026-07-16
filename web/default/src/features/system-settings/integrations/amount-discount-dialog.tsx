@@ -34,6 +34,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Dialog } from '@/components/dialog'
 
 const createAmountDiscountDialogSchema = (t: (key: string) => string) =>
   z.object({

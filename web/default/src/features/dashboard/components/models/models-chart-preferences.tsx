@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Dialog } from '@/components/dialog'
 import {
   CONSUMPTION_DISTRIBUTION_CHART_OPTIONS,
   MODEL_ANALYTICS_CHART_OPTIONS,

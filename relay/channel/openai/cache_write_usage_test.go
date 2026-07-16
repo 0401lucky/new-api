@@ -49,13 +49,13 @@ func TestResponsesHandlersPropagateCacheWriteTokens(t *testing.T) {
 	})
 }
 
-func TestOpenAIHandlerNormalizesInputCacheWriteTokens(t *testing.T) {
+func TestOpenAIImageHandlerNormalizesInputCacheWriteTokens(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	body := `{"usage":{"input_tokens":100,"output_tokens":5,"total_tokens":105,"input_tokens_details":{"cached_tokens":20,"cached_creation_tokens":10,"cache_write_tokens":30}}}`
 	resp := &http.Response{Body: io.NopCloser(strings.NewReader(body))}
 
-	usage, apiErr := OpenaiHandlerWithUsage(ctx, nil, resp)
+	usage, apiErr := OpenaiImageHandler(ctx, nil, resp)
 
 	require.Nil(t, apiErr)
 	require.Equal(t, 30, usage.PromptTokensDetails.CacheWriteTokens)
