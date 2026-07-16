@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -103,82 +102,6 @@ func refreshCodexWhamToken(c *gin.Context, wham *codexWhamContext) bool {
 	return true
 }
 
-// 记录每个渠道+方法已探测成功的 wham 端点，避免对非幂等的 POST 反复多端点试探
-var codexWhamEndpointCache sync.Map
-
-func fetchCodexWhamWithRefresh(
-	c *gin.Context,
-	method string,
-	endpoints []string,
-) (statusCode int, body []byte, err error) {
-	channelId, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		return 0, nil, fmt.Errorf("invalid channel id: %w", err)
-	}
-	wham, err := newCodexWhamContext(channelId)
-	if err != nil {
-		return 0, nil, err
-	}
-
-	cacheKey := fmt.Sprintf("%d:%s:%s", channelId, method, endpoints[0])
-	cachedOnly := false
-	if cached, ok := codexWhamEndpointCache.Load(cacheKey); ok {
-		endpoints = []string{cached.(string)}
-		cachedOnly = true
-	}
-
-	refreshed := false
-	for index, endpoint := range endpoints {
-		ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
-		statusCode, body, err = service.FetchCodexWham(
-			ctx,
-			wham.client,
-			wham.channel.GetBaseURL(),
-			wham.oauthKey.AccessToken,
-			wham.oauthKey.AccountID,
-			method,
-			endpoint,
-		)
-		cancel()
-		if err != nil {
-			return statusCode, body, err
-		}
-
-		if (statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden) && !refreshed {
-			refreshed = refreshCodexWhamToken(c, wham)
-			if refreshed {
-				ctx2, cancel2 := context.WithTimeout(c.Request.Context(), 15*time.Second)
-				statusCode, body, err = service.FetchCodexWham(
-					ctx2,
-					wham.client,
-					wham.channel.GetBaseURL(),
-					wham.oauthKey.AccessToken,
-					wham.oauthKey.AccountID,
-					method,
-					endpoint,
-				)
-				cancel2()
-				if err != nil {
-					return statusCode, body, err
-				}
-			}
-		}
-
-		if statusCode == http.StatusNotFound && cachedOnly {
-			// 缓存的端点已失效，清除后由下次调用重新探测
-			codexWhamEndpointCache.Delete(cacheKey)
-			return statusCode, body, nil
-		}
-		if statusCode != http.StatusNotFound || index == len(endpoints)-1 {
-			if statusCode != http.StatusNotFound {
-				codexWhamEndpointCache.Store(cacheKey, endpoint)
-			}
-			return statusCode, body, nil
-		}
-	}
-	return statusCode, body, nil
-}
-
 func writeCodexWhamResponse(c *gin.Context, statusCode int, body []byte) {
 	var payload any
 	if common.Unmarshal(body, &payload) != nil {
@@ -235,11 +158,24 @@ func GetCodexChannelUsage(c *gin.Context) {
 }
 
 func GetCodexUsageResetCredits(c *gin.Context) {
-	statusCode, body, err := fetchCodexWhamWithRefresh(c, http.MethodGet, []string{
-		"rate_limit_reset_credits",
-		"usage/reset-credits",
-		"rate-limit-reset-credits",
-	})
+	channelId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, fmt.Errorf("invalid channel id: %w", err))
+		return
+	}
+	wham, err := newCodexWhamContext(channelId)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": err.Error()})
+		return
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+	statusCode, body, err := service.FetchCodexWhamRateLimitResetCredits(ctx, wham.client, wham.channel.GetBaseURL(), wham.oauthKey.AccessToken, wham.oauthKey.AccountID)
+	cancel()
+	if err == nil && (statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden) && refreshCodexWhamToken(c, wham) {
+		ctx2, cancel2 := context.WithTimeout(c.Request.Context(), 15*time.Second)
+		statusCode, body, err = service.FetchCodexWhamRateLimitResetCredits(ctx2, wham.client, wham.channel.GetBaseURL(), wham.oauthKey.AccessToken, wham.oauthKey.AccountID)
+		cancel2()
+	}
 	if err != nil {
 		common.SysError("failed to fetch codex reset credits: " + err.Error())
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": "获取重置次数失败，请稍后重试"})
@@ -249,11 +185,24 @@ func GetCodexUsageResetCredits(c *gin.Context) {
 }
 
 func ResetCodexChannelUsage(c *gin.Context) {
-	statusCode, body, err := fetchCodexWhamWithRefresh(c, http.MethodPost, []string{
-		"usage/reset",
-		"rate_limit_reset",
-		"rate-limit-reset",
-	})
+	channelId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, fmt.Errorf("invalid channel id: %w", err))
+		return
+	}
+	wham, err := newCodexWhamContext(channelId)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": err.Error()})
+		return
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+	statusCode, body, err := service.ConsumeCodexWhamRateLimitResetCredit(ctx, wham.client, wham.channel.GetBaseURL(), wham.oauthKey.AccessToken, wham.oauthKey.AccountID)
+	cancel()
+	if err == nil && (statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden) && refreshCodexWhamToken(c, wham) {
+		ctx2, cancel2 := context.WithTimeout(c.Request.Context(), 15*time.Second)
+		statusCode, body, err = service.ConsumeCodexWhamRateLimitResetCredit(ctx2, wham.client, wham.channel.GetBaseURL(), wham.oauthKey.AccessToken, wham.oauthKey.AccountID)
+		cancel2()
+	}
 	if err != nil {
 		common.SysError("failed to reset codex usage: " + err.Error())
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": "重置用量失败，请稍后重试"})

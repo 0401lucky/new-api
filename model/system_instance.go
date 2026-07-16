@@ -1,154 +1,100 @@
 package model
 
 import (
-	"errors"
-	"os"
-	"runtime"
-	"strings"
-	"sync"
-	"time"
-
 	"github.com/QuantumNous/new-api/common"
+
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-const SystemInstanceStaleAfterSeconds int64 = 90
+const (
+	SystemInstanceStatusOnline = "online"
+	SystemInstanceStatusStale  = "stale"
 
-var (
-	systemInstanceStartedAt = time.Now().Unix()
-	systemNodeNameOnce      sync.Once
-	systemNodeName          string
-	systemNodeNameSource    string
+	SystemInstanceStaleAfterSeconds int64 = 90
 )
 
+// SystemInstance 保留历史 ID 主键，避免现有 SQLite/MySQL/PostgreSQL 表在
+// 升级时切换主键；node_name 唯一索引仍可用于跨节点 upsert。
 type SystemInstance struct {
 	ID         int64  `json:"id" gorm:"primaryKey"`
 	NodeName   string `json:"node_name" gorm:"type:varchar(191);uniqueIndex;not null"`
 	Info       string `json:"info" gorm:"type:text"`
 	StartedAt  int64  `json:"started_at" gorm:"bigint;index"`
 	LastSeenAt int64  `json:"last_seen_at" gorm:"bigint;index"`
-	CreatedAt  int64  `json:"created_at" gorm:"bigint"`
-	UpdatedAt  int64  `json:"updated_at" gorm:"bigint"`
+	CreatedAt  int64  `json:"created_at" gorm:"bigint;index"`
+	UpdatedAt  int64  `json:"updated_at" gorm:"bigint;index"`
 }
 
 func (SystemInstance) TableName() string {
 	return "system_instances"
 }
 
-func currentSystemNodeName() (string, string) {
-	systemNodeNameOnce.Do(func() {
-		if configured := strings.TrimSpace(common.NodeName); configured != "" {
-			systemNodeName = configured
-			systemNodeNameSource = "env"
-			return
-		}
-		if hostname, err := os.Hostname(); err == nil && strings.TrimSpace(hostname) != "" {
-			systemNodeName = strings.TrimSpace(hostname)
-			systemNodeNameSource = "hostname"
-			return
-		}
-		systemNodeName = "node-" + common.GetUUID()
-		systemNodeNameSource = "generated"
-	})
-	return systemNodeName, systemNodeNameSource
+type SystemInstanceResponse struct {
+	NodeName          string `json:"node_name"`
+	Status            string `json:"status"`
+	StaleAfterSeconds int64  `json:"stale_after_seconds"`
+	StartedAt         int64  `json:"started_at"`
+	LastSeenAt        int64  `json:"last_seen_at"`
+	Info              any    `json:"info"`
 }
 
-func buildSystemInstanceInfo(nodeName string, source string) string {
-	hostname, _ := os.Hostname()
-	var mem runtime.MemStats
-	runtime.ReadMemStats(&mem)
-
-	info := map[string]any{
-		"schema_version": 1,
-		"node": map[string]any{
-			"name":                      nodeName,
-			"source":                    source,
-			"manually_configured":       source == "env",
-			"should_configure_manually": source != "env",
-		},
-		"role": map[string]any{
-			"is_master": common.IsMasterNode,
-		},
-		"runtime": map[string]any{
-			"version":    runtime.Version(),
-			"goos":       runtime.GOOS,
-			"goarch":     runtime.GOARCH,
-			"started_at": systemInstanceStartedAt,
-		},
-		"host": map[string]any{
-			"hostname": hostname,
-		},
-		"resources": map[string]any{
-			"memory": map[string]any{
-				"used_bytes":   mem.Alloc,
-				"system_bytes": mem.Sys,
-			},
-		},
-	}
-	payload, err := common.Marshal(info)
-	if err != nil {
-		return "{}"
-	}
-	return string(payload)
-}
-
-func ReportCurrentSystemInstance() error {
-	if DB == nil {
-		return errors.New("database is not initialized")
-	}
-
-	nodeName, source := currentSystemNodeName()
+func (instance *SystemInstance) BeforeCreate(_ *gorm.DB) error {
 	now := common.GetTimestamp()
-	instance := SystemInstance{
-		NodeName:   nodeName,
-		Info:       buildSystemInstanceInfo(nodeName, source),
-		StartedAt:  systemInstanceStartedAt,
-		LastSeenAt: now,
-		UpdatedAt:  now,
-	}
-
-	var existing SystemInstance
-	err := DB.Where("node_name = ?", nodeName).First(&existing).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	if instance.CreatedAt == 0 {
 		instance.CreatedAt = now
-		return DB.Create(&instance).Error
 	}
+	if instance.UpdatedAt == 0 {
+		instance.UpdatedAt = now
+	}
+	return nil
+}
+
+func UpsertSystemInstance(nodeName string, info any, startedAt int64, lastSeenAt int64) error {
+	infoText, err := marshalSystemInstanceInfo(info)
 	if err != nil {
 		return err
 	}
-
-	return DB.Model(&SystemInstance{}).
-		Where("id = ?", existing.ID).
-		Updates(map[string]any{
-			"info":         instance.Info,
-			"started_at":   instance.StartedAt,
-			"last_seen_at": instance.LastSeenAt,
-			"updated_at":   instance.UpdatedAt,
-		}).Error
+	if lastSeenAt == 0 {
+		lastSeenAt = common.GetTimestamp()
+	}
+	instance := &SystemInstance{
+		NodeName:   nodeName,
+		Info:       infoText,
+		StartedAt:  startedAt,
+		LastSeenAt: lastSeenAt,
+		UpdatedAt:  lastSeenAt,
+	}
+	return DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "node_name"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"info",
+			"started_at",
+			"last_seen_at",
+			"updated_at",
+		}),
+	}).Create(instance).Error
 }
 
-func StartSystemInstanceHeartbeat() {
-	go func() {
-		if err := ReportCurrentSystemInstance(); err != nil {
-			common.SysError("failed to report system instance: " + err.Error())
-		}
-
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for range ticker.C {
-			if err := ReportCurrentSystemInstance(); err != nil {
-				common.SysError("failed to report system instance: " + err.Error())
-			}
-		}
-	}()
-}
-
-func ListSystemInstances() ([]SystemInstance, error) {
-	_ = ReportCurrentSystemInstance()
-
-	instances := make([]SystemInstance, 0)
+func ListSystemInstances() ([]*SystemInstance, error) {
+	var instances []*SystemInstance
 	err := DB.Order("last_seen_at desc").Find(&instances).Error
 	return instances, err
+}
+
+func (instance *SystemInstance) ToResponse(now int64) SystemInstanceResponse {
+	status := SystemInstanceStatusOnline
+	if now-instance.LastSeenAt > SystemInstanceStaleAfterSeconds {
+		status = SystemInstanceStatusStale
+	}
+	return SystemInstanceResponse{
+		NodeName:          instance.NodeName,
+		Status:            status,
+		StaleAfterSeconds: SystemInstanceStaleAfterSeconds,
+		StartedAt:         instance.StartedAt,
+		LastSeenAt:        instance.LastSeenAt,
+		Info:              decodeSystemInstanceInfo(instance.Info),
+	}
 }
 
 func DeleteStaleSystemInstances() (int64, error) {
@@ -161,4 +107,26 @@ func DeleteStaleSystemInstance(nodeName string) (int64, error) {
 	cutoff := common.GetTimestamp() - SystemInstanceStaleAfterSeconds
 	result := DB.Where("node_name = ? AND last_seen_at < ?", nodeName, cutoff).Delete(&SystemInstance{})
 	return result.RowsAffected, result.Error
+}
+
+func marshalSystemInstanceInfo(v any) (string, error) {
+	if v == nil {
+		return "", nil
+	}
+	data, err := common.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func decodeSystemInstanceInfo(data string) any {
+	if data == "" {
+		return nil
+	}
+	var value any
+	if err := common.UnmarshalJsonStr(data, &value); err != nil {
+		return data
+	}
+	return value
 }

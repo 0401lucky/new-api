@@ -47,16 +47,6 @@ func updateSingleChannelStatus(id int, status int) (bool, string, error) {
 	return true, "", nil
 }
 
-func GetChannelOps(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "",
-		"data": gin.H{
-			"retry_times": common.RetryTimes,
-		},
-	})
-}
-
 func UpdateChannelStatus(c *gin.Context) {
 	channelID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || channelID <= 0 {

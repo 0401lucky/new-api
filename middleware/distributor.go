@@ -103,14 +103,13 @@ func Distribute() func(c *gin.Context) {
 
 				if preferredChannelID, found := service.GetPreferredChannelByAffinity(c, modelRequest.Model, usingGroup); found {
 					affinityUsable := false
+					pathMismatch := false
 					preferred, err := model.CacheGetChannel(preferredChannelID)
-					if err == nil && preferred != nil {
-						if preferred.Status != common.ChannelStatusEnabled {
-							if service.ShouldSkipRetryAfterChannelAffinityFailure(c) {
-								abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorAffinityChannelDisabled))
-								return
-							}
-						} else if usingGroup == "auto" {
+					if err == nil && preferred != nil && preferred.Status == common.ChannelStatusEnabled {
+						pathMismatch = !channelSupportsRequestPath(preferred, c.Request.URL.Path)
+					}
+					if err == nil && preferred != nil && preferred.Status == common.ChannelStatusEnabled && !pathMismatch {
+						if usingGroup == "auto" {
 							userGroup := common.GetContextKeyString(c, constant.ContextKeyUserGroup)
 							autoGroups := service.GetUserAutoGroup(userGroup)
 							for _, g := range autoGroups {
@@ -130,17 +129,22 @@ func Distribute() func(c *gin.Context) {
 							service.MarkChannelAffinityUsed(c, usingGroup, preferred.Id)
 						}
 					}
-					if !affinityUsable && !service.ShouldKeepChannelAffinityOnChannelDisabled() {
+					if !affinityUsable && service.ShouldSkipRetryAfterChannelAffinityFailure(c) {
+						abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorAffinityChannelDisabled))
+						return
+					}
+					if !affinityUsable && !pathMismatch && !service.ShouldKeepChannelAffinityOnChannelDisabled() {
 						service.ClearCurrentChannelAffinityCache(c)
 					}
 				}
 
 				if channel == nil {
 					channel, selectGroup, err = service.CacheGetRandomSatisfiedChannel(&service.RetryParam{
-						Ctx:        c,
-						ModelName:  modelRequest.Model,
-						TokenGroup: usingGroup,
-						Retry:      common.GetPointer(0),
+						Ctx:         c,
+						ModelName:   modelRequest.Model,
+						TokenGroup:  usingGroup,
+						RequestPath: c.Request.URL.Path,
+						Retry:       common.GetPointer(0),
 					})
 					if err != nil {
 						showGroup := usingGroup
@@ -170,6 +174,18 @@ func Distribute() func(c *gin.Context) {
 			service.RecordChannelAffinity(c, channel.Id)
 		}
 	}
+}
+
+// channelSupportsRequestPath 仅对 Advanced Custom 渠道执行请求路径匹配。
+func channelSupportsRequestPath(channel *model.Channel, requestPath string) bool {
+	if channel == nil {
+		return false
+	}
+	if channel.Type != constant.ChannelTypeAdvancedCustom {
+		return true
+	}
+	config := channel.GetOtherSettings().AdvancedCustom
+	return config != nil && config.SupportsPath(requestPath)
 }
 
 // getModelFromRequest 从请求中读取模型信息

@@ -146,55 +146,16 @@ func TestGetFlowQuotaDataAggregatesConsumeLogs(t *testing.T) {
 		Key:   "sk-test",
 		Group: "vip",
 	}).Error)
+	require.NoError(t, DB.Create(&Token{Id: 11, UserId: 3, Name: "main-key", Key: "sk-test"}).Error)
 
 	now := common.GetTimestamp()
-	logs := []Log{
-		{
-			UserId:           3,
-			Username:         "target",
-			Type:             LogTypeConsume,
-			CreatedAt:        now,
-			TokenId:          11,
-			TokenName:        "main-key",
-			Group:            "vip",
-			ModelName:        "gpt-test",
-			ChannelId:        7,
-			PromptTokens:     1,
-			CompletionTokens: 2,
-			Quota:            10,
-		},
-		{
-			UserId:           3,
-			Username:         "target",
-			Type:             LogTypeConsume,
-			CreatedAt:        now + 1,
-			TokenId:          11,
-			TokenName:        "main-key",
-			Group:            "vip",
-			ModelName:        "gpt-test",
-			ChannelId:        7,
-			PromptTokens:     3,
-			CompletionTokens: 4,
-			Quota:            20,
-		},
-		{
-			UserId:    3,
-			Username:  "target",
-			Type:      LogTypeError,
-			CreatedAt: now,
-			TokenId:   11,
-			TokenName: "main-key",
-			Group:     "vip",
-			ModelName: "gpt-test",
-			ChannelId: 7,
-			Quota:     999,
-		},
+	quotaRows := []QuotaData{
+		{UserID: 3, Username: "target", ModelName: "gpt-test", CreatedAt: now, UseGroup: "vip", TokenID: 11, ChannelID: 7, NodeName: "node-a", TokenUsed: 3, Count: 1, Quota: 10},
+		{UserID: 3, Username: "target", ModelName: "gpt-test", CreatedAt: now + 1, UseGroup: "vip", TokenID: 11, ChannelID: 7, NodeName: "node-a", TokenUsed: 7, Count: 1, Quota: 20},
 	}
-	for i := range logs {
-		require.NoError(t, DB.Create(&logs[i]).Error)
-	}
+	require.NoError(t, DB.Create(&quotaRows).Error)
 
-	rows, err := GetFlowQuotaData(now-10, now+10, "", 3)
+	rows, err := GetFlowQuotaData(now-10, now+10, "", 3, common.RoleRootUser)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 
@@ -208,7 +169,7 @@ func TestGetFlowQuotaDataAggregatesConsumeLogs(t *testing.T) {
 	require.Equal(t, 7, row.ChannelID)
 	require.Equal(t, "primary-channel", row.ChannelName)
 	require.Equal(t, "gpt-test", row.ModelName)
-	require.Equal(t, int64(10), row.TokenUsed)
-	require.Equal(t, int64(2), row.Count)
-	require.Equal(t, int64(30), row.Quota)
+	require.Equal(t, 10, row.TokenUsed)
+	require.Equal(t, 2, row.Count)
+	require.Equal(t, 30, row.Quota)
 }

@@ -74,6 +74,27 @@ const (
 	LogTypeLogin   = 7
 )
 
+func ensureLogRequestId(log *Log) {
+	if log != nil && log.RequestId == "" {
+		log.RequestId = common.NewRequestId()
+	}
+}
+
+func createLog(log *Log) error {
+	ensureLogRequestId(log)
+	return LOG_DB.Create(log).Error
+}
+
+func clickHouseLogOrder(prefix string) string {
+	return prefix + "created_at desc, " + prefix + "request_id desc"
+}
+
+func assignDisplayLogIds(logs []*Log, startIdx int) {
+	for i := range logs {
+		logs[i].Id = startIdx + i + 1
+	}
+}
+
 func formatUserLogs(logs []*Log, startIdx int) {
 	for i := range logs {
 		logs[i].ChannelName = ""
@@ -88,12 +109,16 @@ func formatUserLogs(logs []*Log, startIdx int) {
 			delete(otherMap, "stream_status")
 		}
 		logs[i].Other = common.MapToJsonStr(otherMap)
-		logs[i].Id = startIdx + i + 1
 	}
+	assignDisplayLogIds(logs, startIdx)
 }
 
 func GetLogByTokenId(tokenId int) (logs []*Log, err error) {
-	err = LOG_DB.Model(&Log{}).Where("token_id = ?", tokenId).Order("id desc").Limit(common.MaxRecentItems).Find(&logs).Error
+	order := "id desc"
+	if common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
+		order = clickHouseLogOrder("")
+	}
+	err = LOG_DB.Model(&Log{}).Where("token_id = ?", tokenId).Order(order).Limit(common.MaxRecentItems).Find(&logs).Error
 	formatUserLogs(logs, 0)
 	return logs, err
 }
@@ -110,7 +135,7 @@ func RecordLog(userId int, logType int, content string) {
 		Type:      logType,
 		Content:   content,
 	}
-	err := LOG_DB.Create(log).Error
+	err := createLog(log)
 	if err != nil {
 		common.SysLog("failed to record log: " + err.Error())
 	}
@@ -135,7 +160,7 @@ func RecordLogWithAdminInfo(userId int, logType int, content string, adminInfo m
 		}
 		log.Other = common.MapToJsonStr(other)
 	}
-	if err := LOG_DB.Create(log).Error; err != nil {
+	if err := createLog(log); err != nil {
 		common.SysLog("failed to record log: " + err.Error())
 	}
 }
@@ -172,7 +197,7 @@ func RecordLoginLog(userId int, username string, content string, ip string, acti
 		Ip:        ip,
 		Other:     common.MapToJsonStr(other),
 	}
-	if err := LOG_DB.Create(log).Error; err != nil {
+	if err := createLog(log); err != nil {
 		common.SysLog("failed to record login log: " + err.Error())
 	}
 }
@@ -203,7 +228,7 @@ func RecordOperationAuditLog(logUserId int, content string, ip string, action st
 		Ip:        ip,
 		Other:     common.MapToJsonStr(other),
 	}
-	if err := LOG_DB.Create(log).Error; err != nil {
+	if err := createLog(log); err != nil {
 		common.SysLog("failed to record operation audit log: " + err.Error())
 	}
 }
@@ -230,7 +255,7 @@ func RecordTopupLog(userId int, content string, callerIp string, paymentMethod s
 		Ip:        callerIp,
 		Other:     common.MapToJsonStr(other),
 	}
-	err := LOG_DB.Create(log).Error
+	err := createLog(log)
 	if err != nil {
 		common.SysLog("failed to record topup log: " + err.Error())
 	}
@@ -276,7 +301,7 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 		UpstreamRequestId: upstreamRequestId,
 		Other:             otherStr,
 	}
-	err := LOG_DB.Create(log).Error
+	err := createLog(log)
 	if err != nil {
 		logger.LogError(c, "failed to record log: "+err.Error())
 	}
@@ -316,6 +341,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	username := c.GetString("username")
 	requestId := c.GetString(common.RequestIdKey)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
+	createdAt := common.GetTimestamp()
 	otherStr := common.MapToJsonStr(params.Other)
 	// 判断是否需要记录 IP
 	needRecordIp := false
@@ -327,7 +353,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	log := &Log{
 		UserId:           userId,
 		Username:         username,
-		CreatedAt:        common.GetTimestamp(),
+		CreatedAt:        createdAt,
 		Type:             LogTypeConsume,
 		Content:          params.Content,
 		PromptTokens:     params.PromptTokens,
@@ -350,13 +376,24 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		UpstreamRequestId: upstreamRequestId,
 		Other:             otherStr,
 	}
-	err := LOG_DB.Create(log).Error
+	err := createLog(log)
 	if err != nil {
 		logger.LogError(c, "failed to record log: "+err.Error())
 	}
 	if common.DataExportEnabled {
 		gopool.Go(func() {
-			LogQuotaData(userId, username, params.ModelName, params.Quota, common.GetTimestamp(), params.PromptTokens+params.CompletionTokens)
+			LogQuotaData(QuotaDataLogParams{
+				UserID:    userId,
+				Username:  username,
+				ModelName: params.ModelName,
+				Quota:     params.Quota,
+				CreatedAt: createdAt,
+				TokenUsed: params.PromptTokens + params.CompletionTokens,
+				UseGroup:  params.Group,
+				TokenID:   params.TokenId,
+				ChannelID: params.ChannelId,
+				NodeName:  common.NodeName,
+			})
 		})
 	}
 	recordModelHealthSuccessEvent(c, params, log.CreatedAt)
@@ -407,10 +444,11 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 			tokenName = token.Name
 		}
 	}
+	createdAt := common.GetTimestamp()
 	log := &Log{
 		UserId:    params.UserId,
 		Username:  username,
-		CreatedAt: common.GetTimestamp(),
+		CreatedAt: createdAt,
 		Type:      params.LogType,
 		Content:   params.Content,
 		TokenName: tokenName,
@@ -421,9 +459,24 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 		Group:     params.Group,
 		Other:     common.MapToJsonStr(params.Other),
 	}
-	err := LOG_DB.Create(log).Error
+	err := createLog(log)
 	if err != nil {
 		common.SysLog("failed to record task billing log: " + err.Error())
+	}
+	if params.LogType == LogTypeConsume && common.DataExportEnabled {
+		gopool.Go(func() {
+			LogQuotaData(QuotaDataLogParams{
+				UserID:    params.UserId,
+				Username:  username,
+				ModelName: params.ModelName,
+				Quota:     params.Quota,
+				CreatedAt: createdAt,
+				UseGroup:  params.Group,
+				TokenID:   params.TokenId,
+				ChannelID: params.ChannelId,
+				NodeName:  common.NodeName,
+			})
+		})
 	}
 }
 
@@ -469,9 +522,16 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 	if err != nil {
 		return nil, 0, err
 	}
-	err = tx.Order("logs.created_at desc, logs.id desc").Limit(num).Offset(startIdx).Find(&logs).Error
+	order := "logs.created_at desc, logs.id desc"
+	if common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
+		order = clickHouseLogOrder("logs.")
+	}
+	err = tx.Order(order).Limit(num).Offset(startIdx).Find(&logs).Error
 	if err != nil {
 		return nil, 0, err
+	}
+	if common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
+		assignDisplayLogIds(logs, startIdx)
 	}
 
 	channelIds := types.NewSet[int]()
@@ -553,7 +613,11 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 		common.SysError("failed to count user logs: " + err.Error())
 		return nil, 0, errors.New("查询日志失败")
 	}
-	err = tx.Order("logs.id desc").Limit(num).Offset(startIdx).Find(&logs).Error
+	order := "logs.id desc"
+	if common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
+		order = clickHouseLogOrder("logs.")
+	}
+	err = tx.Order(order).Limit(num).Offset(startIdx).Find(&logs).Error
 	if err != nil {
 		common.SysError("failed to search user logs: " + err.Error())
 		return nil, 0, errors.New("查询日志失败")
@@ -576,21 +640,6 @@ type UserModelUsageStat struct {
 	Quota        int64  `json:"quota"`
 }
 
-type FlowQuotaData struct {
-	UserID      int    `json:"user_id" gorm:"column:user_id"`
-	Username    string `json:"username" gorm:"column:username"`
-	NodeName    string `json:"node_name" gorm:"column:node_name"`
-	UseGroup    string `json:"use_group" gorm:"column:use_group"`
-	TokenID     int    `json:"token_id" gorm:"column:token_id"`
-	TokenName   string `json:"token_name" gorm:"column:token_name"`
-	ChannelID   int    `json:"channel_id" gorm:"column:channel_id"`
-	ChannelName string `json:"channel_name" gorm:"-"`
-	ModelName   string `json:"model_name" gorm:"column:model_name"`
-	TokenUsed   int64  `json:"token_used" gorm:"column:token_used"`
-	Count       int64  `json:"count" gorm:"column:count"`
-	Quota       int64  `json:"quota" gorm:"column:quota"`
-}
-
 func GetUserModelUsageStats(userId int, startTimestamp int64, endTimestamp int64, limit int) ([]UserModelUsageStat, error) {
 	if limit <= 0 {
 		limit = 200
@@ -601,128 +650,30 @@ func GetUserModelUsageStats(userId int, startTimestamp int64, endTimestamp int64
 
 	var stats []UserModelUsageStat
 	query := LOG_DB.Table("logs").
-		Select("model_name, COUNT(*) AS request_count, COALESCE(SUM(prompt_tokens), 0) + COALESCE(SUM(completion_tokens), 0) AS total_tokens, COALESCE(SUM(quota), 0) AS quota").
+		Select("model_name, count(*) AS request_count, COALESCE(sum(prompt_tokens), 0) + COALESCE(sum(completion_tokens), 0) AS total_tokens, COALESCE(sum(quota), 0) AS quota").
 		Where("user_id = ? AND type = ?", userId, LogTypeConsume)
-
 	if startTimestamp != 0 {
 		query = query.Where("created_at >= ?", startTimestamp)
 	}
 	if endTimestamp != 0 {
 		query = query.Where("created_at <= ?", endTimestamp)
 	}
-
-	err := query.
+	if err := query.
 		Group("model_name").
 		Order("request_count desc, total_tokens desc").
 		Limit(limit).
-		Scan(&stats).Error
-	if err != nil {
+		Scan(&stats).Error; err != nil {
 		common.SysError("failed to query user model usage stats: " + err.Error())
 		return nil, errors.New("查询用户模型统计失败")
 	}
 	return stats, nil
 }
 
-func fillFlowQuotaChannelNames(rows []FlowQuotaData) error {
-	channelIds := types.NewSet[int]()
-	for _, row := range rows {
-		if row.ChannelID > 0 {
-			channelIds.Add(row.ChannelID)
-		}
-	}
-	if channelIds.Len() == 0 {
-		return nil
-	}
-
-	var channels []struct {
-		Id   int    `gorm:"column:id"`
-		Name string `gorm:"column:name"`
-	}
-	queryChannelIds := channelIds.Items()
-	if common.MemoryCacheEnabled {
-		queryChannelIds = make([]int, 0, channelIds.Len())
-		for _, channelId := range channelIds.Items() {
-			if cacheChannel, err := CacheGetChannel(channelId); err == nil {
-				channels = append(channels, struct {
-					Id   int    `gorm:"column:id"`
-					Name string `gorm:"column:name"`
-				}{
-					Id:   channelId,
-					Name: cacheChannel.Name,
-				})
-			} else {
-				queryChannelIds = append(queryChannelIds, channelId)
-			}
-		}
-	}
-	if len(queryChannelIds) > 0 {
-		var dbChannels []struct {
-			Id   int    `gorm:"column:id"`
-			Name string `gorm:"column:name"`
-		}
-		if err := DB.Table("channels").
-			Select("id, name").
-			Where("id IN ?", queryChannelIds).
-			Find(&dbChannels).Error; err != nil {
-			return err
-		}
-		channels = append(channels, dbChannels...)
-	}
-
-	channelNames := make(map[int]string, len(channels))
-	for _, channel := range channels {
-		channelNames[channel.Id] = channel.Name
-	}
-	for i := range rows {
-		rows[i].ChannelName = channelNames[rows[i].ChannelID]
-	}
-	return nil
-}
-
-func GetFlowQuotaData(startTimestamp int64, endTimestamp int64, username string, userId int) ([]FlowQuotaData, error) {
-	query := LOG_DB.Table("logs").
-		Select(
-			"logs.user_id, logs.username, logs."+logGroupCol+" AS use_group, logs.token_id, logs.token_name, logs.channel_id, logs.model_name, COUNT(*) AS count, COALESCE(SUM(logs.prompt_tokens), 0) + COALESCE(SUM(logs.completion_tokens), 0) AS token_used, COALESCE(SUM(logs.quota), 0) AS quota",
-		).
-		Where("logs.type = ?", LogTypeConsume)
-
-	var err error
-	if query, err = applyLogUserFilter(query, "logs.username", "logs.user_id", username, userId); err != nil {
-		return nil, err
-	}
-	if startTimestamp != 0 {
-		query = query.Where("logs.created_at >= ?", startTimestamp)
-	}
-	if endTimestamp != 0 {
-		query = query.Where("logs.created_at <= ?", endTimestamp)
-	}
-
-	var rows []FlowQuotaData
-	if err = query.
-		Group("logs.user_id, logs.username, logs." + logGroupCol + ", logs.token_id, logs.token_name, logs.channel_id, logs.model_name").
-		Order("quota desc, count desc").
-		Scan(&rows).Error; err != nil {
-		common.SysError("failed to query flow quota data: " + err.Error())
-		return nil, errors.New("查询分流数据失败")
-	}
-
-	if common.NodeName != "" {
-		for i := range rows {
-			rows[i].NodeName = common.NodeName
-		}
-	}
-	if err = fillFlowQuotaChannelNames(rows); err != nil {
-		common.SysError("failed to query flow quota channel names: " + err.Error())
-		return nil, errors.New("查询分流渠道名称失败")
-	}
-	return rows, nil
-}
-
 func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, userId int, tokenName string, channel int, group string) (stat Stat, err error) {
-	tx := LOG_DB.Table("logs").Select("COALESCE(SUM(quota), 0) quota")
+	tx := LOG_DB.Table("logs").Select("COALESCE(sum(quota), 0) quota")
 
 	// 为rpm和tpm创建单独的查询
-	rpmTpmQuery := LOG_DB.Table("logs").Select("COUNT(*) rpm, COALESCE(SUM(prompt_tokens), 0) + COALESCE(SUM(completion_tokens), 0) tpm")
+	rpmTpmQuery := LOG_DB.Table("logs").Select("count(*) rpm, COALESCE(sum(prompt_tokens), 0) + COALESCE(sum(completion_tokens), 0) tpm")
 
 	if tx, err = applyLogUserFilter(tx, "username", "user_id", username, userId); err != nil {
 		return stat, err
@@ -775,7 +726,7 @@ func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelNa
 }
 
 func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string) (token int) {
-	tx := LOG_DB.Table("logs").Select("COALESCE(SUM(prompt_tokens), 0) + COALESCE(SUM(completion_tokens), 0)")
+	tx := LOG_DB.Table("logs").Select("COALESCE(sum(prompt_tokens), 0) + COALESCE(sum(completion_tokens), 0)")
 	if username != "" {
 		tx = tx.Where("username = ?", username)
 	}
@@ -795,45 +746,50 @@ func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelNa
 	return token
 }
 
-func DeleteOldLog(ctx context.Context, targetTimestamp int64, limit int) (int64, error) {
-	var total int64 = 0
-
-	for {
-		if nil != ctx.Err() {
-			return total, ctx.Err()
-		}
-
-		result := LOG_DB.Where("created_at < ?", targetTimestamp).Limit(limit).Delete(&Log{})
-		if nil != result.Error {
-			return total, result.Error
-		}
-
-		total += result.RowsAffected
-
-		if result.RowsAffected < int64(limit) {
-			break
-		}
-	}
-
-	return total, nil
-}
-
 func CountOldLog(ctx context.Context, targetTimestamp int64) (int64, error) {
-	var count int64
-	err := LOG_DB.WithContext(ctx).Model(&Log{}).Where("created_at < ?", targetTimestamp).Count(&count).Error
-	return count, err
+	var total int64
+	if err := LOG_DB.WithContext(ctx).Model(&Log{}).Where("created_at < ?", targetTimestamp).Count(&total).Error; err != nil {
+		return 0, err
+	}
+	return total, nil
 }
 
 func DeleteOldLogBatch(ctx context.Context, targetTimestamp int64, limit int) (int64, error) {
 	if limit <= 0 {
 		limit = 100
 	}
-	if common.UsingMySQL {
-		// MySQL 支持 DELETE ... LIMIT，且不允许 DELETE 时子查询同一张表
+	if nil != ctx.Err() {
+		return 0, ctx.Err()
+	}
+
+	if common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
+		// ClickHouse DELETE is a heavy mutation that rewrites data parts, so
+		// per-batch mutations would be pathologically slow. Remove all matching
+		// rows in a single synchronous mutation regardless of limit; the reported
+		// count lets the caller's progress loop complete in one pass.
+		total, err := CountOldLog(ctx, targetTimestamp)
+		if err != nil {
+			return 0, err
+		}
+		if total == 0 {
+			return 0, nil
+		}
+		if err := LOG_DB.WithContext(ctx).Exec(
+			"ALTER TABLE logs DELETE WHERE created_at < ? SETTINGS mutations_sync = 1",
+			targetTimestamp,
+		).Error; err != nil {
+			return 0, err
+		}
+		return total, nil
+	}
+
+	if common.UsingLogDatabase(common.DatabaseTypeMySQL) {
+		// MySQL 支持 DELETE ... LIMIT，且不允许 DELETE 时子查询同一张表。
 		result := LOG_DB.WithContext(ctx).Where("created_at < ?", targetTimestamp).Limit(limit).Delete(&Log{})
 		return result.RowsAffected, result.Error
 	}
-	// PostgreSQL/SQLite 的 DELETE 不支持 LIMIT，先取一批主键再删除
+
+	// PostgreSQL/SQLite 的 DELETE 不支持 LIMIT，先取一批主键再删除。
 	var ids []int
 	if err := LOG_DB.WithContext(ctx).Model(&Log{}).
 		Where("created_at < ?", targetTimestamp).
@@ -847,4 +803,31 @@ func DeleteOldLogBatch(ctx context.Context, targetTimestamp int64, limit int) (i
 	}
 	result := LOG_DB.WithContext(ctx).Where("id IN ?", ids).Delete(&Log{})
 	return result.RowsAffected, result.Error
+}
+
+func DeleteOldLog(ctx context.Context, targetTimestamp int64, limit int) (int64, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
+	var total int64 = 0
+
+	for {
+		if nil != ctx.Err() {
+			return total, ctx.Err()
+		}
+
+		rowsAffected, err := DeleteOldLogBatch(ctx, targetTimestamp, limit)
+		if nil != err {
+			return total, err
+		}
+
+		total += rowsAffected
+
+		if rowsAffected < int64(limit) {
+			break
+		}
+	}
+
+	return total, nil
 }
