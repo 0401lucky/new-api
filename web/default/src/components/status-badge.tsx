@@ -98,6 +98,12 @@ const textSizeMap = {
   lg: 'gap-1.5 text-sm leading-none',
 } as const
 
+const textSizeMap = {
+  sm: 'gap-1 text-xs leading-none',
+  md: 'gap-1 text-xs leading-none',
+  lg: 'gap-1.5 text-xs leading-none',
+} as const
+
 export interface StatusBadgeProps extends Omit<
   React.HTMLAttributes<HTMLSpanElement>,
   'children'

@@ -10,6 +10,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/i18n"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
@@ -183,6 +184,17 @@ func AddRedemption(c *gin.Context) {
 		}
 		keys = append(keys, key)
 	}
+	auditParams := map[string]interface{}{
+		"name":  req.Name,
+		"count": count,
+	}
+	if randomQuotaMode {
+		auditParams["quota_min"] = logger.LogQuota(*req.QuotaMin)
+		auditParams["quota_max"] = logger.LogQuota(*req.QuotaMax)
+	} else {
+		auditParams["quota"] = logger.LogQuota(req.Quota)
+	}
+	recordManageAudit(c, "redemption.create", auditParams)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",

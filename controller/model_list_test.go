@@ -221,6 +221,7 @@ func TestListModelsTokenLimitIncludesTieredBillingModel(t *testing.T) {
 		"zz-token-tiered-visible-model":    `tier("base", p * 1 + c * 2)`,
 		"zz-token-tiered-empty-expr-model": "",
 	})
+	setupModelListControllerTestDB(t)
 
 	setupModelListControllerTestDB(t)
 
