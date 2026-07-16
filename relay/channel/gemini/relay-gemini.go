@@ -501,10 +501,14 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 			// isToolCall = true
 			for _, call := range message.ParseToolCalls() {
 				args := map[string]interface{}{}
-				if call.Function.Arguments != "" {
-					if json.Unmarshal([]byte(call.Function.Arguments), &args) != nil {
+				arguments := strings.TrimSpace(call.Function.Arguments)
+				if arguments != "" && arguments != "null" {
+					if common.Unmarshal([]byte(arguments), &args) != nil {
 						return nil, fmt.Errorf("invalid arguments for function %s, args: %s", call.Function.Name, call.Function.Arguments)
 					}
+				}
+				if args == nil {
+					args = map[string]interface{}{}
 				}
 				toolCall := dto.GeminiPart{
 					FunctionCall: &dto.FunctionCall{

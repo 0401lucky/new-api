@@ -91,9 +91,21 @@ func recordManageAudit(c *gin.Context, action string, params map[string]interfac
 	recordManageAuditFor(c, c.GetInt("id"), action, params)
 }
 
-// recordManageAuditFor 记录一条归属于 logUserId 的管理审计日志（面向用户的操作：
-// 对目标用户的额度调整 / 解绑 / 2FA 等，使该用户也能在自己的日志中看到）。
-func recordManageAuditFor(c *gin.Context, logUserId int, action string, params map[string]interface{}) {
+// recordManageAuditFor 记录一条归属于目标用户的管理审计日志，使额度、解绑、
+// 2FA 等面向用户的操作仍能在目标用户自己的日志中看到；操作者信息保存在
+// admin_info，并在结构化参数中保留 target_user_id。
+func recordManageAuditFor(c *gin.Context, targetUserId int, action string, params map[string]interface{}) {
+	if params == nil {
+		params = map[string]interface{}{}
+	}
+	operatorUserId := c.GetInt("id")
+	if _, ok := params["target_user_id"]; !ok && targetUserId > 0 && targetUserId != operatorUserId {
+		params["target_user_id"] = targetUserId
+	}
+	logUserId := targetUserId
+	if logUserId <= 0 {
+		logUserId = operatorUserId
+	}
 	model.RecordOperationAuditLog(logUserId, auditContentEN(action, params), c.ClientIP(), action, params, auditOperatorInfo(c), nil)
 	markAuditLogged(c)
 }

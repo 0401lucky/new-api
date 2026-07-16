@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
@@ -237,6 +238,33 @@ func TestAdaptorSwitchesGeminiGenerateContentURLForStream(t *testing.T) {
 	assert.Equal(t, "sk-test", parsedURL.Query().Get("key"))
 }
 
+func TestAdaptorSwitchesNativeGeminiGenerateContentURLForStream(t *testing.T) {
+	adaptor := &Adaptor{}
+	info := advancedCustomRelayInfo(&dto.AdvancedCustomConfig{
+		Routes: []dto.AdvancedCustomRoute{
+			{
+				IncomingPath: "/v1beta/models/{model}:generateContent",
+				UpstreamPath: "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?existing=1",
+				Converter:    dto.AdvancedCustomConverterNone,
+			},
+		},
+	})
+	info.RelayFormat = types.RelayFormatGemini
+	info.RelayMode = relayconstant.RelayModeGemini
+	info.RequestURLPath = "/v1beta/models/gemini-2.5-pro:streamGenerateContent"
+	info.UpstreamModelName = "gemini-2.5-pro"
+	info.IsStream = true
+
+	requestURL, err := adaptor.GetRequestURL(info)
+	require.NoError(t, err)
+
+	parsedURL, err := url.Parse(requestURL)
+	require.NoError(t, err)
+	assert.Equal(t, "/v1beta/models/gemini-2.5-pro:streamGenerateContent", parsedURL.Path)
+	assert.Equal(t, "sse", parsedURL.Query().Get("alt"))
+	assert.Equal(t, "1", parsedURL.Query().Get("existing"))
+}
+
 func TestAdaptorMatchesGeminiIncomingPathTemplate(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -279,6 +307,44 @@ func TestAdaptorMatchesGeminiIncomingPathTemplate(t *testing.T) {
 	}
 }
 
+func TestAdaptorConvertsResponsesRequestToOpenAIChatUpstream(t *testing.T) {
+	adaptor := &Adaptor{}
+	info := advancedCustomRelayInfo(&dto.AdvancedCustomConfig{
+		Routes: []dto.AdvancedCustomRoute{
+			{
+				IncomingPath: "/v1/responses",
+				UpstreamPath: "/v1/chat/completions",
+				Converter:    dto.AdvancedCustomConverterOpenAIResponsesToOpenAIChatCompletions,
+			},
+		},
+	})
+	info.RelayMode = relayconstant.RelayModeResponses
+	info.RequestURLPath = "/v1/responses"
+	c := advancedCustomGinContext("/v1/responses")
+
+	converted, err := adaptor.ConvertOpenAIResponsesRequest(c, info, dto.OpenAIResponsesRequest{
+		Model:        "gpt-test",
+		Instructions: mustAdvancedCustomRawMessage(t, "system rules"),
+		Input:        mustAdvancedCustomRawMessage(t, "hello"),
+	})
+	require.NoError(t, err)
+
+	chatReq, ok := converted.(*dto.GeneralOpenAIRequest)
+	require.True(t, ok)
+	assert.Equal(t, "gpt-test", chatReq.Model)
+	require.Len(t, chatReq.Messages, 2)
+	assert.Equal(t, "system", chatReq.Messages[0].Role)
+	assert.Equal(t, "system rules", chatReq.Messages[0].StringContent())
+	assert.Equal(t, "user", chatReq.Messages[1].Role)
+	assert.Equal(t, "hello", chatReq.Messages[1].StringContent())
+
+	requestURL, err := adaptor.GetRequestURL(info)
+	require.NoError(t, err)
+	parsedURL, err := url.Parse(requestURL)
+	require.NoError(t, err)
+	assert.Equal(t, "/v1/chat/completions", parsedURL.Path)
+}
+
 func advancedCustomRelayInfo(config *dto.AdvancedCustomConfig) *relaycommon.RelayInfo {
 	return &relaycommon.RelayInfo{
 		RelayFormat:    types.RelayFormatOpenAI,
@@ -301,4 +367,11 @@ func advancedCustomGinContext(path string) *gin.Context {
 	c.Request = httptest.NewRequest(http.MethodPost, path, nil)
 	c.Request.Header.Set("Content-Type", "application/json")
 	return c
+}
+
+func mustAdvancedCustomRawMessage(t *testing.T, value any) []byte {
+	t.Helper()
+	raw, err := common.Marshal(value)
+	require.NoError(t, err)
+	return raw
 }
