@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import axios from 'axios'
+import { ExternalLink } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -133,6 +134,7 @@ type OAuthSetupGuideProps = {
   title: string
   description: ReactNode
   rows: OAuthSetupGuideRow[]
+  children?: ReactNode
 }
 
 function OAuthSetupGuide(props: OAuthSetupGuideProps) {
@@ -165,6 +167,7 @@ function OAuthSetupGuide(props: OAuthSetupGuideProps) {
             </div>
           ))}
         </div>
+        {props.children}
       </AlertDescription>
     </Alert>
   )
@@ -255,7 +258,11 @@ export function OAuthSection(props: OAuthSectionProps) {
     'oidc',
     fallbackSiteUrl
   )
-  const linuxDOCallbackUrl = `${siteUrl}/api/oauth/linuxdo`
+  const linuxDOCallbackUrl = buildOAuthCallbackUrl(
+    props.serverAddress,
+    'linuxdo',
+    fallbackSiteUrl
+  )
 
   const formDefaults = useMemo(
     () => buildFormDefaults(props.defaultValues),
@@ -855,7 +862,17 @@ export function OAuthSection(props: OAuthSectionProps) {
                       copyLabel: t('Copy callback URL'),
                     },
                   ]}
-                />
+                >
+                  <a
+                    href='https://connect.linux.do/'
+                    target='_blank'
+                    rel='noreferrer'
+                    className='text-primary inline-flex w-fit items-center gap-1 underline underline-offset-3 hover:no-underline'
+                  >
+                    {t('Manage your LinuxDO OAuth app')}
+                    <ExternalLink className='size-3' aria-hidden='true' />
+                  </a>
+                </OAuthSetupGuide>
 
                 <FormField
                   control={form.control}

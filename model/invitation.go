@@ -73,7 +73,7 @@ func UseInvitationCodeWithTx(tx *gorm.DB, key string, userId int) error {
 	}
 
 	code := &InvitationCode{}
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").Where(commonKeyCol+" = ?", key).First(code).Error; err != nil {
+	if err := lockForUpdate(tx).Where(commonKeyCol+" = ?", key).First(code).Error; err != nil {
 		return ErrInvitationCodeInvalid
 	}
 	if code.Status == common.InvitationCodeStatusUsed {
@@ -86,10 +86,21 @@ func UseInvitationCodeWithTx(tx *gorm.DB, key string, userId int) error {
 		return errors.New("该邀请码已过期")
 	}
 
-	code.UsedTime = common.GetTimestamp()
-	code.Status = common.InvitationCodeStatusUsed
-	code.UsedUserId = userId
-	return tx.Model(code).Select("used_time", "status", "used_user_id").Updates(code).Error
+	now := common.GetTimestamp()
+	result := tx.Model(&InvitationCode{}).
+		Where("id = ? AND status = ? AND (expired_time = ? OR expired_time >= ?)", code.Id, common.InvitationCodeStatusEnabled, 0, now).
+		Updates(map[string]interface{}{
+			"used_time":    now,
+			"status":       common.InvitationCodeStatusUsed,
+			"used_user_id": userId,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("该邀请码已被使用")
+	}
+	return nil
 }
 
 func (code *InvitationCode) Insert() error {

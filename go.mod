@@ -51,12 +51,12 @@ require (
 	github.com/waffo-com/waffo-go v1.3.2
 	github.com/yapingcat/gomedia v0.0.0-20240906162731-17feea57090c
 	github.com/zricethezav/gitleaks/v8 v8.30.0
-	golang.org/x/crypto v0.45.0
-	golang.org/x/image v0.38.0
-	golang.org/x/net v0.47.0
+	golang.org/x/crypto v0.51.0
+	golang.org/x/image v0.41.0
+	golang.org/x/net v0.55.0
 	golang.org/x/sync v0.20.0
-	golang.org/x/sys v0.38.0
-	golang.org/x/text v0.35.0
+	golang.org/x/sys v0.45.0
+	golang.org/x/text v0.37.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/clickhouse v0.6.0
 	gorm.io/driver/mysql v1.4.3
@@ -80,7 +80,7 @@ require (
 	github.com/bodgit/plumbing v1.3.0 // indirect
 	github.com/bodgit/sevenzip v1.6.0 // indirect
 	github.com/bodgit/windows v1.0.1 // indirect
-	github.com/casbin/govaluate v1.3.0 // indirect
+	github.com/casbin/govaluate v1.10.0 // indirect
 	github.com/charmbracelet/lipgloss v0.5.0 // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
 	github.com/fatih/semgroup v1.2.0 // indirect

@@ -1,10 +1,14 @@
 package model
 
 import (
+	"errors"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func seedFlowQuotaData(t *testing.T, quotaData QuotaData) {
@@ -190,4 +194,116 @@ func TestLogQuotaDataSplitsRowsByUseGroupTokenChannelAndNode(t *testing.T) {
 	require.Equal(t, 60, rows[0].TokenUsed)
 	require.Equal(t, "default", rows[1].UseGroup)
 	require.Equal(t, 25, rows[1].Quota)
+}
+
+func TestSaveQuotaDataCacheDoesNotBlockNewLogsDuringDatabaseWrite(t *testing.T) {
+	truncateTables(t)
+	CacheQuotaDataLock.Lock()
+	CacheQuotaData = make(map[string]*QuotaData)
+	CacheQuotaDataLock.Unlock()
+
+	LogQuotaData(QuotaDataLogParams{
+		UserID: 1, Username: "alice", ModelName: "gpt-a", CreatedAt: 3600,
+		UseGroup: "vip", TokenID: 11, ChannelID: 1, NodeName: "node-a", Quota: 100, TokenUsed: 40,
+	})
+
+	const callbackName = "test:block_quota_data_flush"
+	blocked := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	require.NoError(t, DB.Callback().Query().Before("gorm:query").Register(callbackName, func(tx *gorm.DB) {
+		if tx.Statement.Table != "quota_data" {
+			return
+		}
+		once.Do(func() { close(blocked) })
+		<-release
+	}))
+	t.Cleanup(func() {
+		_ = DB.Callback().Query().Remove(callbackName)
+	})
+
+	flushDone := make(chan struct{})
+	go func() {
+		SaveQuotaDataCache()
+		close(flushDone)
+	}()
+	select {
+	case <-blocked:
+	case <-time.After(time.Second):
+		t.Fatal("quota data flush did not reach database query")
+	}
+
+	logDone := make(chan struct{})
+	go func() {
+		LogQuotaData(QuotaDataLogParams{
+			UserID: 1, Username: "alice", ModelName: "gpt-a", CreatedAt: 3600,
+			UseGroup: "vip", TokenID: 11, ChannelID: 1, NodeName: "node-a", Quota: 50, TokenUsed: 20,
+		})
+		close(logDone)
+	}()
+	select {
+	case <-logDone:
+	case <-time.After(time.Second):
+		t.Fatal("LogQuotaData was blocked by database flush")
+	}
+
+	close(release)
+	select {
+	case <-flushDone:
+	case <-time.After(time.Second):
+		t.Fatal("quota data flush did not finish")
+	}
+	require.NoError(t, DB.Callback().Query().Remove(callbackName))
+
+	CacheQuotaDataLock.Lock()
+	remaining := make([]QuotaData, 0, len(CacheQuotaData))
+	for _, quotaData := range CacheQuotaData {
+		remaining = append(remaining, *quotaData)
+	}
+	CacheQuotaDataLock.Unlock()
+	require.Len(t, remaining, 1)
+	require.Equal(t, 1, remaining[0].Count)
+	require.Equal(t, 50, remaining[0].Quota)
+	require.Equal(t, 20, remaining[0].TokenUsed)
+}
+
+func TestSaveQuotaDataCacheRetainsFailedEntriesForRetry(t *testing.T) {
+	truncateTables(t)
+	CacheQuotaDataLock.Lock()
+	CacheQuotaData = make(map[string]*QuotaData)
+	CacheQuotaDataLock.Unlock()
+
+	LogQuotaData(QuotaDataLogParams{
+		UserID: 2, Username: "bob", ModelName: "gpt-b", CreatedAt: 7200,
+		UseGroup: "default", TokenID: 22, ChannelID: 2, NodeName: "node-b", Quota: 75, TokenUsed: 30,
+	})
+
+	const callbackName = "test:fail_quota_data_flush"
+	require.NoError(t, DB.Callback().Query().Before("gorm:query").Register(callbackName, func(tx *gorm.DB) {
+		if tx.Statement.Table == "quota_data" {
+			tx.AddError(errors.New("forced quota data query failure"))
+		}
+	}))
+	t.Cleanup(func() {
+		_ = DB.Callback().Query().Remove(callbackName)
+	})
+
+	SaveQuotaDataCache()
+
+	CacheQuotaDataLock.Lock()
+	failedCount := len(CacheQuotaData)
+	CacheQuotaDataLock.Unlock()
+	require.Equal(t, 1, failedCount)
+	require.NoError(t, DB.Callback().Query().Remove(callbackName))
+
+	SaveQuotaDataCache()
+
+	CacheQuotaDataLock.Lock()
+	remainingCount := len(CacheQuotaData)
+	CacheQuotaDataLock.Unlock()
+	require.Zero(t, remainingCount)
+	var row QuotaData
+	require.NoError(t, DB.Where("user_id = ? AND model_name = ?", 2, "gpt-b").First(&row).Error)
+	require.Equal(t, 75, row.Quota)
+	require.Equal(t, 30, row.TokenUsed)
 }

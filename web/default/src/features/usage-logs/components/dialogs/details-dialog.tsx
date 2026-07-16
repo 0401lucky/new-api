@@ -153,7 +153,8 @@ function formatLogBalanceRange(
     return `${formatLogQuota(min)} - ${formatLogQuota(max)}`
   }
   if (min != null) return `${formatLogQuota(min)}+`
-  return `< ${formatLogQuota(max!)}`
+  if (max != null) return `< ${formatLogQuota(max)}`
+  return unlimitedLabel
 }
 
 function quotaSaturationKindLabel(
@@ -163,6 +164,14 @@ function quotaSaturationKindLabel(
   if (kind === 'overflow') return t('Overflow')
   if (kind === 'underflow') return t('Underflow')
   return t('Invalid (NaN)')
+}
+
+function getReasoningEffortVariant(
+  effort: string
+): StatusBadgeProps['variant'] {
+  if (effort === 'high') return 'orange'
+  if (effort === 'medium') return 'yellow'
+  return 'green'
 }
 
 function BillingBreakdown(props: {
@@ -383,8 +392,13 @@ function BillingBreakdown(props: {
 
   return (
     <DetailSection label={t('Billing Details')}>
-      {rows.map((row, idx) => (
-        <DetailRow key={idx} label={row.label} value={row.value} mono />
+      {rows.map((row) => (
+        <DetailRow
+          key={`${row.label}-${row.value}`}
+          label={row.label}
+          value={row.value}
+          mono
+        />
       ))}
     </DetailSection>
   )
@@ -449,8 +463,13 @@ function TokenBreakdown(props: { log: UsageLog; other: LogOtherData }) {
 
   return (
     <DetailSection label={t('Token Breakdown')}>
-      {rows.map((row, idx) => (
-        <DetailRow key={idx} label={row.label} value={row.value} mono />
+      {rows.map((row) => (
+        <DetailRow
+          key={`${row.label}-${row.value}`}
+          label={row.label}
+          value={row.value}
+          mono
+        />
       ))}
     </DetailSection>
   )
@@ -463,8 +482,18 @@ function PromptCheckDetails(props: { other: LogOtherData | null }) {
 
   const action = promptCheck.action || '-'
   const matches = promptCheck.matches || []
-  const statusVariant =
-    action === 'block' ? 'red' : action === 'warn' ? 'orange' : 'neutral'
+  let statusVariant: StatusBadgeProps['variant'] = 'neutral'
+  if (action === 'block') {
+    statusVariant = 'red'
+  } else if (action === 'warn') {
+    statusVariant = 'orange'
+  }
+  let reviewResult = t('Cleared')
+  if (promptCheck.review_flagged) {
+    reviewResult = t('Flagged')
+  } else if (promptCheck.review_error) {
+    reviewResult = promptCheck.review_error
+  }
 
   return (
     <DetailSection
@@ -500,13 +529,7 @@ function PromptCheckDetails(props: { other: LogOtherData | null }) {
       {promptCheck.reviewed && (
         <DetailRow
           label={t('Review result')}
-          value={
-            promptCheck.review_flagged
-              ? t('Flagged')
-              : promptCheck.review_error
-                ? promptCheck.review_error
-                : t('Cleared')
-          }
+          value={reviewResult}
         />
       )}
       {matches.length > 0 && (
@@ -514,9 +537,9 @@ function PromptCheckDetails(props: { other: LogOtherData | null }) {
           <p className='text-muted-foreground text-xs font-medium'>
             {t('Matched rules')}
           </p>
-          {matches.map((match, idx) => (
+          {matches.map((match) => (
             <div
-              key={`${match.name || 'match'}-${idx}`}
+              key={`${match.name || 'match'}-${match.category || ''}-${match.matched || ''}-${match.weight ?? ''}`}
               className='bg-background/60 min-w-0 rounded border p-2'
             >
               <div className='flex min-w-0 flex-wrap items-center gap-1.5'>
@@ -970,9 +993,9 @@ export function DetailsDialog(props: DetailsDialogProps) {
             icon={<ShieldCheck className='size-3.5' aria-hidden='true' />}
             label={t('Top-up Audit Info')}
           >
-            {topupAuditFields.map((field, idx) => (
+            {topupAuditFields.map((field) => (
               <DetailRow
-                key={idx}
+                key={field.label}
                 label={field.label}
                 value={field.value}
                 mono
@@ -1059,9 +1082,9 @@ export function DetailsDialog(props: DetailsDialogProps) {
             {operationText != null && (
               <DetailRow label={t('Operation')} value={operationText} />
             )}
-            {loginAuditFields.map((field, idx) => (
+            {loginAuditFields.map((field) => (
               <DetailRow
-                key={idx}
+                key={field.label}
                 label={field.label}
                 value={field.value}
                 mono
@@ -1114,13 +1137,7 @@ export function DetailsDialog(props: DetailsDialogProps) {
             value={
               <StatusBadge
                 label={other.reasoning_effort}
-                variant={
-                  other.reasoning_effort === 'high'
-                    ? 'orange'
-                    : other.reasoning_effort === 'medium'
-                      ? 'yellow'
-                      : 'green'
-                }
+                variant={getReasoningEffortVariant(other.reasoning_effort)}
                 size='sm'
                 copyable={false}
               />
@@ -1306,12 +1323,12 @@ export function DetailsDialog(props: DetailsDialogProps) {
             icon={<Settings2 className='size-3.5' aria-hidden='true' />}
             label={`${t('Param Override')} (${other.po.length})`}
           >
-            {other.po.filter(Boolean).map((line, idx) => {
+            {other.po.filter(Boolean).map((line) => {
               const parsed = parseAuditLine(line)
               if (!parsed) return null
               return (
                 <div
-                  key={idx}
+                  key={`${parsed.action}-${parsed.content}`}
                   className='bg-background/60 flex min-w-0 flex-col gap-1.5 rounded border p-2 sm:flex-row sm:items-start sm:gap-2'
                 >
                   <StatusBadge

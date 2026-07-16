@@ -242,6 +242,71 @@ func TestProtectedFetchRoundTripperUsesConfiguredProxy(t *testing.T) {
 	require.Equal(t, []string{"127.0.0.1:3128"}, dialed)
 }
 
+func TestProtectedFetchRoundTripperRejectsDomainTargetThroughProxyWhenResolvedIPFilteringEnabled(t *testing.T) {
+	roundTripper := &ssrfProtectedRoundTripper{
+		getProtection: staticProtection(&common.SSRFProtection{
+			ApplyIPFilterForDomain: true,
+		}),
+	}
+
+	err := roundTripper.validateProxyTarget(
+		mustParseURL(t, "https://safe.example/resource"),
+		mustParseURL(t, "http://127.0.0.1:3128"),
+	)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "domain fetch through proxy")
+}
+
+func TestProtectedFetchRoundTripperAllowsProxyWithoutRebindingWindow(t *testing.T) {
+	tests := []struct {
+		name       string
+		targetURL  string
+		proxyURL   string
+		protection *common.SSRFProtection
+	}{
+		{
+			name:      "literal IP target",
+			targetURL: "https://93.184.216.34/resource",
+			proxyURL:  "http://127.0.0.1:3128",
+			protection: &common.SSRFProtection{
+				ApplyIPFilterForDomain: true,
+			},
+		},
+		{
+			name:      "domain IP filtering disabled",
+			targetURL: "https://safe.example/resource",
+			proxyURL:  "http://127.0.0.1:3128",
+			protection: &common.SSRFProtection{
+				ApplyIPFilterForDomain: false,
+			},
+		},
+		{
+			name:      "direct connection",
+			targetURL: "https://safe.example/resource",
+			protection: &common.SSRFProtection{
+				ApplyIPFilterForDomain: true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roundTripper := &ssrfProtectedRoundTripper{
+				getProtection: staticProtection(tt.protection),
+			}
+			var proxyURL *url.URL
+			if tt.proxyURL != "" {
+				proxyURL = mustParseURL(t, tt.proxyURL)
+			}
+
+			err := roundTripper.validateProxyTarget(mustParseURL(t, tt.targetURL), proxyURL)
+
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestProtectedFetchRoundTripperRejectsPrivateTargetBeforeProxy(t *testing.T) {
 	configureSSRFTestFetchSetting(t)
 	proxyURL := mustParseURL(t, "http://127.0.0.1:3128")

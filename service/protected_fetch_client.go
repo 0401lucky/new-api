@@ -109,7 +109,34 @@ func (t *ssrfProtectedRoundTripper) RoundTrip(req *http.Request) (*http.Response
 	if err != nil {
 		return nil, err
 	}
+	if err := t.validateProxyTarget(req.URL, proxyURL); err != nil {
+		return nil, err
+	}
 	return t.transportFor(proxyURL).RoundTrip(req)
+}
+
+func (t *ssrfProtectedRoundTripper) validateProxyTarget(targetURL, proxyURL *url.URL) error {
+	if targetURL == nil || proxyURL == nil {
+		return nil
+	}
+
+	protection, enabled, err := t.getProtection()
+	if err != nil {
+		return err
+	}
+	if !enabled || protection == nil || !protection.ApplyIPFilterForDomain {
+		return nil
+	}
+
+	// HTTP proxies resolve domain targets themselves. Even if the application
+	// validates the domain now, a later proxy-side lookup can observe a rebound
+	// private address. Literal IP targets are safe because the proxy has no DNS
+	// name to resolve; domain targets must use the protected direct dialer when
+	// resolved-IP filtering is enabled.
+	if net.ParseIP(targetURL.Hostname()) == nil {
+		return fmt.Errorf("SSRF-protected domain fetch through proxy is not supported when resolved-IP filtering is enabled")
+	}
+	return nil
 }
 
 func (t *ssrfProtectedRoundTripper) CloseIdleConnections() {

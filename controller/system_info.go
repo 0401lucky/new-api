@@ -31,7 +31,7 @@ func ListSystemInstances(c *gin.Context) {
 }
 
 func DeleteStaleSystemInstances(c *gin.Context) {
-	deletedCount, err := model.DeleteStaleSystemInstances()
+	deletedCount, err := model.DeleteStaleSystemInstances(common.GetTimestamp())
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -49,17 +49,17 @@ func DeleteStaleSystemInstance(c *gin.Context) {
 		return
 	}
 
-	deletedCount, err := model.DeleteStaleSystemInstance(nodeName)
+	deleted, err := model.DeleteStaleSystemInstance(nodeName, common.GetTimestamp())
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
-	if deletedCount == 0 {
+	if !deleted {
 		common.ApiErrorMsg(c, "instance is not stale or no longer exists")
 		return
 	}
 
 	common.ApiSuccess(c, gin.H{
-		"deleted_count": deletedCount,
+		"deleted_count": 1,
 	})
 }
