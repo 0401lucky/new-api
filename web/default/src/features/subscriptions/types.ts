@@ -35,6 +35,7 @@ export const subscriptionPlanSchema = z.object({
   quota_reset_custom_seconds: z.number().optional(),
   enabled: z.boolean(),
   sort_order: z.number(),
+  auto_grant: z.boolean().optional().default(false),
   allow_balance_pay: z.boolean().optional().default(true),
   allow_wallet_overflow: z.boolean().optional().default(true),
   max_purchase_per_user: z.number(),
@@ -148,8 +149,17 @@ export interface SelfSubscriptionData {
 // Dialog Types
 // ============================================================================
 
+export interface SubscriptionGrantAllResult {
+  plan_id: number
+  total_users: number
+  granted_count: number
+  skipped_count: number
+  failed_count: number
+}
+
 export type SubscriptionsDialogType =
   | 'create'
   | 'update'
   | 'toggle-status'
   | 'reset-subscriptions'
+  | 'grant-all'

@@ -107,10 +107,17 @@ const renderPlanTitle = (text, record, t) => {
 
   return (
     <Popover content={popoverContent} position='rightTop' showArrow>
-      <div style={{ cursor: 'pointer', maxWidth: 180 }}>
-        <Text strong ellipsis={{ showTooltip: false }}>
-          {text}
-        </Text>
+      <div style={{ cursor: 'pointer', maxWidth: 220 }}>
+        <Space spacing={4} wrap>
+          <Text strong ellipsis={{ showTooltip: false }}>
+            {text}
+          </Text>
+          {plan?.auto_grant ? (
+            <Tag color='blue' shape='circle' size='small'>
+              {t('新用户自动发放')}
+            </Tag>
+          ) : null}
+        </Space>
         {subtitle && (
           <Text
             type='tertiary'
@@ -231,9 +238,10 @@ const renderPaymentConfig = (text, record, t, enableEpay) => {
 const renderOperations = (
   text,
   record,
-  { openEdit, setPlanEnabled, t, complianceConfirmed },
+  { openEdit, setPlanEnabled, grantPlanToAll, t, complianceConfirmed },
 ) => {
   const isEnabled = record?.plan?.enabled;
+  const planTitle = record?.plan?.title || `#${record?.plan?.id || ''}`;
 
   const handleToggle = () => {
     if (isEnabled) {
@@ -253,6 +261,18 @@ const renderOperations = (
     }
   };
 
+  const handleGrantAll = () => {
+    Modal.confirm({
+      title: t('发放给全部用户'),
+      content: t(
+        '将套餐 {{plan}} 发放给所有启用用户？已有该套餐的用户将跳过。',
+        { plan: planTitle },
+      ),
+      centered: true,
+      onOk: () => grantPlanToAll?.(record),
+    });
+  };
+
   return (
     <Space spacing={8}>
       <Button
@@ -263,6 +283,15 @@ const renderOperations = (
         disabled={!complianceConfirmed}
       >
         {t('编辑')}
+      </Button>
+      <Button
+        theme='light'
+        type='secondary'
+        size='small'
+        onClick={handleGrantAll}
+        disabled={!complianceConfirmed}
+      >
+        {t('发放给全部用户')}
       </Button>
       {isEnabled ? (
         <Button
@@ -293,6 +322,7 @@ export const getSubscriptionsColumns = ({
   t,
   openEdit,
   setPlanEnabled,
+  grantPlanToAll,
   enableEpay,
   complianceConfirmed = true,
 }) => {
@@ -362,11 +392,12 @@ export const getSubscriptionsColumns = ({
       title: t('操作'),
       dataIndex: 'operate',
       fixed: 'right',
-      width: 160,
+      width: 280,
       render: (text, record) =>
         renderOperations(text, record, {
           openEdit,
           setPlanEnabled,
+          grantPlanToAll,
           t,
           complianceConfirmed,
         }),

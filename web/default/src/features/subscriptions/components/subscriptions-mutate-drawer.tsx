@@ -67,6 +67,7 @@ import {
   createPlan,
   updatePlan,
   getGroups,
+  grantPlanToAllUsers,
   createWaffoPancakeSubscriptionProduct,
   listWaffoPancakeSubscriptionProductOptions,
 } from '../api'
@@ -167,7 +168,34 @@ export function SubscriptionsMutateDrawer({
       } else {
         const res = await createPlan(payload)
         if (res.success) {
-          toast.success(t('Create succeeded'))
+          const createdPlanId =
+            typeof res.data === 'object' && res.data
+              ? Number(
+                  (res.data as { id?: number; plan?: { id?: number } }).id ??
+                    (res.data as { plan?: { id?: number } }).plan?.id ??
+                    0
+                )
+              : 0
+          let grantMsg = ''
+          if (values.grant_to_all_now && createdPlanId > 0) {
+            try {
+              const grantRes = await grantPlanToAllUsers(createdPlanId)
+              if (grantRes.success && grantRes.data) {
+                grantMsg = t(
+                  'Granted to {{granted}} users, skipped {{skipped}}',
+                  {
+                    granted: grantRes.data.granted_count || 0,
+                    skipped: grantRes.data.skipped_count || 0,
+                  }
+                )
+              }
+            } catch {
+              toast.error(t('Plan created, but grant to all users failed'))
+            }
+          }
+          toast.success(
+            grantMsg ? `${t('Create succeeded')}. ${grantMsg}` : t('Create succeeded')
+          )
           onOpenChange(false)
           triggerRefresh()
         }
@@ -578,6 +606,58 @@ export function SubscriptionsMutateDrawer({
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name='auto_grant'
+                  render={({ field }) => (
+                    <FormItem className={sideDrawerSwitchItemClassName()}>
+                      <div className='flex min-w-0 flex-1 flex-col gap-0.5'>
+                        <FormLabel className='!mt-0'>
+                          {t('Auto-grant to new users')}
+                        </FormLabel>
+                        <FormDescription>
+                          {t(
+                            'When enabled, newly registered users automatically receive this plan'
+                          )}
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {!isEdit && (
+                  <FormField
+                    control={form.control}
+                    name='grant_to_all_now'
+                    render={({ field }) => (
+                      <FormItem className={sideDrawerSwitchItemClassName()}>
+                        <div className='flex min-w-0 flex-1 flex-col gap-0.5'>
+                          <FormLabel className='!mt-0'>
+                            {t('Grant to all existing users after create')}
+                          </FormLabel>
+                          <FormDescription>
+                            {t(
+                              'After creating the plan, immediately grant it to all enabled users. Users who already have this plan are skipped.'
+                            )}
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
             </SideDrawerSection>
 

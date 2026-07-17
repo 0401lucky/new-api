@@ -92,6 +92,8 @@ const AddEditSubscriptionModal = ({
     quota_reset_custom_seconds: 0,
     enabled: true,
     sort_order: 0,
+    auto_grant: false,
+    grant_to_all_now: false,
     max_purchase_per_user: 0,
     total_amount: 0,
     upgrade_group: '',
@@ -116,6 +118,8 @@ const AddEditSubscriptionModal = ({
       quota_reset_custom_seconds: Number(p.quota_reset_custom_seconds || 0),
       enabled: p.enabled !== false,
       sort_order: Number(p.sort_order || 0),
+      auto_grant: !!p.auto_grant,
+      grant_to_all_now: false,
       max_purchase_per_user: Number(p.max_purchase_per_user || 0),
       total_amount: Number(
         quotaToDisplayAmount(p.total_amount || 0).toFixed(2),
@@ -150,9 +154,11 @@ const AddEditSubscriptionModal = ({
     try {
       const payload = {
         plan: {
-          ...values,
+          title: values.title,
+          subtitle: values.subtitle,
           price_amount: Number(values.price_amount || 0),
           currency: 'USD',
+          duration_unit: values.duration_unit,
           duration_value: Number(values.duration_value || 0),
           custom_seconds: Number(values.custom_seconds || 0),
           quota_reset_period: values.quota_reset_period || 'never',
@@ -160,10 +166,14 @@ const AddEditSubscriptionModal = ({
             values.quota_reset_period === 'custom'
               ? Number(values.quota_reset_custom_seconds || 0)
               : 0,
+          enabled: values.enabled,
           sort_order: Number(values.sort_order || 0),
+          auto_grant: !!values.auto_grant,
           max_purchase_per_user: Number(values.max_purchase_per_user || 0),
           total_amount: displayAmountToQuota(values.total_amount),
           upgrade_group: values.upgrade_group || '',
+          stripe_price_id: values.stripe_price_id || '',
+          creem_product_id: values.creem_product_id || '',
         },
       };
       if (editingPlan?.plan?.id) {
@@ -181,7 +191,28 @@ const AddEditSubscriptionModal = ({
       } else {
         const res = await API.post('/api/subscription/admin/plans', payload);
         if (res.data?.success) {
-          showSuccess(t('创建成功'));
+          const createdId = Number(res.data?.data?.id || 0);
+          let grantMsg = '';
+          if (values.grant_to_all_now && createdId > 0) {
+            try {
+              const grantRes = await API.post(
+                `/api/subscription/admin/plans/${createdId}/grant-all`,
+              );
+              if (grantRes.data?.success) {
+                const granted = grantRes.data?.data?.granted_count || 0;
+                const skipped = grantRes.data?.data?.skipped_count || 0;
+                grantMsg = t('已发放给 {{granted}} 位用户，跳过 {{skipped}} 位', {
+                  granted,
+                  skipped,
+                });
+              }
+            } catch {
+              showError(t('套餐已创建，但全员发放失败'));
+            }
+          }
+          showSuccess(
+            grantMsg ? `${t('创建成功')}。${grantMsg}` : t('创建成功'),
+          );
           handleClose();
           refresh?.();
         } else {
@@ -378,6 +409,28 @@ const AddEditSubscriptionModal = ({
                         size='large'
                       />
                     </Col>
+
+                    <Col span={12}>
+                      <Form.Switch
+                        field='auto_grant'
+                        label={t('新用户自动发放')}
+                        extraText={t('开启后，新注册用户将自动获得此套餐')}
+                        size='large'
+                      />
+                    </Col>
+
+                    {!isEdit && (
+                      <Col span={12}>
+                        <Form.Switch
+                          field='grant_to_all_now'
+                          label={t('创建后立即发放给全部现有用户')}
+                          extraText={t(
+                            '创建套餐后立即向所有启用用户发放。已有该套餐的用户将跳过。',
+                          )}
+                          size='large'
+                        />
+                      </Col>
+                    )}
                   </Row>
                 </Card>
 

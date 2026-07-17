@@ -291,6 +291,7 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 			"custom_seconds":             req.Plan.CustomSeconds,
 			"enabled":                    req.Plan.Enabled,
 			"sort_order":                 req.Plan.SortOrder,
+			"auto_grant":                 req.Plan.AutoGrant,
 			"stripe_price_id":            req.Plan.StripePriceId,
 			"creem_product_id":           req.Plan.CreemProductId,
 			"waffo_pancake_product_id":   req.Plan.WaffoPancakeProductId,
@@ -504,6 +505,35 @@ func AdminResetPlanSubscriptions(c *gin.Context) {
 		"reset_count":        result.ResetCount,
 		"user_count":         result.UserCount,
 		"advance_reset_time": result.AdvanceResetTime,
+	})
+	common.ApiSuccess(c, result)
+}
+
+// AdminGrantPlanToAllUsers binds a plan to every enabled user without an existing record for that plan.
+func AdminGrantPlanToAllUsers(c *gin.Context) {
+	if !requirePaymentCompliance(c) {
+		return
+	}
+
+	planId, _ := strconv.Atoi(c.Param("id"))
+	if planId <= 0 {
+		common.ApiErrorMsg(c, "无效的ID")
+		return
+	}
+	result, err := model.AdminGrantPlanToAllUsers(planId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.SysLog(fmt.Sprintf("admin grant plan %d to all users: granted=%d skipped=%d failed=%d total=%d",
+		result.PlanId, result.GrantedCount, result.SkippedCount, result.FailedCount, result.TotalUsers))
+	recordManageAudit(c, "subscription.plan_grant_all", map[string]interface{}{
+		"plan_id":       result.PlanId,
+		"plan_title":    result.PlanTitle,
+		"granted_count": result.GrantedCount,
+		"skipped_count": result.SkippedCount,
+		"failed_count":  result.FailedCount,
+		"total_users":   result.TotalUsers,
 	})
 	common.ApiSuccess(c, result)
 }

@@ -41,6 +41,9 @@ export function getPlanFormSchema(t: TFunction) {
     quota_reset_custom_seconds: z.coerce.number().min(0).optional(),
     enabled: z.boolean(),
     sort_order: z.coerce.number(),
+    auto_grant: z.boolean(),
+    // Create-only ephemeral flag: not persisted on the plan.
+    grant_to_all_now: z.boolean(),
     allow_balance_pay: z.boolean(),
     allow_wallet_overflow: z.boolean(),
     max_purchase_per_user: z.coerce.number().min(0),
@@ -66,6 +69,8 @@ export const PLAN_FORM_DEFAULTS: PlanFormValues = {
   quota_reset_custom_seconds: 0,
   enabled: true,
   sort_order: 0,
+  auto_grant: false,
+  grant_to_all_now: false,
   allow_balance_pay: true,
   allow_wallet_overflow: true,
   max_purchase_per_user: 0,
@@ -89,6 +94,8 @@ export function planToFormValues(plan: SubscriptionPlan): PlanFormValues {
     quota_reset_custom_seconds: Number(plan.quota_reset_custom_seconds || 0),
     enabled: plan.enabled !== false,
     sort_order: Number(plan.sort_order || 0),
+    auto_grant: !!plan.auto_grant,
+    grant_to_all_now: false,
     allow_balance_pay: plan.allow_balance_pay !== false,
     allow_wallet_overflow: plan.allow_wallet_overflow !== false,
     max_purchase_per_user: Number(plan.max_purchase_per_user || 0),
@@ -104,9 +111,11 @@ export function planToFormValues(plan: SubscriptionPlan): PlanFormValues {
 export function formValuesToPlanPayload(values: PlanFormValues): PlanPayload {
   return {
     plan: {
-      ...values,
+      title: values.title,
+      subtitle: values.subtitle,
       price_amount: Number(values.price_amount || 0),
       currency: 'USD',
+      duration_unit: values.duration_unit,
       duration_value: Number(values.duration_value || 0),
       custom_seconds: Number(values.custom_seconds || 0),
       quota_reset_period: values.quota_reset_period || 'never',
@@ -114,11 +123,18 @@ export function formValuesToPlanPayload(values: PlanFormValues): PlanPayload {
         values.quota_reset_period === 'custom'
           ? Number(values.quota_reset_custom_seconds || 0)
           : 0,
+      enabled: values.enabled,
       sort_order: Number(values.sort_order || 0),
+      auto_grant: !!values.auto_grant,
+      allow_balance_pay: values.allow_balance_pay,
+      allow_wallet_overflow: values.allow_wallet_overflow,
       max_purchase_per_user: Number(values.max_purchase_per_user || 0),
       total_amount: parseQuotaFromDollars(Number(values.total_amount || 0)),
       upgrade_group: values.upgrade_group || '',
       downgrade_group: values.downgrade_group || '',
+      stripe_price_id: values.stripe_price_id || '',
+      creem_product_id: values.creem_product_id || '',
+      waffo_pancake_product_id: values.waffo_pancake_product_id || '',
     },
   }
 }

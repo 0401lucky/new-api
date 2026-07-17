@@ -628,6 +628,9 @@ func (user *User) finishInsert(inviterId int) {
 			_ = inviteUser(inviterId)
 		}
 	}
+	if err := GrantAutoSubscriptionsToNewUser(user.Id); err != nil {
+		common.SysError(fmt.Sprintf("auto grant subscriptions to user %d failed: %v", user.Id, err))
+	}
 }
 
 func (user *User) FinishInsert(inviterId int) {
@@ -683,6 +686,9 @@ func (user *User) FinalizeUserCreation(inviterId int) {
 			RecordLog(inviterId, LogTypeSystem, fmt.Sprintf("邀请用户赠送 %s", logger.LogQuota(common.QuotaForInviter)))
 			_ = inviteUser(inviterId)
 		}
+	}
+	if err := GrantAutoSubscriptionsToNewUser(user.Id); err != nil {
+		common.SysError(fmt.Sprintf("auto grant subscriptions to user %d failed: %v", user.Id, err))
 	}
 }
 

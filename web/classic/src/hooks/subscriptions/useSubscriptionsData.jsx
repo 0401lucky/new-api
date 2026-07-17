@@ -100,6 +100,42 @@ export const useSubscriptionsData = () => {
     }
   };
 
+  // Grant plan to all enabled users (skip users who already have it)
+  const grantPlanToAll = async (planRecordOrId) => {
+    const planId =
+      typeof planRecordOrId === 'number'
+        ? planRecordOrId
+        : planRecordOrId?.plan?.id;
+    if (!planId) return;
+    setLoading(true);
+    try {
+      const res = await API.post(
+        `/api/subscription/admin/plans/${planId}/grant-all`,
+      );
+      if (res.data?.success) {
+        const granted = res.data?.data?.granted_count || 0;
+        const skipped = res.data?.data?.skipped_count || 0;
+        const failed = res.data?.data?.failed_count || 0;
+        showSuccess(
+          t('已发放给 {{granted}} 位用户，跳过 {{skipped}} 位', {
+            granted,
+            skipped,
+          }),
+        );
+        if (failed > 0) {
+          showError(t('{{count}} 位用户发放失败', { count: failed }));
+        }
+        await loadPlans();
+      } else {
+        showError(res.data?.message || t('操作失败'));
+      }
+    } catch (e) {
+      showError(t('请求失败'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Modal control functions
   const closeEdit = () => {
     setShowEdit(false);
@@ -155,6 +191,7 @@ export const useSubscriptionsData = () => {
     // Actions
     loadPlans,
     setPlanEnabled,
+    grantPlanToAll,
     refresh,
     closeEdit,
     openCreate,

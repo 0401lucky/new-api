@@ -10,6 +10,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/pkg/cachex"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/samber/hot"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -159,6 +160,9 @@ type SubscriptionPlan struct {
 
 	Enabled   bool `json:"enabled" gorm:"default:true"`
 	SortOrder int  `json:"sort_order" gorm:"type:int;default:0"`
+
+	// AutoGrant binds this plan to newly created users when enabled.
+	AutoGrant bool `json:"auto_grant" gorm:"default:false"`
 
 	AllowBalancePay *bool `json:"allow_balance_pay"`
 
@@ -502,7 +506,7 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 			return nil, errors.New("已达到该套餐购买上限")
 		}
 	}
-	nowUnix := GetDBTimestamp()
+	nowUnix := GetDBTimestampTx(tx)
 	now := time.Unix(nowUnix, 0)
 	endUnix, err := calcPlanEndTime(now, plan)
 	if err != nil {
@@ -714,6 +718,157 @@ func AdminBindSubscription(userId int, planId int, sourceNote string) (string, e
 		return fmt.Sprintf("用户分组将升级到 %s", plan.UpgradeGroup), nil
 	}
 	return "", nil
+}
+
+// SubscriptionGrantAllResult summarizes a bulk grant of one plan to all enabled users.
+type SubscriptionGrantAllResult struct {
+	PlanId       int    `json:"plan_id"`
+	TotalUsers   int    `json:"total_users"`
+	GrantedCount int    `json:"granted_count"`
+	SkippedCount int    `json:"skipped_count"`
+	FailedCount  int    `json:"failed_count"`
+	PlanTitle    string `json:"-"`
+}
+
+const subscriptionGrantAllBatchSize = 200
+
+func userAlreadyHasPlanSubscriptionTx(tx *gorm.DB, userId int, planId int) (bool, error) {
+	if tx == nil {
+		tx = DB
+	}
+	if userId <= 0 || planId <= 0 {
+		return false, errors.New("invalid userId or planId")
+	}
+	var count int64
+	if err := tx.Model(&UserSubscription{}).
+		Where("user_id = ? AND plan_id = ?", userId, planId).
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// BindSubscriptionIfAbsent creates a user subscription from the plan when the user
+// has no prior subscription record for that plan. granted=false with err=nil means skipped.
+func BindSubscriptionIfAbsent(userId int, plan *SubscriptionPlan, source string) (granted bool, err error) {
+	if plan == nil || plan.Id == 0 {
+		return false, errors.New("invalid plan")
+	}
+	if userId <= 0 {
+		return false, errors.New("invalid user id")
+	}
+	if strings.TrimSpace(source) == "" {
+		source = "admin"
+	}
+	var upgradeGroup string
+	err = DB.Transaction(func(tx *gorm.DB) error {
+		exists, err := userAlreadyHasPlanSubscriptionTx(tx, userId, plan.Id)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return nil
+		}
+		if _, err := CreateUserSubscriptionFromPlanTx(tx, userId, plan, source); err != nil {
+			return err
+		}
+		granted = true
+		upgradeGroup = strings.TrimSpace(plan.UpgradeGroup)
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+	if granted && upgradeGroup != "" {
+		_ = UpdateUserGroupCache(userId, upgradeGroup)
+	}
+	return granted, nil
+}
+
+// AdminGrantPlanToAllUsers binds a plan to every enabled user that does not already
+// have any subscription record for that plan. Each user is handled in its own transaction.
+func AdminGrantPlanToAllUsers(planId int) (*SubscriptionGrantAllResult, error) {
+	if planId <= 0 {
+		return nil, errors.New("invalid planId")
+	}
+	plan, err := GetSubscriptionPlanById(planId)
+	if err != nil {
+		return nil, err
+	}
+	result := &SubscriptionGrantAllResult{
+		PlanId:    plan.Id,
+		PlanTitle: plan.Title,
+	}
+
+	var lastID int
+	for {
+		var users []User
+		if err := DB.Select("id").
+			Where("status = ? AND id > ?", common.UserStatusEnabled, lastID).
+			Order("id asc").
+			Limit(subscriptionGrantAllBatchSize).
+			Find(&users).Error; err != nil {
+			return result, err
+		}
+		if len(users) == 0 {
+			break
+		}
+		for _, u := range users {
+			result.TotalUsers++
+			lastID = u.Id
+			granted, bindErr := BindSubscriptionIfAbsent(u.Id, plan, "admin")
+			if bindErr != nil {
+				result.FailedCount++
+				common.SysError(fmt.Sprintf("grant plan %d to user %d failed: %v", plan.Id, u.Id, bindErr))
+				continue
+			}
+			if granted {
+				result.GrantedCount++
+			} else {
+				result.SkippedCount++
+			}
+		}
+		if len(users) < subscriptionGrantAllBatchSize {
+			break
+		}
+	}
+	return result, nil
+}
+
+// ListAutoGrantSubscriptionPlans returns enabled plans that should be bound to new users.
+func ListAutoGrantSubscriptionPlans() ([]SubscriptionPlan, error) {
+	var plans []SubscriptionPlan
+	if err := DB.Where("enabled = ? AND auto_grant = ?", true, true).
+		Order("id asc").
+		Find(&plans).Error; err != nil {
+		return nil, err
+	}
+	for i := range plans {
+		plans[i].NormalizeDefaults()
+	}
+	return plans, nil
+}
+
+// GrantAutoSubscriptionsToNewUser binds every enabled auto-grant plan the user does not already have.
+// Errors for individual plans are logged; a non-nil return only means listing plans failed.
+func GrantAutoSubscriptionsToNewUser(userId int) error {
+	if userId <= 0 {
+		return errors.New("invalid user id")
+	}
+	if !operation_setting.IsPaymentComplianceConfirmed() {
+		return nil
+	}
+	plans, err := ListAutoGrantSubscriptionPlans()
+	if err != nil {
+		return err
+	}
+	for i := range plans {
+		plan := &plans[i]
+		if _, bindErr := BindSubscriptionIfAbsent(userId, plan, "auto_grant"); bindErr != nil {
+			common.SysError(fmt.Sprintf("auto grant plan %d to user %d failed: %v", plan.Id, userId, bindErr))
+		}
+	}
+	return nil
 }
 
 func calcSubscriptionBalanceQuota(priceAmount float64) (int, error) {
