@@ -28,6 +28,8 @@ import type {
   ResetPlanSubscriptionsRequest,
   SubscriptionResetResult,
   SubscriptionGrantAllResult,
+  AdminUserSubscriptionListParams,
+  AdminUserSubscriptionListPage,
   SubscriptionPayResponse,
   SubscriptionPayRequest,
   SelfSubscriptionData,
@@ -136,6 +138,32 @@ export async function grantPlanToAllUsers(
 ): Promise<ApiResponse<SubscriptionGrantAllResult>> {
   const res = await api.post(
     `/api/subscription/admin/plans/${planId}/grant-all`
+  )
+  return res.data
+}
+
+export async function listAdminUserSubscriptions(
+  params: AdminUserSubscriptionListParams = {}
+): Promise<ApiResponse<AdminUserSubscriptionListPage>> {
+  const {
+    p = 1,
+    page_size = 20,
+    keyword = '',
+    plan_id,
+    user_id,
+    status = '',
+    source = '',
+  } = params
+  const search = new URLSearchParams()
+  search.set('p', String(p))
+  search.set('page_size', String(page_size))
+  if (keyword) search.set('keyword', keyword)
+  if (plan_id && plan_id > 0) search.set('plan_id', String(plan_id))
+  if (user_id && user_id > 0) search.set('user_id', String(user_id))
+  if (status) search.set('status', status)
+  if (source) search.set('source', source)
+  const res = await api.get(
+    `/api/subscription/admin/user_subscriptions?${search.toString()}`
   )
   return res.data
 }

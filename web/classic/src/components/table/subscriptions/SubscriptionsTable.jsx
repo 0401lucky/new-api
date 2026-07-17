@@ -34,6 +34,7 @@ const SubscriptionsTable = (subscriptionsData) => {
     openEdit,
     setPlanEnabled,
     grantPlanToAll,
+    openPlanSubscribers,
     t,
     enableEpay,
     complianceConfirmed,
@@ -45,6 +46,7 @@ const SubscriptionsTable = (subscriptionsData) => {
       openEdit,
       setPlanEnabled,
       grantPlanToAll,
+      openPlanSubscribers,
       enableEpay,
       complianceConfirmed,
     });
@@ -53,6 +55,7 @@ const SubscriptionsTable = (subscriptionsData) => {
     openEdit,
     setPlanEnabled,
     grantPlanToAll,
+    openPlanSubscribers,
     enableEpay,
     complianceConfirmed,
   ]);

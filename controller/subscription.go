@@ -392,6 +392,28 @@ func AdminListUserSubscriptions(c *gin.Context) {
 	common.ApiSuccess(c, subs)
 }
 
+// AdminListAllUserSubscriptions lists user subscription instances with filters (global or by plan).
+func AdminListAllUserSubscriptions(c *gin.Context) {
+	pageInfo := common.GetPageQuery(c)
+	planId, _ := strconv.Atoi(c.Query("plan_id"))
+	userId, _ := strconv.Atoi(c.Query("user_id"))
+	q := model.AdminUserSubscriptionQuery{
+		Keyword: c.Query("keyword"),
+		PlanId:  planId,
+		UserId:  userId,
+		Status:  c.Query("status"),
+		Source:  c.Query("source"),
+	}
+	items, total, err := model.AdminListUserSubscriptionsPage(q, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(items)
+	common.ApiSuccess(c, pageInfo)
+}
+
 type AdminCreateUserSubscriptionRequest struct {
 	PlanId int `json:"plan_id"`
 }

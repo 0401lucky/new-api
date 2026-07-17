@@ -17,10 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Info } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 import { SubscriptionsDialogs } from './components/subscriptions-dialogs'
 import { SubscriptionsPrimaryButtons } from './components/subscriptions-primary-buttons'
@@ -29,10 +31,12 @@ import {
   useSubscriptions,
 } from './components/subscriptions-provider'
 import { SubscriptionsTable } from './components/subscriptions-table'
+import { UserSubscriptionsTable } from './components/user-subscriptions-table'
 
 function SubscriptionsContent() {
   const { t } = useTranslation()
   const { complianceConfirmed } = useSubscriptions()
+  const [tab, setTab] = useState('plans')
 
   return (
     <>
@@ -50,7 +54,7 @@ function SubscriptionsContent() {
                 )}
               </AlertDescription>
             </Alert>
-            <SubscriptionsPrimaryButtons />
+            {tab === 'plans' ? <SubscriptionsPrimaryButtons /> : null}
           </div>
         </SectionPageLayout.Actions>
         <SectionPageLayout.Content>
@@ -64,9 +68,30 @@ function SubscriptionsContent() {
                 </AlertDescription>
               </Alert>
             ) : null}
-            <div className='min-h-0 flex-1'>
-              <SubscriptionsTable />
-            </div>
+            <Tabs
+              value={tab}
+              onValueChange={setTab}
+              className='flex min-h-0 flex-1 flex-col gap-3'
+            >
+              <TabsList className='w-fit shrink-0'>
+                <TabsTrigger value='plans'>{t('Plans')}</TabsTrigger>
+                <TabsTrigger value='instances'>
+                  {t('User subscriptions')}
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent
+                value='plans'
+                className='mt-0 min-h-0 flex-1 outline-none'
+              >
+                <SubscriptionsTable />
+              </TabsContent>
+              <TabsContent
+                value='instances'
+                className='mt-0 min-h-0 flex-1 outline-none'
+              >
+                <UserSubscriptionsTable />
+              </TabsContent>
+            </Tabs>
           </div>
         </SectionPageLayout.Content>
       </SectionPageLayout>

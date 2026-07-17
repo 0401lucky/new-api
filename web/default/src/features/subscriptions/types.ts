@@ -76,6 +76,30 @@ export interface UserSubscriptionRecord {
   subscription: UserSubscription
 }
 
+/** Admin global/plan subscriber list row */
+export interface AdminUserSubscriptionItem {
+  subscription: UserSubscription
+  username?: string
+  plan_title?: string
+}
+
+export interface AdminUserSubscriptionListParams {
+  p?: number
+  page_size?: number
+  keyword?: string
+  plan_id?: number
+  user_id?: number
+  status?: string
+  source?: string
+}
+
+export interface AdminUserSubscriptionListPage {
+  page: number
+  page_size: number
+  total: number
+  items: AdminUserSubscriptionItem[]
+}
+
 // ============================================================================
 // API Request/Response Types
 // ============================================================================
@@ -163,3 +187,4 @@ export type SubscriptionsDialogType =
   | 'toggle-status'
   | 'reset-subscriptions'
   | 'grant-all'
+  | 'plan-subscribers'

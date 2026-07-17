@@ -1039,6 +1039,133 @@ func GetAllUserSubscriptions(userId int) ([]SubscriptionSummary, error) {
 	return buildSubscriptionSummaries(subs), nil
 }
 
+// AdminUserSubscriptionQuery filters for the admin user-subscription list.
+type AdminUserSubscriptionQuery struct {
+	Keyword string
+	PlanId  int
+	UserId  int
+	Status  string // active | expired | cancelled | empty=all
+	Source  string
+}
+
+// AdminUserSubscriptionItem is a user subscription row enriched for admin views.
+type AdminUserSubscriptionItem struct {
+	Subscription UserSubscription `json:"subscription"`
+	Username     string           `json:"username"`
+	PlanTitle    string           `json:"plan_title"`
+}
+
+// AdminListUserSubscriptionsPage returns paginated user subscriptions with username/plan title.
+func AdminListUserSubscriptionsPage(q AdminUserSubscriptionQuery, startIdx int, pageSize int) ([]AdminUserSubscriptionItem, int64, error) {
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	if startIdx < 0 {
+		startIdx = 0
+	}
+	now := GetDBTimestamp()
+	query := DB.Model(&UserSubscription{})
+
+	if q.PlanId > 0 {
+		query = query.Where("plan_id = ?", q.PlanId)
+	}
+	if q.UserId > 0 {
+		query = query.Where("user_id = ?", q.UserId)
+	}
+	if source := strings.TrimSpace(q.Source); source != "" {
+		query = query.Where("source = ?", source)
+	}
+
+	switch strings.TrimSpace(strings.ToLower(q.Status)) {
+	case "active":
+		// Live instances: status active and not past end_time.
+		query = query.Where("status = ? AND (end_time = 0 OR end_time > ?)", "active", now)
+	case "expired":
+		query = query.Where("(status = ?) OR (status = ? AND end_time > 0 AND end_time <= ?)",
+			"expired", "active", now)
+	case "cancelled":
+		query = query.Where("status = ?", "cancelled")
+	}
+
+	keyword := strings.TrimSpace(q.Keyword)
+	if keyword != "" {
+		if id, err := strconv.Atoi(keyword); err == nil && id > 0 {
+			query = query.Where(
+				"id = ? OR user_id = ? OR plan_id = ?",
+				id, id, id,
+			)
+		} else {
+			like := "%" + keyword + "%"
+			userSub := DB.Model(&User{}).Select("id").Where("username LIKE ?", like)
+			planSub := DB.Model(&SubscriptionPlan{}).Select("id").Where("title LIKE ?", like)
+			query = query.Where("user_id IN (?) OR plan_id IN (?)", userSub, planSub)
+		}
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var subs []UserSubscription
+	if err := query.Order("id desc").
+		Offset(startIdx).
+		Limit(pageSize).
+		Find(&subs).Error; err != nil {
+		return nil, 0, err
+	}
+	if len(subs) == 0 {
+		return []AdminUserSubscriptionItem{}, total, nil
+	}
+
+	userIds := make([]int, 0, len(subs))
+	planIds := make([]int, 0, len(subs))
+	userSeen := make(map[int]struct{}, len(subs))
+	planSeen := make(map[int]struct{}, len(subs))
+	for _, sub := range subs {
+		if _, ok := userSeen[sub.UserId]; !ok && sub.UserId > 0 {
+			userSeen[sub.UserId] = struct{}{}
+			userIds = append(userIds, sub.UserId)
+		}
+		if _, ok := planSeen[sub.PlanId]; !ok && sub.PlanId > 0 {
+			planSeen[sub.PlanId] = struct{}{}
+			planIds = append(planIds, sub.PlanId)
+		}
+	}
+
+	usernameById := make(map[int]string, len(userIds))
+	if len(userIds) > 0 {
+		var users []User
+		if err := DB.Select("id, username").Where("id IN ?", userIds).Find(&users).Error; err != nil {
+			return nil, 0, err
+		}
+		for _, u := range users {
+			usernameById[u.Id] = u.Username
+		}
+	}
+
+	planTitleById := make(map[int]string, len(planIds))
+	if len(planIds) > 0 {
+		var plans []SubscriptionPlan
+		if err := DB.Select("id, title").Where("id IN ?", planIds).Find(&plans).Error; err != nil {
+			return nil, 0, err
+		}
+		for _, p := range plans {
+			planTitleById[p.Id] = p.Title
+		}
+	}
+
+	items := make([]AdminUserSubscriptionItem, 0, len(subs))
+	for _, sub := range subs {
+		items = append(items, AdminUserSubscriptionItem{
+			Subscription: sub,
+			Username:     usernameById[sub.UserId],
+			PlanTitle:    planTitleById[sub.PlanId],
+		})
+	}
+	return items, total, nil
+}
+
 func buildSubscriptionSummaries(subs []UserSubscription) []SubscriptionSummary {
 	if len(subs) == 0 {
 		return []SubscriptionSummary{}

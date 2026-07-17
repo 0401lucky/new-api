@@ -238,7 +238,14 @@ const renderPaymentConfig = (text, record, t, enableEpay) => {
 const renderOperations = (
   text,
   record,
-  { openEdit, setPlanEnabled, grantPlanToAll, t, complianceConfirmed },
+  {
+    openEdit,
+    setPlanEnabled,
+    grantPlanToAll,
+    openPlanSubscribers,
+    t,
+    complianceConfirmed,
+  },
 ) => {
   const isEnabled = record?.plan?.enabled;
   const planTitle = record?.plan?.title || `#${record?.plan?.id || ''}`;
@@ -286,6 +293,14 @@ const renderOperations = (
       </Button>
       <Button
         theme='light'
+        type='tertiary'
+        size='small'
+        onClick={() => openPlanSubscribers?.(record)}
+      >
+        {t('查看订阅者')}
+      </Button>
+      <Button
+        theme='light'
         type='secondary'
         size='small'
         onClick={handleGrantAll}
@@ -323,6 +338,7 @@ export const getSubscriptionsColumns = ({
   openEdit,
   setPlanEnabled,
   grantPlanToAll,
+  openPlanSubscribers,
   enableEpay,
   complianceConfirmed = true,
 }) => {
@@ -392,12 +408,13 @@ export const getSubscriptionsColumns = ({
       title: t('操作'),
       dataIndex: 'operate',
       fixed: 'right',
-      width: 280,
+      width: 340,
       render: (text, record) =>
         renderOperations(text, record, {
           openEdit,
           setPlanEnabled,
           grantPlanToAll,
+          openPlanSubscribers,
           t,
           complianceConfirmed,
         }),

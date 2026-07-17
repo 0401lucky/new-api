@@ -28,6 +28,7 @@ func TestSetApiRouterRegisters(t *testing.T) {
 		http.MethodPost + " /api/subscription/admin/users/:id/subscriptions/reset",
 		http.MethodPost + " /api/subscription/admin/plans/:id/subscriptions/reset",
 		http.MethodPost + " /api/subscription/admin/plans/:id/grant-all",
+		http.MethodGet + " /api/subscription/admin/user_subscriptions",
 		http.MethodGet + " /api/system-info/instances",
 		http.MethodGet + " /api/system-task/list",
 	}

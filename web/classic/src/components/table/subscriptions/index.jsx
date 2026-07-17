@@ -18,12 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useContext, useEffect, useState } from 'react';
-import { Banner } from '@douyinfe/semi-ui';
+import { Banner, Tabs, TabPane } from '@douyinfe/semi-ui';
 import CardPro from '../../common/ui/CardPro';
 import SubscriptionsTable from './SubscriptionsTable';
 import SubscriptionsActions from './SubscriptionsActions';
 import SubscriptionsDescription from './SubscriptionsDescription';
+import UserSubscriptionsPanel from './UserSubscriptionsPanel';
 import AddEditSubscriptionModal from './modals/AddEditSubscriptionModal';
+import PlanSubscribersModal from './modals/PlanSubscribersModal';
 import { useSubscriptionsData } from '../../../hooks/subscriptions/useSubscriptionsData';
 import { useIsMobile } from '../../../hooks/common/useIsMobile';
 import { createCardProPagination } from '../../../helpers/utils';
@@ -36,6 +38,8 @@ const SubscriptionsPage = () => {
   const [statusState] = useContext(StatusContext);
   const enableEpay = !!statusState?.status?.enable_online_topup;
   const [complianceConfirmed, setComplianceConfirmed] = useState(true);
+  const [activeTab, setActiveTab] = useState('plans');
+  const [subscribersPlan, setSubscribersPlan] = useState(null);
 
   const {
     showEdit,
@@ -47,7 +51,12 @@ const SubscriptionsPage = () => {
     compactMode,
     setCompactMode,
     t,
+    allPlans,
   } = subscriptionsData;
+
+  const openPlanSubscribers = (planRecord) => {
+    setSubscribersPlan(planRecord);
+  };
 
   useEffect(() => {
     const loadComplianceStatus = async () => {
@@ -75,45 +84,57 @@ const SubscriptionsPage = () => {
         refresh={refresh}
         t={t}
       />
+      <PlanSubscribersModal
+        visible={!!subscribersPlan}
+        plan={subscribersPlan}
+        onClose={() => setSubscribersPlan(null)}
+        t={t}
+      />
 
       <CardPro
         type='type1'
         descriptionArea={
-          <SubscriptionsDescription
-            compactMode={compactMode}
-            setCompactMode={setCompactMode}
-            t={t}
-          />
+          activeTab === 'plans' ? (
+            <SubscriptionsDescription
+              compactMode={compactMode}
+              setCompactMode={setCompactMode}
+              t={t}
+            />
+          ) : null
         }
         actionsArea={
           <div className='flex flex-col md:flex-row justify-between items-start md:items-center gap-2 w-full'>
-            {/* Mobile: actions first; Desktop: actions left */}
             <div className='order-1 md:order-0 w-full md:w-auto'>
-              <SubscriptionsActions
-                openCreate={openCreate}
-                t={t}
-                disabled={!complianceConfirmed}
-              />
+              {activeTab === 'plans' ? (
+                <SubscriptionsActions
+                  openCreate={openCreate}
+                  t={t}
+                  disabled={!complianceConfirmed}
+                />
+              ) : null}
             </div>
             <Banner
               type='info'
               description={t('Stripe/Creem 需在第三方平台创建商品并填入 ID')}
               closeIcon={null}
-              // Mobile: banner below; Desktop: banner right
               className='!rounded-lg order-2 md:order-1'
               style={{ maxWidth: '100%' }}
             />
           </div>
         }
-        paginationArea={createCardProPagination({
-          currentPage: subscriptionsData.activePage,
-          pageSize: subscriptionsData.pageSize,
-          total: subscriptionsData.planCount,
-          onPageChange: subscriptionsData.handlePageChange,
-          onPageSizeChange: subscriptionsData.handlePageSizeChange,
-          isMobile,
-          t: subscriptionsData.t,
-        })}
+        paginationArea={
+          activeTab === 'plans'
+            ? createCardProPagination({
+                currentPage: subscriptionsData.activePage,
+                pageSize: subscriptionsData.pageSize,
+                total: subscriptionsData.planCount,
+                onPageChange: subscriptionsData.handlePageChange,
+                onPageSizeChange: subscriptionsData.handlePageSizeChange,
+                isMobile,
+                t: subscriptionsData.t,
+              })
+            : null
+        }
         t={t}
       >
         {!complianceConfirmed && (
@@ -126,11 +147,25 @@ const SubscriptionsPage = () => {
             className='!rounded-lg mb-3'
           />
         )}
-        <SubscriptionsTable
-          {...subscriptionsData}
-          enableEpay={enableEpay}
-          complianceConfirmed={complianceConfirmed}
-        />
+        <Tabs
+          type='line'
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          className='mb-2'
+        >
+          <TabPane tab={t('套餐')} itemKey='plans' />
+          <TabPane tab={t('用户订阅')} itemKey='instances' />
+        </Tabs>
+        {activeTab === 'plans' ? (
+          <SubscriptionsTable
+            {...subscriptionsData}
+            openPlanSubscribers={openPlanSubscribers}
+            enableEpay={enableEpay}
+            complianceConfirmed={complianceConfirmed}
+          />
+        ) : (
+          <UserSubscriptionsPanel plans={allPlans || []} t={t} />
+        )}
       </CardPro>
     </>
   );
