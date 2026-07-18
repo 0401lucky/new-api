@@ -10,16 +10,13 @@ import (
 	"github.com/QuantumNous/new-api/setting"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestShouldBypassModelRequestRateLimitForAdminRole(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	c, _ := gin.CreateTestContext(httptest.NewRecorder())
-	c.Set("role", common.RoleAdminUser)
-
-	if !shouldBypassModelRequestRateLimit(c, 123) {
-		t.Fatal("admin role should bypass model request rate limit")
-	}
+func TestShouldBypassModelRequestRateLimitAdminRoleNoLongerBypasses(t *testing.T) {
+	// 管理员角色不再自动绕过，仅豁免用户 ID 可绕过
+	assert.False(t, shouldBypassModelRequestRateLimit(123))
 }
 
 func TestShouldBypassModelRequestRateLimitForExemptUser(t *testing.T) {
@@ -30,23 +27,16 @@ func TestShouldBypassModelRequestRateLimitForExemptUser(t *testing.T) {
 		setting.ModelRequestRateLimitExemptUserIDs = oldIDs
 	})
 
-	if err := setting.UpdateModelRequestRateLimitExemptUserIDs("123"); err != nil {
-		t.Fatalf("UpdateModelRequestRateLimitExemptUserIDs error: %v", err)
-	}
-
-	c, _ := gin.CreateTestContext(httptest.NewRecorder())
-	if !shouldBypassModelRequestRateLimit(c, 123) {
-		t.Fatal("configured exempt user should bypass model request rate limit")
-	}
+	require.NoError(t, setting.UpdateModelRequestRateLimitExemptUserIDs("123"))
+	assert.True(t, shouldBypassModelRequestRateLimit(123))
+	assert.False(t, shouldBypassModelRequestRateLimit(456))
 }
 
 func TestMemoryConcurrencyLimiterAcquireRelease(t *testing.T) {
 	limiter := newMemoryConcurrencyLimiter()
 
 	release, allowed := limiter.Acquire("user:1", 1)
-	if !allowed {
-		t.Fatal("first acquire should be allowed")
-	}
+	require.True(t, allowed)
 
 	secondRelease, allowed := limiter.Acquire("user:1", 1)
 	if allowed {
@@ -59,9 +49,7 @@ func TestMemoryConcurrencyLimiterAcquireRelease(t *testing.T) {
 	release()
 
 	thirdRelease, allowed := limiter.Acquire("user:1", 1)
-	if !allowed {
-		t.Fatal("third acquire should be allowed after release")
-	}
+	require.True(t, allowed)
 	thirdRelease()
 }
 
@@ -70,27 +58,25 @@ func TestMemoryConcurrencyLimiterUnlimited(t *testing.T) {
 
 	for i := 0; i < 3; i++ {
 		release, allowed := limiter.Acquire("user:1", 0)
-		if !allowed {
-			t.Fatal("limit 0 should be unlimited")
-		}
+		require.True(t, allowed)
 		release()
 	}
 }
 
-func TestModelRequestRateLimitRejectsConcurrentRequest(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	oldRedisEnabled := common.RedisEnabled
-	oldRateLimiter := inMemoryRateLimiter
-	oldConcurrencyLimiter := inMemoryConcurrencyLimiter
-	oldEnabled := setting.ModelRequestRateLimitEnabled
-	oldDuration := setting.ModelRequestRateLimitDurationMinutes
-	oldTotalCount := setting.ModelRequestRateLimitCount
-	oldSuccessCount := setting.ModelRequestRateLimitSuccessCount
-	oldConcurrencyCount := setting.ModelRequestRateLimitConcurrencyCount
-	oldGroup := setting.ModelRequestRateLimitGroup
-	oldExemptIDs := setting.ModelRequestRateLimitExemptUserIDs
-
+func restoreModelRateLimitSettings(
+	t *testing.T,
+	oldRedisEnabled bool,
+	oldRateLimiter common.InMemoryRateLimiter,
+	oldConcurrencyLimiter *memoryConcurrencyLimiter,
+	oldEnabled bool,
+	oldDuration int,
+	oldTotalCount int,
+	oldSuccessCount int,
+	oldConcurrencyCount int,
+	oldGroup map[string][3]int,
+	oldExemptIDs map[int]struct{},
+) {
+	t.Helper()
 	t.Cleanup(func() {
 		common.RedisEnabled = oldRedisEnabled
 		inMemoryRateLimiter = oldRateLimiter
@@ -105,6 +91,24 @@ func TestModelRequestRateLimitRejectsConcurrentRequest(t *testing.T) {
 		setting.ModelRequestRateLimitGroup = oldGroup
 		setting.ModelRequestRateLimitExemptUserIDs = oldExemptIDs
 	})
+}
+
+func TestModelRequestRateLimitRejectsConcurrentRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	restoreModelRateLimitSettings(
+		t,
+		common.RedisEnabled,
+		inMemoryRateLimiter,
+		inMemoryConcurrencyLimiter,
+		setting.ModelRequestRateLimitEnabled,
+		setting.ModelRequestRateLimitDurationMinutes,
+		setting.ModelRequestRateLimitCount,
+		setting.ModelRequestRateLimitSuccessCount,
+		setting.ModelRequestRateLimitConcurrencyCount,
+		setting.ModelRequestRateLimitGroup,
+		setting.ModelRequestRateLimitExemptUserIDs,
+	)
 
 	common.RedisEnabled = false
 	inMemoryRateLimiter = common.InMemoryRateLimiter{}
@@ -147,9 +151,7 @@ func TestModelRequestRateLimitRejectsConcurrentRequest(t *testing.T) {
 
 	secondRecorder := httptest.NewRecorder()
 	router.ServeHTTP(secondRecorder, httptest.NewRequest(http.MethodGet, "/", nil))
-	if secondRecorder.Code != http.StatusTooManyRequests {
-		t.Fatalf("expected concurrent request status 429, got %d", secondRecorder.Code)
-	}
+	assert.Equal(t, http.StatusTooManyRequests, secondRecorder.Code)
 
 	close(releaseFirst)
 	select {
@@ -157,13 +159,202 @@ func TestModelRequestRateLimitRejectsConcurrentRequest(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("first request did not finish")
 	}
-	if firstRecorder.Code != http.StatusOK {
-		t.Fatalf("expected first request status 200, got %d", firstRecorder.Code)
-	}
+	assert.Equal(t, http.StatusOK, firstRecorder.Code)
 
 	thirdRecorder := httptest.NewRecorder()
 	router.ServeHTTP(thirdRecorder, httptest.NewRequest(http.MethodGet, "/", nil))
-	if thirdRecorder.Code != http.StatusOK {
-		t.Fatalf("expected request after release status 200, got %d", thirdRecorder.Code)
+	assert.Equal(t, http.StatusOK, thirdRecorder.Code)
+}
+
+func TestModelRequestRateLimitAdminNoLongerBypasses(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	restoreModelRateLimitSettings(
+		t,
+		common.RedisEnabled,
+		inMemoryRateLimiter,
+		inMemoryConcurrencyLimiter,
+		setting.ModelRequestRateLimitEnabled,
+		setting.ModelRequestRateLimitDurationMinutes,
+		setting.ModelRequestRateLimitCount,
+		setting.ModelRequestRateLimitSuccessCount,
+		setting.ModelRequestRateLimitConcurrencyCount,
+		setting.ModelRequestRateLimitGroup,
+		setting.ModelRequestRateLimitExemptUserIDs,
+	)
+
+	common.RedisEnabled = false
+	inMemoryRateLimiter = common.InMemoryRateLimiter{}
+	inMemoryConcurrencyLimiter = newMemoryConcurrencyLimiter()
+	setting.ModelRequestRateLimitMutex.Lock()
+	setting.ModelRequestRateLimitEnabled = true
+	setting.ModelRequestRateLimitDurationMinutes = 1
+	setting.ModelRequestRateLimitCount = 0
+	setting.ModelRequestRateLimitSuccessCount = 1000
+	setting.ModelRequestRateLimitConcurrencyCount = 1
+	setting.ModelRequestRateLimitGroup = map[string][3]int{}
+	setting.ModelRequestRateLimitExemptUserIDs = map[int]struct{}{}
+	setting.ModelRequestRateLimitMutex.Unlock()
+
+	entered := make(chan struct{}, 1)
+	hold := make(chan struct{})
+	done := make(chan struct{}, 1)
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("id", 1)
+		c.Set("role", common.RoleAdminUser)
+	})
+	router.Use(ModelRequestRateLimit())
+	router.GET("/", func(c *gin.Context) {
+		entered <- struct{}{}
+		<-hold
+		c.Status(http.StatusOK)
+		done <- struct{}{}
+	})
+
+	first := httptest.NewRecorder()
+	go router.ServeHTTP(first, httptest.NewRequest(http.MethodGet, "/", nil))
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("admin first request should still be rate limited (enter handler)")
 	}
+
+	second := httptest.NewRecorder()
+	router.ServeHTTP(second, httptest.NewRequest(http.MethodGet, "/", nil))
+	assert.Equal(t, http.StatusTooManyRequests, second.Code, "admin should no longer bypass concurrency limit")
+
+	close(hold)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("first request did not finish")
+	}
+}
+
+func TestTokenRateLimitAppliesWhenGlobalDisabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	restoreModelRateLimitSettings(
+		t,
+		common.RedisEnabled,
+		inMemoryRateLimiter,
+		inMemoryConcurrencyLimiter,
+		setting.ModelRequestRateLimitEnabled,
+		setting.ModelRequestRateLimitDurationMinutes,
+		setting.ModelRequestRateLimitCount,
+		setting.ModelRequestRateLimitSuccessCount,
+		setting.ModelRequestRateLimitConcurrencyCount,
+		setting.ModelRequestRateLimitGroup,
+		setting.ModelRequestRateLimitExemptUserIDs,
+	)
+
+	common.RedisEnabled = false
+	inMemoryRateLimiter = common.InMemoryRateLimiter{}
+	inMemoryConcurrencyLimiter = newMemoryConcurrencyLimiter()
+	setting.ModelRequestRateLimitMutex.Lock()
+	setting.ModelRequestRateLimitEnabled = false // 全局关闭
+	setting.ModelRequestRateLimitDurationMinutes = 1
+	setting.ModelRequestRateLimitCount = 0
+	setting.ModelRequestRateLimitSuccessCount = 1000
+	setting.ModelRequestRateLimitConcurrencyCount = 0
+	setting.ModelRequestRateLimitGroup = map[string][3]int{}
+	setting.ModelRequestRateLimitExemptUserIDs = map[int]struct{}{}
+	setting.ModelRequestRateLimitMutex.Unlock()
+
+	entered := make(chan struct{}, 1)
+	hold := make(chan struct{})
+	done := make(chan struct{}, 1)
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("id", 99)
+		c.Set("role", common.RoleAdminUser)
+		c.Set("token_id", 7)
+		c.Set("token_rate_limit_enabled", true)
+		c.Set("token_rate_limit_total", 0)
+		c.Set("token_rate_limit_success", 100)
+		c.Set("token_rate_limit_concurrency", 1)
+	})
+	router.Use(ModelRequestRateLimit())
+	router.GET("/", func(c *gin.Context) {
+		entered <- struct{}{}
+		<-hold
+		c.Status(http.StatusOK)
+		done <- struct{}{}
+	})
+
+	first := httptest.NewRecorder()
+	go router.ServeHTTP(first, httptest.NewRequest(http.MethodGet, "/", nil))
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("token-limited first request did not enter")
+	}
+
+	second := httptest.NewRecorder()
+	router.ServeHTTP(second, httptest.NewRequest(http.MethodGet, "/", nil))
+	assert.Equal(t, http.StatusTooManyRequests, second.Code, "token concurrency should apply when global is off")
+
+	close(hold)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("first request did not finish")
+	}
+	assert.Equal(t, http.StatusOK, first.Code)
+}
+
+func TestTokenRateLimitSuccessCount(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	restoreModelRateLimitSettings(
+		t,
+		common.RedisEnabled,
+		inMemoryRateLimiter,
+		inMemoryConcurrencyLimiter,
+		setting.ModelRequestRateLimitEnabled,
+		setting.ModelRequestRateLimitDurationMinutes,
+		setting.ModelRequestRateLimitCount,
+		setting.ModelRequestRateLimitSuccessCount,
+		setting.ModelRequestRateLimitConcurrencyCount,
+		setting.ModelRequestRateLimitGroup,
+		setting.ModelRequestRateLimitExemptUserIDs,
+	)
+
+	common.RedisEnabled = false
+	inMemoryRateLimiter = common.InMemoryRateLimiter{}
+	inMemoryConcurrencyLimiter = newMemoryConcurrencyLimiter()
+	setting.ModelRequestRateLimitMutex.Lock()
+	setting.ModelRequestRateLimitEnabled = false
+	setting.ModelRequestRateLimitDurationMinutes = 1
+	setting.ModelRequestRateLimitCount = 0
+	setting.ModelRequestRateLimitSuccessCount = 1000
+	setting.ModelRequestRateLimitConcurrencyCount = 0
+	setting.ModelRequestRateLimitGroup = map[string][3]int{}
+	setting.ModelRequestRateLimitExemptUserIDs = map[int]struct{}{}
+	setting.ModelRequestRateLimitMutex.Unlock()
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("id", 50)
+		c.Set("token_id", 8)
+		c.Set("token_rate_limit_enabled", true)
+		c.Set("token_rate_limit_total", 0)
+		c.Set("token_rate_limit_success", 1)
+		c.Set("token_rate_limit_concurrency", 0)
+	})
+	router.Use(ModelRequestRateLimit())
+	router.GET("/", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	first := httptest.NewRecorder()
+	router.ServeHTTP(first, httptest.NewRequest(http.MethodGet, "/", nil))
+	assert.Equal(t, http.StatusOK, first.Code)
+
+	second := httptest.NewRecorder()
+	router.ServeHTTP(second, httptest.NewRequest(http.MethodGet, "/", nil))
+	assert.Equal(t, http.StatusTooManyRequests, second.Code)
 }

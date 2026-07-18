@@ -201,11 +201,11 @@ func acquireRedisConcurrencySlot(ctx context.Context, rdb *redis.Client, key str
 	return release, true, nil
 }
 
-func acquireConcurrencySlot(userId string, maxCount int) (concurrencyReleaseFunc, bool, error) {
+func acquireConcurrencySlot(identity string, maxCount int) (concurrencyReleaseFunc, bool, error) {
 	if maxCount <= 0 {
 		return func() {}, true, nil
 	}
-	key := fmt.Sprintf("rateLimit:%s:%s", ModelRequestRateLimitConcurrencyMark, userId)
+	key := fmt.Sprintf("rateLimit:%s:%s", ModelRequestRateLimitConcurrencyMark, identity)
 	if common.RedisEnabled {
 		return acquireRedisConcurrencySlot(context.Background(), common.RDB, key, maxCount)
 	}
@@ -213,149 +213,187 @@ func acquireConcurrencySlot(userId string, maxCount int) (concurrencyReleaseFunc
 	return release, allowed, nil
 }
 
-// Redis限流处理器
-func redisRateLimitHandler(duration int64, totalMaxCount, successMaxCount, concurrencyMaxCount int) gin.HandlerFunc {
+type rateLimitLayer struct {
+	identity            string
+	totalMaxCount       int
+	successMaxCount     int
+	concurrencyMaxCount int
+}
+
+func (l rateLimitLayer) successRedisKey() string {
+	return fmt.Sprintf("rateLimit:%s:%s", ModelRequestRateLimitSuccessCountMark, l.identity)
+}
+
+func (l rateLimitLayer) totalRedisKey() string {
+	return fmt.Sprintf("rateLimit:%s", l.identity)
+}
+
+func (l rateLimitLayer) successMemoryKey() string {
+	return ModelRequestRateLimitSuccessCountMark + l.identity
+}
+
+func (l rateLimitLayer) totalMemoryKey() string {
+	return ModelRequestRateLimitCountMark + l.identity
+}
+
+// Redis限流：对多层 identity 依次检查，全部通过后执行请求并记录成功
+func redisRateLimitHandler(duration int64, layers []rateLimitLayer) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userId := strconv.Itoa(c.GetInt("id"))
 		ctx := context.Background()
 		rdb := common.RDB
+		releases := make([]concurrencyReleaseFunc, 0, len(layers))
+		defer func() {
+			for i := len(releases) - 1; i >= 0; i-- {
+				releases[i]()
+			}
+		}()
 
-		// 1. 检查成功请求数限制
-		successKey := fmt.Sprintf("rateLimit:%s:%s", ModelRequestRateLimitSuccessCountMark, userId)
-		allowed, err := checkRedisRateLimit(ctx, rdb, successKey, successMaxCount, duration)
-		if err != nil {
-			fmt.Println("检查成功请求数限制失败:", err.Error())
-			abortWithOpenAiMessage(c, http.StatusInternalServerError, "rate_limit_check_failed")
-			return
-		}
-		if !allowed {
-			abortWithOpenAiMessage(c, http.StatusTooManyRequests, fmt.Sprintf("您已达到请求数限制：%d分钟内最多请求%d次", setting.ModelRequestRateLimitDurationMinutes, successMaxCount))
-			return
-		}
-
-		//2.检查总请求数限制并记录总请求（当totalMaxCount为0时会自动跳过，使用令牌桶限流器
-		if totalMaxCount > 0 {
-			totalKey := fmt.Sprintf("rateLimit:%s", userId)
-			// 初始化
-			tb := limiter.New(ctx, rdb)
-			allowed, err = tb.Allow(
-				ctx,
-				totalKey,
-				limiter.WithCapacity(int64(totalMaxCount)*duration),
-				limiter.WithRate(int64(totalMaxCount)),
-				limiter.WithRequested(duration),
-			)
-
+		for _, layer := range layers {
+			successKey := layer.successRedisKey()
+			allowed, err := checkRedisRateLimit(ctx, rdb, successKey, layer.successMaxCount, duration)
 			if err != nil {
-				fmt.Println("检查总请求数限制失败:", err.Error())
+				fmt.Println("检查成功请求数限制失败:", err.Error())
 				abortWithOpenAiMessage(c, http.StatusInternalServerError, "rate_limit_check_failed")
 				return
 			}
-
 			if !allowed {
-				abortWithOpenAiMessage(c, http.StatusTooManyRequests, fmt.Sprintf("您已达到总请求数限制：%d分钟内最多请求%d次，包括失败次数，请检查您的请求是否正确", setting.ModelRequestRateLimitDurationMinutes, totalMaxCount))
+				abortWithOpenAiMessage(c, http.StatusTooManyRequests, fmt.Sprintf("您已达到请求数限制：%d分钟内最多请求%d次", setting.ModelRequestRateLimitDurationMinutes, layer.successMaxCount))
 				return
 			}
+
+			if layer.totalMaxCount > 0 {
+				totalKey := layer.totalRedisKey()
+				tb := limiter.New(ctx, rdb)
+				allowed, err = tb.Allow(
+					ctx,
+					totalKey,
+					limiter.WithCapacity(int64(layer.totalMaxCount)*duration),
+					limiter.WithRate(int64(layer.totalMaxCount)),
+					limiter.WithRequested(duration),
+				)
+				if err != nil {
+					fmt.Println("检查总请求数限制失败:", err.Error())
+					abortWithOpenAiMessage(c, http.StatusInternalServerError, "rate_limit_check_failed")
+					return
+				}
+				if !allowed {
+					abortWithOpenAiMessage(c, http.StatusTooManyRequests, fmt.Sprintf("您已达到总请求数限制：%d分钟内最多请求%d次，包括失败次数，请检查您的请求是否正确", setting.ModelRequestRateLimitDurationMinutes, layer.totalMaxCount))
+					return
+				}
+			}
+
+			release, allowed, err := acquireConcurrencySlot(layer.identity, layer.concurrencyMaxCount)
+			if err != nil {
+				fmt.Println("检查并发请求数限制失败:", err.Error())
+				abortWithOpenAiMessage(c, http.StatusInternalServerError, "rate_limit_check_failed")
+				return
+			}
+			if !allowed {
+				abortWithOpenAiMessage(c, http.StatusTooManyRequests, fmt.Sprintf("您已达到并发请求数限制：最多同时处理%d个请求", layer.concurrencyMaxCount))
+				return
+			}
+			releases = append(releases, release)
 		}
 
-		release, allowed, err := acquireConcurrencySlot(userId, concurrencyMaxCount)
-		if err != nil {
-			fmt.Println("检查并发请求数限制失败:", err.Error())
-			abortWithOpenAiMessage(c, http.StatusInternalServerError, "rate_limit_check_failed")
-			return
-		}
-		if !allowed {
-			abortWithOpenAiMessage(c, http.StatusTooManyRequests, fmt.Sprintf("您已达到并发请求数限制：最多同时处理%d个请求", concurrencyMaxCount))
-			return
-		}
-		defer release()
-
-		// 4. 处理请求
 		c.Next()
 
-		// 5. 如果请求成功，记录成功请求
 		if c.Writer.Status() < 400 {
-			recordRedisRequest(ctx, rdb, successKey, successMaxCount)
+			for _, layer := range layers {
+				recordRedisRequest(ctx, rdb, layer.successRedisKey(), layer.successMaxCount)
+			}
 		}
 	}
 }
 
-// 内存限流处理器
-func memoryRateLimitHandler(duration int64, totalMaxCount, successMaxCount, concurrencyMaxCount int) gin.HandlerFunc {
+// 内存限流：对多层 identity 依次检查
+func memoryRateLimitHandler(duration int64, layers []rateLimitLayer) gin.HandlerFunc {
 	inMemoryRateLimiter.Init(time.Duration(setting.ModelRequestRateLimitDurationMinutes) * time.Minute)
 
 	return func(c *gin.Context) {
-		userId := strconv.Itoa(c.GetInt("id"))
-		totalKey := ModelRequestRateLimitCountMark + userId
-		successKey := ModelRequestRateLimitSuccessCountMark + userId
+		releases := make([]concurrencyReleaseFunc, 0, len(layers))
+		defer func() {
+			for i := len(releases) - 1; i >= 0; i-- {
+				releases[i]()
+			}
+		}()
 
-		// 1. 检查总请求数限制（当totalMaxCount为0时跳过）
-		if totalMaxCount > 0 && !inMemoryRateLimiter.Request(totalKey, totalMaxCount, duration) {
-			c.Status(http.StatusTooManyRequests)
-			c.Abort()
-			return
+		for _, layer := range layers {
+			if layer.totalMaxCount > 0 && !inMemoryRateLimiter.Request(layer.totalMemoryKey(), layer.totalMaxCount, duration) {
+				c.Status(http.StatusTooManyRequests)
+				c.Abort()
+				return
+			}
+
+			// 使用临时 key 检查成功请求限制，避免实际记录
+			checkKey := layer.successMemoryKey() + "_check"
+			if layer.successMaxCount > 0 && !inMemoryRateLimiter.Request(checkKey, layer.successMaxCount, duration) {
+				c.Status(http.StatusTooManyRequests)
+				c.Abort()
+				return
+			}
+
+			release, allowed, err := acquireConcurrencySlot(layer.identity, layer.concurrencyMaxCount)
+			if err != nil {
+				abortWithOpenAiMessage(c, http.StatusInternalServerError, "rate_limit_check_failed")
+				return
+			}
+			if !allowed {
+				c.Status(http.StatusTooManyRequests)
+				c.Abort()
+				return
+			}
+			releases = append(releases, release)
 		}
 
-		// 2. 检查成功请求数限制
-		// 使用一个临时key来检查限制，这样可以避免实际记录
-		checkKey := successKey + "_check"
-		if !inMemoryRateLimiter.Request(checkKey, successMaxCount, duration) {
-			c.Status(http.StatusTooManyRequests)
-			c.Abort()
-			return
-		}
-
-		release, allowed, err := acquireConcurrencySlot(userId, concurrencyMaxCount)
-		if err != nil {
-			abortWithOpenAiMessage(c, http.StatusInternalServerError, "rate_limit_check_failed")
-			return
-		}
-		if !allowed {
-			c.Status(http.StatusTooManyRequests)
-			c.Abort()
-			return
-		}
-		defer release()
-
-		// 3. 处理请求
 		c.Next()
 
-		// 4. 如果请求成功，记录到实际的成功请求计数中
 		if c.Writer.Status() < 400 {
-			inMemoryRateLimiter.Request(successKey, successMaxCount, duration)
+			for _, layer := range layers {
+				if layer.successMaxCount > 0 {
+					inMemoryRateLimiter.Request(layer.successMemoryKey(), layer.successMaxCount, duration)
+				}
+			}
 		}
 	}
 }
 
 // ModelRequestRateLimit 模型请求限流中间件
+// 支持用户级（全局/分组）与 Token 级双层限流，取更严（两层都检查）。
 func ModelRequestRateLimit() func(c *gin.Context) {
 	return func(c *gin.Context) {
-		// 在每个请求时检查是否启用限流
-		if !setting.ModelRequestRateLimitEnabled {
+		tokenRateLimitEnabled := c.GetBool("token_rate_limit_enabled")
+		globalEnabled := setting.ModelRequestRateLimitEnabled
+
+		if !globalEnabled && !tokenRateLimitEnabled {
 			c.Next()
 			return
 		}
 
 		userID := c.GetInt("id")
-		if shouldBypassModelRequestRateLimit(c, userID) {
+		bypassUser := shouldBypassModelRequestRateLimit(userID)
+
+		// 用户级可绕过，且 Token 未启用自定义限流时，整段放行
+		if bypassUser && !tokenRateLimitEnabled {
 			c.Header("X-RateLimit-Bypass", "ModelRequestRateLimit")
 			c.Next()
 			return
 		}
 
-		// 计算限流参数
-		duration := int64(setting.ModelRequestRateLimitDurationMinutes * 60)
+		durationMinutes := setting.ModelRequestRateLimitDurationMinutes
+		if durationMinutes <= 0 {
+			durationMinutes = 1
+		}
+		duration := int64(durationMinutes * 60)
+
+		// 用户/分组默认参数
 		totalMaxCount := setting.ModelRequestRateLimitCount
 		successMaxCount := setting.ModelRequestRateLimitSuccessCount
 		concurrencyMaxCount := setting.ModelRequestRateLimitConcurrencyCount
 
-		// 获取分组
 		group := common.GetContextKeyString(c, constant.ContextKeyTokenGroup)
 		if group == "" {
 			group = common.GetContextKeyString(c, constant.ContextKeyUserGroup)
 		}
-
-		//获取分组的限流配置
 		groupTotalCount, groupSuccessCount, groupConcurrencyCount, found := setting.GetGroupRateLimit(group)
 		if found {
 			totalMaxCount = groupTotalCount
@@ -363,18 +401,54 @@ func ModelRequestRateLimit() func(c *gin.Context) {
 			concurrencyMaxCount = groupConcurrencyCount
 		}
 
-		// 根据存储类型选择并执行限流处理器
+		layers := make([]rateLimitLayer, 0, 2)
+
+		// Token 层：按 token_id 独立计数
+		if tokenRateLimitEnabled {
+			tokenID := c.GetInt("token_id")
+			tokenTotal := c.GetInt("token_rate_limit_total")
+			tokenSuccess := c.GetInt("token_rate_limit_success")
+			tokenConcurrency := c.GetInt("token_rate_limit_concurrency")
+			// success=0 时回退到全局/分组成功请求上限，避免「启用了却无限」
+			if tokenSuccess <= 0 {
+				tokenSuccess = successMaxCount
+				if tokenSuccess <= 0 {
+					tokenSuccess = 1000
+				}
+			}
+			layers = append(layers, rateLimitLayer{
+				identity:            fmt.Sprintf("t:%d", tokenID),
+				totalMaxCount:       tokenTotal,
+				successMaxCount:     tokenSuccess,
+				concurrencyMaxCount: tokenConcurrency,
+			})
+		}
+
+		// 用户层：全局限流开启且用户未豁免时生效
+		if globalEnabled && !bypassUser {
+			layers = append(layers, rateLimitLayer{
+				identity:            strconv.Itoa(userID),
+				totalMaxCount:       totalMaxCount,
+				successMaxCount:     successMaxCount,
+				concurrencyMaxCount: concurrencyMaxCount,
+			})
+		}
+
+		if len(layers) == 0 {
+			c.Next()
+			return
+		}
+
 		if common.RedisEnabled {
-			redisRateLimitHandler(duration, totalMaxCount, successMaxCount, concurrencyMaxCount)(c)
+			redisRateLimitHandler(duration, layers)(c)
 		} else {
-			memoryRateLimitHandler(duration, totalMaxCount, successMaxCount, concurrencyMaxCount)(c)
+			memoryRateLimitHandler(duration, layers)(c)
 		}
 	}
 }
 
-func shouldBypassModelRequestRateLimit(c *gin.Context, userID int) bool {
-	if c.GetInt("role") >= common.RoleAdminUser {
-		return true
-	}
+// shouldBypassModelRequestRateLimit 仅按豁免用户 ID 判断；管理员角色不再自动绕过。
+// Token 启用自定义限流时，调用方不会使用本函数的绕过结果。
+func shouldBypassModelRequestRateLimit(userID int) bool {
 	return setting.IsModelRequestRateLimitExemptUser(userID)
 }

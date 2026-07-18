@@ -55,6 +55,8 @@ const (
 	MsgTokenExhausted            = "token.exhausted"
 	MsgTokenStatusUnavailable    = "token.status_unavailable"
 	MsgTokenDbError              = "token.db_error"
+	MsgTokenRateLimitInvalid     = "token.rate_limit_invalid"
+	MsgTokenRateLimitExceedMax   = "token.rate_limit_exceed_max"
 )
 
 // Redemption related messages

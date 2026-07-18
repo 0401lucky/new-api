@@ -249,6 +249,7 @@ export function ApiKeysMutateDrawer({
     : t('Enter quota in {{currency}}', { currency: currencyLabel })
   const selectedGroup = form.watch('group')
   const unlimitedQuota = form.watch('unlimited_quota')
+  const rateLimitEnabled = form.watch('rate_limit_enabled')
 
   return (
     <Sheet
@@ -580,6 +581,117 @@ export function ApiKeysMutateDrawer({
                         </FormItem>
                       )}
                     />
+
+                    <FormField
+                      control={form.control}
+                      name='rate_limit_enabled'
+                      render={({ field }) => (
+                        <FormItem className={sideDrawerSwitchItemClassName()}>
+                          <div className='flex flex-col gap-0.5'>
+                            <FormLabel className='text-sm'>
+                              {t('Custom rate limit')}
+                            </FormLabel>
+                            <FormDescription className='text-xs'>
+                              {t(
+                                'Limit RPM and concurrency for this key. Time window matches system model rate-limit minutes (default 1 minute).'
+                              )}
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={!!field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    {rateLimitEnabled && (
+                      <div className='grid gap-4 sm:grid-cols-3'>
+                        <FormField
+                          control={form.control}
+                          name='rate_limit_success'
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>
+                                {t('Successful requests (window)')}
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  type='number'
+                                  min={0}
+                                  value={field.value}
+                                  onChange={(e) =>
+                                    field.onChange(
+                                      Number.parseInt(e.target.value, 10) || 0
+                                    )
+                                  }
+                                />
+                              </FormControl>
+                              <FormDescription className='text-xs'>
+                                {t(
+                                  'Approx. RPM when window is 1 minute. 0 falls back to system default.'
+                                )}
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name='rate_limit_total'
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>
+                                {t('Total requests (window)')}
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  type='number'
+                                  min={0}
+                                  value={field.value}
+                                  onChange={(e) =>
+                                    field.onChange(
+                                      Number.parseInt(e.target.value, 10) || 0
+                                    )
+                                  }
+                                />
+                              </FormControl>
+                              <FormDescription className='text-xs'>
+                                {t('Includes failures. 0 means unlimited.')}
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name='rate_limit_concurrency'
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>{t('Max concurrency')}</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type='number'
+                                  min={0}
+                                  value={field.value}
+                                  onChange={(e) =>
+                                    field.onChange(
+                                      Number.parseInt(e.target.value, 10) || 0
+                                    )
+                                  }
+                                />
+                              </FormControl>
+                              <FormDescription className='text-xs'>
+                                {t('0 means unlimited concurrency.')}
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    )}
                   </div>
                 </CollapsibleContent>
               </SideDrawerSection>

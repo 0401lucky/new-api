@@ -164,6 +164,22 @@ func GetTokenUsage(c *gin.Context) {
 	})
 }
 
+const maxTokenRateLimitValue = 100_000_000
+
+func validateTokenRateLimit(c *gin.Context, token *model.Token) bool {
+	if token.RateLimitTotal < 0 || token.RateLimitSuccess < 0 || token.RateLimitConcurrency < 0 {
+		common.ApiErrorI18n(c, i18n.MsgTokenRateLimitInvalid)
+		return false
+	}
+	if token.RateLimitTotal > maxTokenRateLimitValue ||
+		token.RateLimitSuccess > maxTokenRateLimitValue ||
+		token.RateLimitConcurrency > maxTokenRateLimitValue {
+		common.ApiErrorI18n(c, i18n.MsgTokenRateLimitExceedMax, map[string]any{"Max": maxTokenRateLimitValue})
+		return false
+	}
+	return true
+}
+
 func AddToken(c *gin.Context) {
 	token := model.Token{}
 	err := c.ShouldBindJSON(&token)
@@ -187,6 +203,9 @@ func AddToken(c *gin.Context) {
 			return
 		}
 	}
+	if !validateTokenRateLimit(c, &token) {
+		return
+	}
 	// 检查用户令牌数量是否已达上限
 	maxTokens := operation_setting.GetMaxUserTokens()
 	count, err := model.CountUserTokens(c.GetInt("id"))
@@ -208,19 +227,23 @@ func AddToken(c *gin.Context) {
 		return
 	}
 	cleanToken := model.Token{
-		UserId:             c.GetInt("id"),
-		Name:               token.Name,
-		Key:                key,
-		CreatedTime:        common.GetTimestamp(),
-		AccessedTime:       common.GetTimestamp(),
-		ExpiredTime:        token.ExpiredTime,
-		RemainQuota:        token.RemainQuota,
-		UnlimitedQuota:     token.UnlimitedQuota,
-		ModelLimitsEnabled: token.ModelLimitsEnabled,
-		ModelLimits:        token.ModelLimits,
-		AllowIps:           token.AllowIps,
-		Group:              token.Group,
-		CrossGroupRetry:    token.CrossGroupRetry,
+		UserId:               c.GetInt("id"),
+		Name:                 token.Name,
+		Key:                  key,
+		CreatedTime:          common.GetTimestamp(),
+		AccessedTime:         common.GetTimestamp(),
+		ExpiredTime:          token.ExpiredTime,
+		RemainQuota:          token.RemainQuota,
+		UnlimitedQuota:       token.UnlimitedQuota,
+		ModelLimitsEnabled:   token.ModelLimitsEnabled,
+		ModelLimits:          token.ModelLimits,
+		AllowIps:             token.AllowIps,
+		Group:                token.Group,
+		CrossGroupRetry:      token.CrossGroupRetry,
+		RateLimitEnabled:     token.RateLimitEnabled,
+		RateLimitTotal:       token.RateLimitTotal,
+		RateLimitSuccess:     token.RateLimitSuccess,
+		RateLimitConcurrency: token.RateLimitConcurrency,
 	}
 	err = cleanToken.Insert()
 	if err != nil {
@@ -271,6 +294,9 @@ func UpdateToken(c *gin.Context) {
 			return
 		}
 	}
+	if statusOnly == "" && !validateTokenRateLimit(c, &token) {
+		return
+	}
 	cleanToken, err := model.GetTokenByIds(token.Id, userId)
 	if err != nil {
 		common.ApiError(c, err)
@@ -299,6 +325,10 @@ func UpdateToken(c *gin.Context) {
 		cleanToken.AllowIps = token.AllowIps
 		cleanToken.Group = token.Group
 		cleanToken.CrossGroupRetry = token.CrossGroupRetry
+		cleanToken.RateLimitEnabled = token.RateLimitEnabled
+		cleanToken.RateLimitTotal = token.RateLimitTotal
+		cleanToken.RateLimitSuccess = token.RateLimitSuccess
+		cleanToken.RateLimitConcurrency = token.RateLimitConcurrency
 	}
 	err = cleanToken.Update()
 	if err != nil {

@@ -40,21 +40,23 @@ export function getApiKeyFormSchema(t: TFunction) {
       group: z.string().optional(),
       cross_group_retry: z.boolean().optional(),
       tokenCount: z.number().min(1).optional(),
+      rate_limit_enabled: z.boolean(),
+      rate_limit_total: z.number().min(0).max(100_000_000),
+      rate_limit_success: z.number().min(0).max(100_000_000),
+      rate_limit_concurrency: z.number().min(0).max(100_000_000),
     })
     .superRefine((data, ctx) => {
-      if (data.unlimited_quota) {
-        return
-      }
-
-      if (
-        data.remain_quota_dollars === undefined ||
-        data.remain_quota_dollars < 0
-      ) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['remain_quota_dollars'],
-          message: t('Quota must be zero or greater'),
-        })
+      if (!data.unlimited_quota) {
+        if (
+          data.remain_quota_dollars === undefined ||
+          data.remain_quota_dollars < 0
+        ) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['remain_quota_dollars'],
+            message: t('Quota must be zero or greater'),
+          })
+        }
       }
     })
 }
@@ -75,6 +77,10 @@ export const API_KEY_FORM_DEFAULT_VALUES: ApiKeyFormValues = {
   group: DEFAULT_GROUP,
   cross_group_retry: true,
   tokenCount: 1,
+  rate_limit_enabled: false,
+  rate_limit_total: 0,
+  rate_limit_success: 0,
+  rate_limit_concurrency: 0,
 }
 
 export function getApiKeyFormDefaultValues(
@@ -111,6 +117,14 @@ export function transformFormDataToPayload(
     allow_ips: data.allow_ips || '',
     group: data.group || '',
     cross_group_retry: data.group === 'auto' ? !!data.cross_group_retry : false,
+    rate_limit_enabled: !!data.rate_limit_enabled,
+    rate_limit_total: data.rate_limit_enabled ? data.rate_limit_total || 0 : 0,
+    rate_limit_success: data.rate_limit_enabled
+      ? data.rate_limit_success || 0
+      : 0,
+    rate_limit_concurrency: data.rate_limit_enabled
+      ? data.rate_limit_concurrency || 0
+      : 0,
   }
 }
 
@@ -137,5 +151,9 @@ export function transformApiKeyToFormDefaults(
     group: apiKey.group || DEFAULT_GROUP,
     cross_group_retry: !!apiKey.cross_group_retry,
     tokenCount: 1,
+    rate_limit_enabled: !!apiKey.rate_limit_enabled,
+    rate_limit_total: apiKey.rate_limit_total || 0,
+    rate_limit_success: apiKey.rate_limit_success || 0,
+    rate_limit_concurrency: apiKey.rate_limit_concurrency || 0,
   }
 }
