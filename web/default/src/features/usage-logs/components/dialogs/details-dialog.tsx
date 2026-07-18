@@ -518,6 +518,7 @@ function TokenBreakdown(props: { log: UsageLog; other: LogOtherData }) {
 
 function PromptCheckDetails(props: { other: LogOtherData | null }) {
   const { t } = useTranslation()
+  const { copiedText, copyToClipboard } = useCopyToClipboard({ notify: false })
   const promptCheck = props.other?.prompt_check
   if (!promptCheck) return null
 
@@ -535,6 +536,14 @@ function PromptCheckDetails(props: { other: LogOtherData | null }) {
   } else if (promptCheck.review_error) {
     reviewResult = promptCheck.review_error
   }
+
+  // Prefer full_text for human review; fall back to short preview for older logs.
+  const reviewText = (promptCheck.full_text || promptCheck.preview || '').trim()
+  const hasFullText = Boolean(promptCheck.full_text?.trim())
+  const extractedChars =
+    typeof promptCheck.extracted_chars === 'number'
+      ? promptCheck.extracted_chars
+      : undefined
 
   return (
     <DetailSection
@@ -610,8 +619,46 @@ function PromptCheckDetails(props: { other: LogOtherData | null }) {
           ))}
         </div>
       )}
-      {promptCheck.preview && (
-        <DetailRow label={t('Prompt preview')} value={promptCheck.preview} />
+      {reviewText && (
+        <div className='flex min-w-0 flex-col gap-1.5 pt-1'>
+          <div className='flex min-w-0 items-center justify-between gap-2'>
+            <p className='text-muted-foreground text-xs font-medium'>
+              {hasFullText ? t('Full prompt') : t('Prompt preview')}
+              {typeof extractedChars === 'number' && extractedChars > 0 ? (
+                <span className='text-muted-foreground/80 font-normal'>
+                  {' '}
+                  ({extractedChars.toLocaleString()} {t('chars')})
+                </span>
+              ) : null}
+            </p>
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              className='h-6 shrink-0 gap-1 px-1.5 text-[11px]'
+              onClick={() => copyToClipboard(reviewText)}
+              title={t('Copy to clipboard')}
+              aria-label={t('Copy to clipboard')}
+            >
+              {copiedText === reviewText ? (
+                <Check className='size-3 text-green-600' />
+              ) : (
+                <Copy className='size-3' />
+              )}
+              <span>{t('Copy')}</span>
+            </Button>
+          </div>
+          <pre className='bg-background/60 max-h-64 min-w-0 overflow-y-auto rounded border p-2.5 font-mono text-[11px] leading-relaxed wrap-break-word whitespace-pre-wrap'>
+            {reviewText}
+          </pre>
+          {!hasFullText && (
+            <p className='text-muted-foreground text-[11px]'>
+              {t(
+                'Full prompt is only available for checks recorded after this update.'
+              )}
+            </p>
+          )}
+        </div>
       )}
     </DetailSection>
   )
@@ -771,7 +818,9 @@ export function DetailsDialog(props: DetailsDialogProps) {
       contentClassName={cn(
         'min-w-0 overflow-hidden',
         'max-sm:max-h-[calc(100dvh-1.5rem)] max-sm:w-[calc(100vw-1.5rem)] max-sm:max-w-[calc(100vw-1.5rem)] max-sm:p-4',
-        isTieredBilling ? 'sm:max-w-4xl lg:max-w-5xl' : 'sm:max-w-lg'
+        isTieredBilling || other?.prompt_check
+          ? 'sm:max-w-4xl lg:max-w-5xl'
+          : 'sm:max-w-lg'
       )}
       headerClassName='max-sm:gap-1'
       titleClassName='flex items-center gap-2 text-base'

@@ -69,6 +69,8 @@ export interface RecentCallPromptCheckInfo {
   matches?: RecentCallPromptCheckMatch[]
   reason?: string
   preview?: string
+  full_text?: string
+  extracted_chars?: number
   reviewed?: boolean
   review_flagged?: boolean
   review_model?: string

@@ -242,6 +242,9 @@ export interface LogOtherData {
       matched?: string
     }>
     preview?: string
+    /** Admin-only full redacted prompt for manual review */
+    full_text?: string
+    extracted_chars?: number
     reviewed?: boolean
     review_flagged?: boolean
     review_model?: string

@@ -445,10 +445,13 @@ func recordPromptCheckLog(c *gin.Context, relayInfo *relaycommon.RelayInfo, verd
 			"strict_hit":       verdict.StrictHit,
 			"matches":          verdict.Matches,
 			"preview":          verdict.TextPreview,
-			"reviewed":         verdict.Reviewed,
-			"review_flagged":   verdict.ReviewFlagged,
-			"review_model":     verdict.ReviewModel,
-			"review_error":     verdict.ReviewError,
+			// full_text is admin-facing review content; non-admin self logs strip it.
+			"full_text":       verdict.TextFull,
+			"extracted_chars": verdict.ExtractedChars,
+			"reviewed":        verdict.Reviewed,
+			"review_flagged":  verdict.ReviewFlagged,
+			"review_model":    verdict.ReviewModel,
+			"review_error":    verdict.ReviewError,
 		},
 	}
 	if verdict.Action == service.PromptCheckActionBlock {

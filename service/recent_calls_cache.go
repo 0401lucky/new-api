@@ -86,6 +86,8 @@ type RecentCallPromptCheckInfo struct {
 	Matches         []PromptCheckMatch `json:"matches,omitempty"`
 	Reason          string             `json:"reason,omitempty"`
 	Preview         string             `json:"preview,omitempty"`
+	FullText        string             `json:"full_text,omitempty"`
+	ExtractedChars  int                `json:"extracted_chars,omitempty"`
 	Reviewed        bool               `json:"reviewed,omitempty"`
 	ReviewFlagged   bool               `json:"review_flagged,omitempty"`
 	ReviewModel     string             `json:"review_model,omitempty"`
@@ -308,6 +310,8 @@ func (cch *recentCallsCache) UpsertPromptCheckByContext(c *gin.Context, verdict 
 		Matches:         matches,
 		Reason:          verdict.Reason,
 		Preview:         verdict.TextPreview,
+		FullText:        verdict.TextFull,
+		ExtractedChars:  verdict.ExtractedChars,
 		Reviewed:        verdict.Reviewed,
 		ReviewFlagged:   verdict.ReviewFlagged,
 		ReviewModel:     verdict.ReviewModel,

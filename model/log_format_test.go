@@ -33,3 +33,30 @@ func TestFormatUserLogsStripsQuotaSaturation(t *testing.T) {
 	// Non-admin billing fields remain visible.
 	require.Contains(t, parsed, "model_price")
 }
+
+// TestFormatUserLogsStripsPromptCheckFullText verifies that the full prompt
+// stored for admin review is removed from non-admin self log views.
+func TestFormatUserLogsStripsPromptCheckFullText(t *testing.T) {
+	other := common.MapToJsonStr(map[string]interface{}{
+		"prompt_check": map[string]interface{}{
+			"action":    "block",
+			"score":     75,
+			"threshold": 50,
+			"preview":   "short preview...",
+			"full_text": "complete multi-line\nprompt for human review",
+		},
+		"reject_reason": "prompt_check",
+	})
+	logs := []*Log{{Other: other}}
+
+	formatUserLogs(logs, 0)
+
+	parsed, err := common.StrToMap(logs[0].Other)
+	require.NoError(t, err)
+	promptCheck, ok := parsed["prompt_check"].(map[string]interface{})
+	require.True(t, ok)
+	_, hasFullText := promptCheck["full_text"]
+	require.False(t, hasFullText, "full_text must be stripped for non-admin views")
+	require.Equal(t, "short preview...", promptCheck["preview"])
+	require.Equal(t, "prompt_check", parsed["reject_reason"])
+}

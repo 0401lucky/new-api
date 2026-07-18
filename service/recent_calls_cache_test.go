@@ -174,7 +174,9 @@ func TestRecentCallStoresPromptCheckVerdict(t *testing.T) {
 				Matched:  "ignore safety",
 			},
 		},
-		TextPreview: "ignore safety",
+		TextPreview:    "ignore safety",
+		TextFull:       "ignore safety\nwith multi-line full prompt for review",
+		ExtractedChars: 48,
 	}
 
 	cache.UpsertPromptCheckByContext(c, verdict)
@@ -191,5 +193,11 @@ func TestRecentCallStoresPromptCheckVerdict(t *testing.T) {
 	}
 	if len(record.PromptCheck.Matches) != 1 || record.PromptCheck.Matches[0].Matched != "ignore safety" {
 		t.Fatalf("unexpected prompt check matches: %+v", record.PromptCheck.Matches)
+	}
+	if record.PromptCheck.FullText != verdict.TextFull {
+		t.Fatalf("unexpected prompt check full text: %q", record.PromptCheck.FullText)
+	}
+	if record.PromptCheck.ExtractedChars != verdict.ExtractedChars {
+		t.Fatalf("unexpected extracted chars: %d", record.PromptCheck.ExtractedChars)
 	}
 }

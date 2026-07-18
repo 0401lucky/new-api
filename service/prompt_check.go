@@ -44,11 +44,14 @@ type PromptCheckVerdict struct {
 	Matches         []PromptCheckMatch `json:"matches,omitempty"`
 	Reason          string             `json:"reason,omitempty"`
 	TextPreview     string             `json:"text_preview,omitempty"`
-	Reviewed        bool               `json:"reviewed,omitempty"`
-	ReviewFlagged   bool               `json:"review_flagged,omitempty"`
-	ReviewModel     string             `json:"review_model,omitempty"`
-	ReviewError     string             `json:"review_error,omitempty"`
-	ExtractedChars  int                `json:"extracted_chars"`
+	// TextFull is the redacted prompt used for scanning, kept for admin review.
+	// Unlike TextPreview it preserves newlines and is not capped at 500 runes.
+	TextFull       string `json:"text_full,omitempty"`
+	Reviewed       bool   `json:"reviewed,omitempty"`
+	ReviewFlagged  bool   `json:"review_flagged,omitempty"`
+	ReviewModel    string `json:"review_model,omitempty"`
+	ReviewError    string `json:"review_error,omitempty"`
+	ExtractedChars int    `json:"extracted_chars"`
 }
 
 type promptCheckRule struct {
@@ -213,6 +216,7 @@ func CheckPromptText(ctx context.Context, text string) PromptCheckVerdict {
 		Threshold:       threshold,
 		StrictThreshold: strictThreshold,
 		TextPreview:     PromptCheckRedactedPreview(text, 500),
+		TextFull:        PromptCheckFullTextForLog(text),
 		ExtractedChars:  utf8.RuneCountInString(text),
 	}
 	if !verdict.Enabled || strings.TrimSpace(text) == "" {
@@ -506,4 +510,11 @@ func PromptCheckRedact(text string) string {
 
 func PromptCheckRedactedPreview(text string, maxRunes int) string {
 	return PromptCheckPreview(PromptCheckRedact(text), maxRunes)
+}
+
+// PromptCheckFullTextForLog returns a redacted copy of the scanned prompt for
+// admin log review. Whitespace structure is preserved so multi-line prompts
+// remain readable; length is bounded by the same scan-time limit already applied.
+func PromptCheckFullTextForLog(text string) string {
+	return strings.TrimSpace(PromptCheckRedact(text))
 }

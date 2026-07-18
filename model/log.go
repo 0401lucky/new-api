@@ -132,6 +132,11 @@ func formatUserLogs(logs []*Log, startIdx int) {
 			delete(otherMap, "audit_info")
 			// delete(otherMap, "reject_reason")
 			delete(otherMap, "stream_status")
+			// Full prompt text is for admin review only.
+			if promptCheck, ok := otherMap["prompt_check"].(map[string]interface{}); ok {
+				delete(promptCheck, "full_text")
+				otherMap["prompt_check"] = promptCheck
+			}
 		}
 		logs[i].Other = common.MapToJsonStr(otherMap)
 	}
