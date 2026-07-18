@@ -403,6 +403,8 @@ func AdminListAllUserSubscriptions(c *gin.Context) {
 		UserId:  userId,
 		Status:  c.Query("status"),
 		Source:  c.Query("source"),
+		OrderBy: c.Query("order_by"),
+		Order:   c.Query("order"),
 	}
 	items, total, err := model.AdminListUserSubscriptionsPage(q, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
 	if err != nil {

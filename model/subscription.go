@@ -1046,6 +1046,42 @@ type AdminUserSubscriptionQuery struct {
 	UserId  int
 	Status  string // active | expired | cancelled | empty=all
 	Source  string
+	// OrderBy is a whitelist field: id, amount_used, amount_total, start_time, end_time
+	OrderBy string
+	// Order is asc or desc (default desc for amount_used, else id desc)
+	Order string
+}
+
+func resolveAdminUserSubscriptionOrder(orderBy string, order string) string {
+	col := "id"
+	switch strings.TrimSpace(strings.ToLower(orderBy)) {
+	case "amount_used":
+		col = "amount_used"
+	case "amount_total":
+		col = "amount_total"
+	case "start_time":
+		col = "start_time"
+	case "end_time":
+		col = "end_time"
+	case "id", "":
+		col = "id"
+	default:
+		col = "id"
+	}
+	dir := "desc"
+	switch strings.TrimSpace(strings.ToLower(order)) {
+	case "asc":
+		dir = "asc"
+	case "desc", "":
+		dir = "desc"
+	default:
+		dir = "desc"
+	}
+	// Stable secondary key so pagination stays consistent when values tie.
+	if col == "id" {
+		return col + " " + dir
+	}
+	return col + " " + dir + ", id desc"
 }
 
 // AdminUserSubscriptionItem is a user subscription row enriched for admin views.
@@ -1107,8 +1143,9 @@ func AdminListUserSubscriptionsPage(q AdminUserSubscriptionQuery, startIdx int, 
 		return nil, 0, err
 	}
 
+	orderClause := resolveAdminUserSubscriptionOrder(q.OrderBy, q.Order)
 	var subs []UserSubscription
-	if err := query.Order("id desc").
+	if err := query.Order(orderClause).
 		Offset(startIdx).
 		Limit(pageSize).
 		Find(&subs).Error; err != nil {

@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
-import { Search } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDebounce } from '@/hooks/use-debounce'
@@ -105,6 +105,8 @@ function QuotaUsageCell({
   )
 }
 
+type SortOrder = 'asc' | 'desc'
+
 export function UserSubscriptionsTable() {
   const { t } = useTranslation()
   const { refreshTrigger } = useSubscriptions()
@@ -114,10 +116,23 @@ export function UserSubscriptionsTable() {
   const [status, setStatus] = useState<string>('all')
   const [planId, setPlanId] = useState<string>('all')
   const [source, setSource] = useState<string>('all')
+  // Default: newest first. Clicking quota usage switches to amount_used sort.
+  const [orderBy, setOrderBy] = useState<string>('id')
+  const [order, setOrder] = useState<SortOrder>('desc')
 
   useEffect(() => {
     setPage(1)
-  }, [keyword, status, planId, source])
+  }, [keyword, status, planId, source, orderBy, order])
+
+  const toggleQuotaUsageSort = () => {
+    if (orderBy !== 'amount_used') {
+      // First click: highest usage first
+      setOrderBy('amount_used')
+      setOrder('desc')
+      return
+    }
+    setOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))
+  }
 
   const { data: plansData } = useQuery({
     queryKey: ['admin-subscription-plans', refreshTrigger],
@@ -136,6 +151,8 @@ export function UserSubscriptionsTable() {
       status,
       planId,
       source,
+      orderBy,
+      order,
       refreshTrigger,
     ],
     queryFn: async () => {
@@ -146,6 +163,8 @@ export function UserSubscriptionsTable() {
         status: status === 'all' ? undefined : status,
         plan_id: planId === 'all' ? undefined : Number(planId),
         source: source === 'all' ? undefined : source,
+        order_by: orderBy,
+        order,
       })
       return res.data
     },
@@ -260,7 +279,25 @@ export function UserSubscriptionsTable() {
               <th className='px-3 py-2 font-medium'>{t('User')}</th>
               <th className='px-3 py-2 font-medium'>{t('Plan')}</th>
               <th className='px-3 py-2 font-medium'>{t('Status')}</th>
-              <th className='px-3 py-2 font-medium'>{t('Quota usage')}</th>
+              <th className='px-3 py-2 font-medium'>
+                <button
+                  type='button'
+                  className='hover:text-foreground inline-flex items-center gap-1 font-medium'
+                  onClick={toggleQuotaUsageSort}
+                  aria-label={t('Sort by quota usage')}
+                >
+                  {t('Quota usage')}
+                  {orderBy === 'amount_used' ? (
+                    order === 'desc' ? (
+                      <ArrowDown className='h-3.5 w-3.5' />
+                    ) : (
+                      <ArrowUp className='h-3.5 w-3.5' />
+                    )
+                  ) : (
+                    <ArrowUpDown className='text-muted-foreground h-3.5 w-3.5' />
+                  )}
+                </button>
+              </th>
               <th className='px-3 py-2 font-medium'>{t('Validity')}</th>
               <th className='px-3 py-2 font-medium'>{t('Source')}</th>
             </tr>

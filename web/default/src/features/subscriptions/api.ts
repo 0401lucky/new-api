@@ -153,6 +153,8 @@ export async function listAdminUserSubscriptions(
     user_id,
     status = '',
     source = '',
+    order_by = '',
+    order,
   } = params
   const search = new URLSearchParams()
   search.set('p', String(p))
@@ -162,6 +164,8 @@ export async function listAdminUserSubscriptions(
   if (user_id && user_id > 0) search.set('user_id', String(user_id))
   if (status) search.set('status', status)
   if (source) search.set('source', source)
+  if (order_by) search.set('order_by', order_by)
+  if (order) search.set('order', order)
   const res = await api.get(
     `/api/subscription/admin/user_subscriptions?${search.toString()}`
   )

@@ -91,6 +91,10 @@ export interface AdminUserSubscriptionListParams {
   user_id?: number
   status?: string
   source?: string
+  /** Whitelist: id | amount_used | amount_total | start_time | end_time */
+  order_by?: string
+  /** asc | desc */
+  order?: 'asc' | 'desc'
 }
 
 export interface AdminUserSubscriptionListPage {

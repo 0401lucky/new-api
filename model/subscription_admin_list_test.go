@@ -82,4 +82,26 @@ func TestAdminListUserSubscriptionsPageFiltersAndEnriches(t *testing.T) {
 	require.NoError(t, err)
 	assert.EqualValues(t, 1, total)
 	assert.Equal(t, planA.Id, items[0].Subscription.PlanId)
+
+	// sort by amount_used desc: 5000, 1000, 200
+	items, total, err = AdminListUserSubscriptionsPage(AdminUserSubscriptionQuery{
+		OrderBy: "amount_used",
+		Order:   "desc",
+	}, 0, 20)
+	require.NoError(t, err)
+	assert.EqualValues(t, 3, total)
+	require.Len(t, items, 3)
+	assert.EqualValues(t, 5000, items[0].Subscription.AmountUsed)
+	assert.EqualValues(t, 1000, items[1].Subscription.AmountUsed)
+	assert.EqualValues(t, 200, items[2].Subscription.AmountUsed)
+
+	// sort by amount_used asc
+	items, _, err = AdminListUserSubscriptionsPage(AdminUserSubscriptionQuery{
+		OrderBy: "amount_used",
+		Order:   "asc",
+	}, 0, 20)
+	require.NoError(t, err)
+	require.Len(t, items, 3)
+	assert.EqualValues(t, 200, items[0].Subscription.AmountUsed)
+	assert.EqualValues(t, 5000, items[2].Subscription.AmountUsed)
 }

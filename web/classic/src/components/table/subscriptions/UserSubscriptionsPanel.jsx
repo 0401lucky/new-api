@@ -64,6 +64,9 @@ const UserSubscriptionsPanel = ({ plans = [], t }) => {
   const [status, setStatus] = useState('all');
   const [planId, setPlanId] = useState(0);
   const [source, setSource] = useState('all');
+  // Semi Table sorter maps to order_by=amount_used
+  const [orderBy, setOrderBy] = useState('id');
+  const [order, setOrder] = useState('desc');
 
   useEffect(() => {
     const timer = setTimeout(() => setKeyword(keywordInput.trim()), 300);
@@ -72,7 +75,7 @@ const UserSubscriptionsPanel = ({ plans = [], t }) => {
 
   useEffect(() => {
     setPage(1);
-  }, [keyword, status, planId, source]);
+  }, [keyword, status, planId, source, orderBy, order]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,6 +88,8 @@ const UserSubscriptionsPanel = ({ plans = [], t }) => {
       if (status && status !== 'all') params.set('status', status);
       if (planId > 0) params.set('plan_id', String(planId));
       if (source && source !== 'all') params.set('source', source);
+      if (orderBy) params.set('order_by', orderBy);
+      if (order) params.set('order', order);
       const res = await API.get(
         `/api/subscription/admin/user_subscriptions?${params.toString()}`,
       );
@@ -99,7 +104,7 @@ const UserSubscriptionsPanel = ({ plans = [], t }) => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, keyword, status, planId, source, t]);
+  }, [page, pageSize, keyword, status, planId, source, orderBy, order, t]);
 
   useEffect(() => {
     load();
@@ -150,6 +155,14 @@ const UserSubscriptionsPanel = ({ plans = [], t }) => {
     {
       title: t('额度用量'),
       width: 200,
+      dataIndex: 'amount_used_sort',
+      sorter: true,
+      sortOrder:
+        orderBy === 'amount_used'
+          ? order === 'asc'
+            ? 'ascend'
+            : 'descend'
+          : false,
       render: (_, row) => {
         const totalAmt = Number(row?.subscription?.amount_total || 0);
         const used = Number(row?.subscription?.amount_used || 0);
@@ -251,6 +264,34 @@ const UserSubscriptionsPanel = ({ plans = [], t }) => {
         dataSource={items}
         loading={loading}
         rowKey={(row) => row?.subscription?.id}
+        onChange={(
+          pagination,
+          filters,
+          sorter,
+          { action } = {},
+        ) => {
+          if (action === 'paginate' && pagination) {
+            if (pagination.currentPage != null) {
+              setPage(pagination.currentPage);
+            }
+            if (pagination.pageSize != null && pagination.pageSize !== pageSize) {
+              setPageSize(pagination.pageSize);
+              setPage(1);
+            }
+            return;
+          }
+          // sorter may be object or array depending on Semi version
+          const s = Array.isArray(sorter) ? sorter[0] : sorter;
+          if (!s || !s.order) {
+            setOrderBy('id');
+            setOrder('desc');
+            return;
+          }
+          if (s.dataIndex === 'amount_used_sort' || s.field === 'amount_used_sort') {
+            setOrderBy('amount_used');
+            setOrder(s.order === 'ascend' ? 'asc' : 'desc');
+          }
+        }}
         pagination={{
           currentPage: page,
           pageSize,
