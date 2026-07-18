@@ -2139,6 +2139,7 @@
     "Filter by user ID, username, name or email...": "Фильтр по ID пользователя, имени пользователя, имени или email...",
     "Filter by username": "Фильтр по имени пользователя",
     "Filter by username, name or email...": "Фильтр по имени пользователя, имени или email...",
+    "Filter by username, name, email; use #ID for exact user ID": "Поиск по имени/отображаемому имени/email; #ID — точный ID",
     "Filter Dashboard Models": "Фильтровать модели панели управления",
     "Filter models by provider, group, type, endpoint, and tags.": "Фильтруйте модели по поставщику, группе, типу, endpoint и тегам.",
     "Filter models by type, endpoint, vendor, group and tags": "Фильтровать модели по типу, точке доступа, поставщику, группе и тегам",

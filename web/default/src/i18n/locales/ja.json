@@ -2139,6 +2139,7 @@
     "Filter by user ID, username, name or email...": "ユーザーID、ユーザー名、名前またはメールアドレスでフィルター...",
     "Filter by username": "ユーザー名でフィルター",
     "Filter by username, name or email...": "ユーザー名、名前またはメールアドレスでフィルター...",
+    "Filter by username, name, email; use #ID for exact user ID": "ユーザー名/表示名/メールで検索；#ID でユーザーIDを完全一致",
     "Filter Dashboard Models": "ダッシュボードモデルをフィルタリング",
     "Filter models by provider, group, type, endpoint, and tags.": "プロバイダー、グループ、タイプ、エンドポイント、タグでモデルを絞り込みます。",
     "Filter models by type, endpoint, vendor, group and tags": "タイプ、エンドポイント、ベンダー、グループ、タグでモデルをフィルタリング",

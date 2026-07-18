@@ -177,7 +177,9 @@ export function UsersTable() {
       skeletonKeyPrefix='users-skeleton'
       applyHeaderSize
       toolbarProps={{
-        searchPlaceholder: t('Filter by user ID, username, name or email...'),
+        searchPlaceholder: t(
+          'Filter by username, name, email; use #ID for exact user ID'
+        ),
         filters: [
           {
             columnId: 'status',

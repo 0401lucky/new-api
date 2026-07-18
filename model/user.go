@@ -349,21 +349,32 @@ func SearchUsers(keyword string, group string, role *int, status *int, startIdx 
 	query := tx.Unscoped().Model(&User{})
 
 	// 构建搜索条件
+	// "#123" = exact user id match; plain digits still fuzzy-match id CAST LIKE.
 	keyword = strings.TrimSpace(keyword)
 	if keyword != "" {
-		likeCondition := "username LIKE ? OR email LIKE ? OR display_name LIKE ?"
-		likeArgs := []interface{}{"%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%"}
-
-		if _, err := strconv.Atoi(keyword); err == nil {
-			idLikeCondition := "CAST(id AS TEXT) LIKE ?"
-			if common.UsingMySQL {
-				idLikeCondition = "CAST(id AS CHAR) LIKE ?"
+		if strings.HasPrefix(keyword, "#") {
+			idStr := strings.TrimSpace(keyword[1:])
+			if id, convErr := strconv.Atoi(idStr); convErr == nil && id > 0 {
+				query = query.Where("id = ?", id)
+			} else {
+				// Invalid exact-id syntax: return no rows rather than fuzzy-fallback.
+				query = query.Where("1 = 0")
 			}
-			likeCondition = idLikeCondition + " OR " + likeCondition
-			likeArgs = append([]interface{}{"%" + keyword + "%"}, likeArgs...)
-		}
+		} else {
+			likeCondition := "username LIKE ? OR email LIKE ? OR display_name LIKE ?"
+			likeArgs := []interface{}{"%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%"}
 
-		query = query.Where("("+likeCondition+")", likeArgs...)
+			if _, err := strconv.Atoi(keyword); err == nil {
+				idLikeCondition := "CAST(id AS TEXT) LIKE ?"
+				if common.UsingMySQL {
+					idLikeCondition = "CAST(id AS CHAR) LIKE ?"
+				}
+				likeCondition = idLikeCondition + " OR " + likeCondition
+				likeArgs = append([]interface{}{"%" + keyword + "%"}, likeArgs...)
+			}
+
+			query = query.Where("("+likeCondition+")", likeArgs...)
+		}
 	}
 
 	if group != "" {

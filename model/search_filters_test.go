@@ -31,6 +31,36 @@ func TestSearchUsersMatchesPartialUserID(t *testing.T) {
 	require.ElementsMatch(t, []int{3, 13, 163}, matchedIDs)
 }
 
+func TestSearchUsersExactIDWithHashPrefix(t *testing.T) {
+	truncateTables(t)
+
+	users := []User{
+		{Id: 3, Username: "user-three", Password: "password", Status: common.UserStatusEnabled, Group: "default", AffCode: "aff-e3"},
+		{Id: 13, Username: "user-thirteen", Password: "password", Status: common.UserStatusEnabled, Group: "default", AffCode: "aff-e13"},
+		{Id: 163, Username: "user-one-six-three", Password: "password", Status: common.UserStatusEnabled, Group: "default", AffCode: "aff-e163"},
+	}
+	for i := range users {
+		require.NoError(t, DB.Create(&users[i]).Error)
+	}
+
+	matched, total, err := SearchUsers("#13", "", nil, nil, 0, 20)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), total)
+	require.Len(t, matched, 1)
+	require.Equal(t, 13, matched[0].Id)
+
+	// Invalid exact-id syntax yields empty result, not fuzzy fallback.
+	matched, total, err = SearchUsers("#", "", nil, nil, 0, 20)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), total)
+	require.Empty(t, matched)
+
+	matched, total, err = SearchUsers("#abc", "", nil, nil, 0, 20)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), total)
+	require.Empty(t, matched)
+}
+
 func TestGetAllLogsFiltersByExactUserID(t *testing.T) {
 	truncateTables(t)
 

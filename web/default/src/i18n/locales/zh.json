@@ -2139,6 +2139,7 @@
     "Filter by user ID, username, name or email...": "按用户 ID、用户名、姓名或邮箱筛选...",
     "Filter by username": "按用户名筛选",
     "Filter by username, name or email...": "按用户名、姓名或邮箱筛选...",
+    "Filter by username, name, email; use #ID for exact user ID": "按用户名/显示名/邮箱搜索；#ID 可精确匹配用户 ID",
     "Filter Dashboard Models": "筛选仪表板模型",
     "Filter models by provider, group, type, endpoint, and tags.": "按供应商、分组、类型、端点和标签筛选模型。",
     "Filter models by type, endpoint, vendor, group and tags": "按类型、端点、供应商、分组和标签筛选模型",

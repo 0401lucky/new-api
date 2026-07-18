@@ -65,7 +65,9 @@ const UsersFilters = ({
           <Form.Input
             field='searchKeyword'
             prefix={<IconSearch />}
-            placeholder={t('支持搜索用户的 ID、用户名、显示名称和邮箱地址')}
+            placeholder={t(
+              '支持搜索用户名/显示名/邮箱；输入 #ID 可精确匹配用户 ID',
+            )}
             showClear
             pure
             size='small'
