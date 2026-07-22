@@ -177,23 +177,39 @@ func taskModelName(task *model.Task) string {
 }
 
 // RefundTaskQuota 统一的任务失败退款逻辑。
-// 当异步任务失败时，将预扣的 quota 退还给用户（支持钱包和订阅），并退还令牌额度。
-func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) {
+// 资金、令牌额度与任务退款标记在同一数据库事务内提交，避免重复退款或永久漏退。
+func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) bool {
 	quota := task.Quota
 	if quota == 0 {
-		return
+		return true
+	}
+	if quota < 0 {
+		logger.LogError(ctx, fmt.Sprintf("拒绝异常负额度任务退款 task %s: quota=%d", task.TaskID, quota))
+		return false
 	}
 
-	// 1. 退还资金来源（钱包或订阅）
-	if err := taskAdjustFunding(task, -quota); err != nil {
-		logger.LogWarn(ctx, fmt.Sprintf("退还资金来源失败 task %s: %s", task.TaskID, err.Error()))
-		return
+	subscriptionId := 0
+	if taskIsSubscription(task) {
+		subscriptionId = task.PrivateData.SubscriptionId
 	}
+	refunded, err := model.RefundTaskQuotaAtomically(
+		task.ID,
+		quota,
+		task.UserId,
+		subscriptionId,
+		task.PrivateData.TokenId,
+	)
+	if err != nil {
+		logger.LogWarn(ctx, fmt.Sprintf("原子退款失败 task %s: %s", task.TaskID, err.Error()))
+		return false
+	}
+	if !refunded {
+		logger.LogDebug(ctx, "任务 %s 不满足退款条件或已被其他执行者处理", task.TaskID)
+		return false
+	}
+	task.Quota = 0
 
-	// 2. 退还令牌额度
-	taskAdjustTokenQuota(ctx, task, -quota)
-
-	// 3. 记录日志
+	// 日志库可能与主库分离，因此在资金事务成功后记录；退款本身已具备幂等性。
 	other := taskBillingOther(task)
 	other["task_id"] = task.TaskID
 	other["reason"] = reason
@@ -208,6 +224,8 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) {
 		Group:     task.Group,
 		Other:     other,
 	})
+
+	return true
 }
 
 // RecalculateTaskQuota 通用的异步差额结算。

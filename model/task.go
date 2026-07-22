@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	commonRelay "github.com/QuantumNous/new-api/relay/common"
+	"gorm.io/gorm"
 )
 
 type TaskStatus string
@@ -40,6 +42,9 @@ const (
 	TaskStatusSuccess               = "SUCCESS"
 	TaskStatusUnknown               = "UNKNOWN"
 )
+
+// TaskRefundLegacyCutoff 区分明确不自动退款的旧超时任务与可对账任务。
+const TaskRefundLegacyCutoff int64 = 1740182400 // 2025-02-22 00:00:00 UTC
 
 type Task struct {
 	ID         int64                 `json:"id" gorm:"primary_key;AUTO_INCREMENT"`
@@ -309,6 +314,27 @@ func GetTimedOutUnfinishedTasks(cutoffUnix int64, limit int) []*Task {
 	return tasks
 }
 
+// GetUnrefundedFailedTasks 返回已失败但仍有正额度待退款的任务。
+// 旧系统超时任务在 LIMIT 前排除，避免阻塞正常对账任务。
+func GetUnrefundedFailedTasks(updatedBefore int64, limit int) []*Task {
+	if limit <= 0 {
+		return nil
+	}
+
+	var tasks []*Task
+	err := DB.Where("status = ?", TaskStatusFailure).
+		Where("quota > ?", 0).
+		Where("updated_at <= ?", updatedBefore).
+		Where("(submit_time <= ? OR submit_time >= ?)", 0, TaskRefundLegacyCutoff).
+		Order("id").
+		Limit(limit).
+		Find(&tasks).Error
+	if err != nil {
+		return nil
+	}
+	return tasks
+}
+
 func GetAllUnFinishSyncTasks(limit int) []*Task {
 	var tasks []*Task
 	var err error
@@ -330,6 +356,22 @@ func HasUnfinishedSyncTasks() bool {
 		Where("progress != ?", "100%").
 		Where("status != ?", TaskStatusFailure).
 		Where("status != ?", TaskStatusSuccess).
+		Limit(1).
+		Pluck("id", &id).Error
+	return err == nil && id != 0
+}
+
+// HasTaskPollingWork 判断是否仍有未完成任务或正额度待退款任务。
+func HasTaskPollingWork() bool {
+	if HasUnfinishedSyncTasks() {
+		return true
+	}
+
+	var id int64
+	err := DB.Model(&Task{}).
+		Where("status = ?", TaskStatusFailure).
+		Where("quota > ?", 0).
+		Where("(submit_time <= ? OR submit_time >= ?)", 0, TaskRefundLegacyCutoff).
 		Limit(1).
 		Pluck("id", &id).Error
 	return err == nil && id != 0
@@ -426,9 +468,94 @@ func (t *Task) UpdateQuota() error {
 	return DB.Model(t).Update("quota", t.Quota).Error
 }
 
+// RefundTaskQuotaAtomically 在同一事务内认领失败任务并完成额度退款。
+// 返回 false 且 error 为 nil 表示任务状态或额度已变化，本次未获得退款执行权。
+func RefundTaskQuotaAtomically(taskId int64, expectedQuota int, userId int, subscriptionId int, tokenId int) (bool, error) {
+	if expectedQuota <= 0 {
+		return false, nil
+	}
+
+	claimed := false
+	updatedTokenKey := ""
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&Task{}).
+			Where("id = ? AND status = ? AND quota = ?", taskId, TaskStatusFailure, expectedQuota).
+			Update("quota", 0)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return nil
+		}
+
+		if subscriptionId > 0 {
+			if err := postConsumeUserSubscriptionDeltaTx(tx, subscriptionId, -int64(expectedQuota)); err != nil {
+				return err
+			}
+		} else {
+			result = tx.Model(&User{}).
+				Where("id = ?", userId).
+				Update("quota", gorm.Expr("quota + ?", expectedQuota))
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected == 0 {
+				return fmt.Errorf("refund task quota: user %d not found", userId)
+			}
+		}
+
+		if tokenId > 0 {
+			var token Token
+			query := lockForUpdate(tx).Where("id = ?", tokenId).Limit(1).Find(&token)
+			if query.Error != nil {
+				return query.Error
+			}
+			if query.RowsAffected > 0 {
+				result = tx.Model(&Token{}).
+					Where("id = ?", tokenId).
+					Updates(map[string]interface{}{
+						"remain_quota":  gorm.Expr("remain_quota + ?", expectedQuota),
+						"used_quota":    gorm.Expr("used_quota - ?", expectedQuota),
+						"accessed_time": common.GetTimestamp(),
+					})
+				if result.Error != nil {
+					return result.Error
+				}
+				if result.RowsAffected == 0 {
+					return fmt.Errorf("refund task quota: token %d update matched no rows", tokenId)
+				}
+				updatedTokenKey = token.Key
+			}
+		}
+
+		claimed = true
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+	if !claimed {
+		return false, nil
+	}
+
+	// 缓存不属于账务事务；提交成功后尽力同步，失败只记录日志。
+	if subscriptionId <= 0 {
+		if err := cacheIncrUserQuota(userId, int64(expectedQuota)); err != nil {
+			common.SysLog("failed to sync user quota cache after task refund: " + err.Error())
+		}
+	}
+	if common.RedisEnabled && updatedTokenKey != "" {
+		if err := cacheIncrTokenQuota(updatedTokenKey, int64(expectedQuota)); err != nil {
+			common.SysLog("failed to sync token cache after task refund: " + err.Error())
+		}
+	}
+	return true, nil
+}
+
 // UpdateWithStatus performs a conditional UPDATE guarded by fromStatus (CAS).
 // Returns (true, nil) if this caller won the update, (false, nil) if
-// another process already moved the task out of fromStatus.
+// another process already moved the task out of fromStatus. MySQL 通常返回
+// 实际变更行数，因此同值更新即使匹配状态条件也可能返回 false。
 //
 // Uses Model().Select("*").Updates() instead of Save() because GORM's Save
 // falls back to INSERT ON CONFLICT when the WHERE-guarded UPDATE matches

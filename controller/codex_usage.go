@@ -57,7 +57,7 @@ func newCodexWhamContext(channelId int) (*codexWhamContext, error) {
 		return nil, fmt.Errorf("codex channel: account_id is required")
 	}
 
-	client, err := service.NewProxyHttpClient(ch.GetSetting().Proxy)
+	client, err := service.GetHttpClientWithProxy(ch.GetSetting().Proxy)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,6 @@ func refreshCodexWhamToken(c *gin.Context, wham *codexWhamContext) bool {
 		return true
 	}
 	model.InitChannelCache()
-	service.ResetProxyClientCache()
 	return true
 }
 

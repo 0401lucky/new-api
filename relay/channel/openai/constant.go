@@ -58,6 +58,8 @@ var ModelList = []string{
 	"gpt-realtime", "gpt-realtime-2025-08-28",
 	"gpt-realtime-mini", "gpt-realtime-mini-2025-10-06", "gpt-realtime-mini-2025-12-15",
 	"gpt-realtime-1.5",
+	"gpt-realtime-2", "gpt-realtime-2.1", "gpt-realtime-2.1-mini",
+	"gpt-realtime-whisper", "gpt-realtime-translate",
 	"text-embedding-ada-002", "text-embedding-3-small", "text-embedding-3-large",
 	"text-curie-001", "text-babbage-001", "text-ada-001",
 	"text-moderation-latest", "text-moderation-stable",
@@ -74,3 +76,19 @@ var ModelList = []string{
 }
 
 var ChannelName = "openai"
+
+// realtimeGAModels 仅包含已明确切换到 GA 协议、不能携带 Realtime Beta 标识的 OpenAI 模型。
+// 未知模型默认沿用 Beta Header，避免误伤第三方兼容实现或尚未确认协议形态的新模型。
+var realtimeGAModels = map[string]struct{}{
+	"gpt-realtime":                 {},
+	"gpt-realtime-2025-08-28":      {},
+	"gpt-realtime-mini":            {},
+	"gpt-realtime-mini-2025-10-06": {},
+	"gpt-realtime-mini-2025-12-15": {},
+	"gpt-realtime-1.5":             {},
+	"gpt-realtime-2":               {},
+	"gpt-realtime-2.1":             {},
+	"gpt-realtime-2.1-mini":        {},
+	"gpt-realtime-whisper":         {},
+	"gpt-realtime-translate":       {},
+}
