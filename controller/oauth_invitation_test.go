@@ -6,7 +6,6 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/oauth"
-	"github.com/gin-contrib/sessions"
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,7 +37,7 @@ func TestLinuxDOExistingUsernameBypassesInvitationCode(t *testing.T) {
 		Extra: map[string]any{
 			"trust_level": common.LinuxDOMinimumTrustLevel,
 		},
-	}, nil)
+	}, "", "")
 
 	require.NoError(t, err)
 	require.Equal(t, 2001, user.Id)
@@ -77,7 +76,7 @@ func TestLinuxDOExistingUsernameMatchIgnoresCaseBypassesInvitationCode(t *testin
 		Extra: map[string]any{
 			"trust_level": common.LinuxDOMinimumTrustLevel,
 		},
-	}, nil)
+	}, "", "")
 
 	require.NoError(t, err)
 	require.Equal(t, 2003, user.Id)
@@ -117,7 +116,7 @@ func TestLinuxDOExistingProviderIDBypassesInvitationCode(t *testing.T) {
 		Extra: map[string]any{
 			"trust_level": common.LinuxDOMinimumTrustLevel,
 		},
-	}, nil)
+	}, "", "")
 
 	require.NoError(t, err)
 	require.Equal(t, 2002, user.Id)
@@ -143,54 +142,10 @@ func TestLinuxDONewUserRequiresInvitationCode(t *testing.T) {
 		Extra: map[string]any{
 			"trust_level": common.LinuxDOMinimumTrustLevel,
 		},
-	}, newOAuthInvitationTestSession(nil))
+	}, "", "")
 
 	var requiredErr *OAuthInvitationCodeRequiredError
 	require.ErrorAs(t, err, &requiredErr)
 	require.Nil(t, user)
 }
 
-type oauthInvitationTestSession struct {
-	values map[interface{}]interface{}
-}
-
-func newOAuthInvitationTestSession(values map[interface{}]interface{}) *oauthInvitationTestSession {
-	if values == nil {
-		values = map[interface{}]interface{}{}
-	}
-	return &oauthInvitationTestSession{values: values}
-}
-
-func (s *oauthInvitationTestSession) ID() string {
-	return ""
-}
-
-func (s *oauthInvitationTestSession) Get(key interface{}) interface{} {
-	return s.values[key]
-}
-
-func (s *oauthInvitationTestSession) Set(key interface{}, val interface{}) {
-	s.values[key] = val
-}
-
-func (s *oauthInvitationTestSession) Delete(key interface{}) {
-	delete(s.values, key)
-}
-
-func (s *oauthInvitationTestSession) Clear() {
-	s.values = map[interface{}]interface{}{}
-}
-
-func (s *oauthInvitationTestSession) AddFlash(value interface{}, vars ...string) {
-}
-
-func (s *oauthInvitationTestSession) Flashes(vars ...string) []interface{} {
-	return nil
-}
-
-func (s *oauthInvitationTestSession) Options(options sessions.Options) {
-}
-
-func (s *oauthInvitationTestSession) Save() error {
-	return nil
-}

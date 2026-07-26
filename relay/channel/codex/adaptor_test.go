@@ -126,3 +126,17 @@ func TestCodexAdaptorRejectsProxyKeyWithDefaultChatGPTBaseURL(t *testing.T) {
 	err = adaptor.SetupRequestHeader(c, &headers, info)
 	require.ErrorContains(t, err, "non-JSON key requires a Codex-compatible proxy base_url")
 }
+
+func TestGetRequestURLAlphaSearch(t *testing.T) {
+	adaptor := &Adaptor{}
+	info := newTestRelayInfo(
+		relayconstant.RelayModeAlphaSearch,
+		"https://chatgpt.com",
+		`{"access_token":"access-token","account_id":"account-id"}`,
+		false,
+	)
+
+	url, err := adaptor.GetRequestURL(info)
+	require.NoError(t, err)
+	require.Equal(t, "https://chatgpt.com/backend-api/codex/alpha/search", url)
+}
