@@ -28,6 +28,7 @@ type Token struct {
 	UsedQuota          int     `json:"used_quota" gorm:"default:0"` // used quota
 	Group              string  `json:"group" gorm:"default:''"`
 	CrossGroupRetry    bool    `json:"cross_group_retry"` // 跨分组重试，仅auto分组有效
+	AutoGroups         string  `json:"-" gorm:"type:text"`
 	// Token-level rate limits. When RateLimitEnabled is false, only user/group limits apply.
 	// RateLimitTotal / RateLimitConcurrency: 0 means unlimited for that dimension.
 	// RateLimitSuccess: 0 means fall back to global/group success limit when enabled.
@@ -36,6 +37,30 @@ type Token struct {
 	RateLimitSuccess     int            `json:"rate_limit_success" gorm:"default:0"`
 	RateLimitConcurrency int            `json:"rate_limit_concurrency" gorm:"default:0"`
 	DeletedAt            gorm.DeletedAt `gorm:"index"`
+}
+
+func (token *Token) GetAutoGroups() ([]string, error) {
+	if token.AutoGroups == "" {
+		return nil, nil
+	}
+	var groups []string
+	if err := common.UnmarshalJsonStr(token.AutoGroups, &groups); err != nil {
+		return nil, err
+	}
+	return groups, nil
+}
+
+func (token *Token) SetAutoGroups(groups []string) error {
+	if len(groups) == 0 {
+		token.AutoGroups = ""
+		return nil
+	}
+	data, err := common.Marshal(groups)
+	if err != nil {
+		return err
+	}
+	token.AutoGroups = string(data)
+	return nil
 }
 
 func (token *Token) Clean() {
@@ -298,19 +323,17 @@ func (token *Token) Insert() error {
 
 // Update Make sure your token's fields is completed, because this will update non-zero values
 func (token *Token) Update() (err error) {
-	defer func() {
-		if shouldUpdateRedis(true, err) {
-			gopool.Go(func() {
-				err := cacheSetToken(*token)
-				if err != nil {
-					common.SysLog("failed to update token cache: " + err.Error())
-				}
-			})
-		}
-	}()
 	err = DB.Model(token).Select("name", "status", "expired_time", "remain_quota", "unlimited_quota",
-		"model_limits_enabled", "model_limits", "allow_ips", "group", "cross_group_retry",
+		"model_limits_enabled", "model_limits", "allow_ips", "group", "cross_group_retry", "auto_groups",
 		"rate_limit_enabled", "rate_limit_total", "rate_limit_success", "rate_limit_concurrency").Updates(token).Error
+	if shouldUpdateRedis(true, err) {
+		if cacheErr := cacheSetToken(*token); cacheErr != nil {
+			common.SysLog("failed to update token cache: " + cacheErr.Error())
+			if deleteErr := cacheDeleteToken(token.Key); deleteErr != nil {
+				common.SysLog("failed to invalidate token cache after update: " + deleteErr.Error())
+			}
+		}
+	}
 	return err
 }
 

@@ -57,6 +57,9 @@ const (
 	MsgTokenDbError              = "token.db_error"
 	MsgTokenRateLimitInvalid     = "token.rate_limit_invalid"
 	MsgTokenRateLimitExceedMax   = "token.rate_limit_exceed_max"
+	MsgTokenAutoGroupsTooMany    = "token.auto_groups_too_many"
+	MsgTokenAutoGroupsDuplicate  = "token.auto_groups_duplicate"
+	MsgTokenAutoGroupsInvalid    = "token.auto_groups_invalid"
 )
 
 // Redemption related messages

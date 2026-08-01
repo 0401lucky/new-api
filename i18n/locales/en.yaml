@@ -49,6 +49,9 @@ token.status_unavailable: "This token status is unavailable"
 token.db_error: "Invalid token, database query error, please contact administrator"
 token.rate_limit_invalid: "Token rate limit values must be zero or greater"
 token.rate_limit_exceed_max: "Token rate limit value exceeds maximum ({{.Max}})"
+token.auto_groups_too_many: "A token can select at most {{.Max}} Auto groups"
+token.auto_groups_duplicate: "Auto group {{.Group}} is duplicated"
+token.auto_groups_invalid: "Auto group {{.Group}} is unavailable or unauthorized"
 
 # Redemption messages
 redemption.name_length: "Redemption code name length must be between 1-20"
