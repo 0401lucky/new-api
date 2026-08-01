@@ -17,8 +17,6 @@ jobs:
     if: github.event.action != 'closed' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      GOWORK: 'off'
 
     steps:
       - name: Checkout
@@ -31,9 +29,7 @@ jobs:
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
-          cache-dependency-path: |
-            go.sum
-            relaykit/go.sum
+          cache-dependency-path: go.sum
 
       - name: Create frontend embed placeholder
         run: |
@@ -43,19 +39,11 @@ jobs:
       - name: Vet root module
         run: go vet ./...
 
-      - name: Vet relaykit independently
-        working-directory: relaykit
-        run: go vet ./...
-
       - name: Build root module
         run: go build ./...
 
-      - name: Build relaykit independently
-        working-directory: relaykit
-        run: go build ./...
-
-      - name: Test root and relaykit modules
-        run: make test
+      - name: Test root module
+        run: go test ./...
 
   frontend:
     name: Frontend typecheck and test
