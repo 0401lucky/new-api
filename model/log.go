@@ -131,7 +131,8 @@ func formatUserLogs(logs []*Log, startIdx int) {
 			// Remove operation-audit details (operator/route info), admin-only.
 			delete(otherMap, "audit_info")
 			// delete(otherMap, "reject_reason")
-			delete(otherMap, "stream_status")
+			// Stream status is visible to log owners (not admin-only).
+			// delete(otherMap, "stream_status")
 			// Full prompt text is for admin review only.
 			if promptCheck, ok := otherMap["prompt_check"].(map[string]interface{}); ok {
 				delete(promptCheck, "full_text")
