@@ -333,6 +333,8 @@ export type BillingSettings = {
   'checkin_setting.max_quota': number
   'checkin_setting.fixed_quota': number
   'checkin_setting.random_mode': boolean
+  'checkin_setting.reward_type': 'permanent' | 'temporary'
+  'checkin_setting.available_from_minutes': number
 }
 
 export type OperationsSettings = {

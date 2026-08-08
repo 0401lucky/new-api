@@ -108,6 +108,8 @@ const defaultBillingSettings: BillingSettings = {
   'checkin_setting.max_quota': 10000,
   'checkin_setting.fixed_quota': 1000,
   'checkin_setting.random_mode': true,
+  'checkin_setting.reward_type': 'permanent',
+  'checkin_setting.available_from_minutes': 0,
 }
 
 export function BillingSettings() {

@@ -146,6 +146,18 @@ type RelayInfo struct {
 	// SubscriptionAmountTotal / SubscriptionAmountUsedAfterPreConsume are used to compute remaining in logs.
 	SubscriptionAmountTotal               int64
 	SubscriptionAmountUsedAfterPreConsume int64
+
+	// 钱包限时额度资金拆分（用于消费日志审计，不写入永久额度）。
+	// TemporaryQuotaConsumed 本次消费中限时额度扣除量；
+	// PermanentQuotaConsumed 本次消费中永久额度扣除量；
+	// TemporaryQuotaCheckinId 最后使用的签到记录 ID；
+	// TemporaryQuotaExpiresAt 最后使用的限时额度失效时间；
+	// TemporaryQuotaAllocations 按额度桶拆分（退款时逐桶恢复）。
+	TemporaryQuotaConsumed      int
+	PermanentQuotaConsumed      int
+	TemporaryQuotaCheckinId     int
+	TemporaryQuotaExpiresAt     int64
+	TemporaryQuotaAllocations   []TemporaryQuotaAllocation
 	IsClaudeBetaQuery                     bool // /v1/messages?beta=true
 	IsChannelTest                         bool // channel test request
 	RetryIndex                            int
@@ -704,6 +716,14 @@ type TaskRelayInfo struct {
 	// a specific channel (e.g., remix on origin task's channel). Stored as any
 	// to avoid an import cycle with model; callers type-assert to *model.Channel.
 	LockedChannel any
+}
+
+// TemporaryQuotaAllocation 限时额度桶分配（relay 侧 DTO，避免 relay/common 依赖 model）。
+// 对应 model.TemporaryAllocation，供同步消费路径退款时逐桶恢复。
+type TemporaryQuotaAllocation struct {
+	CheckinId int   `json:"checkin_id"`
+	ExpiresAt int64 `json:"expires_at"`
+	Amount    int   `json:"amount"`
 }
 
 type TaskSubmitReq struct {

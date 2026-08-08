@@ -536,7 +536,10 @@ func buildSelfUserData(user *model.User) map[string]interface{} {
 	userSetting := user.GetSetting()
 	permissions := calculateUserPermissions(user.Role)
 	permissions["admin_permissions"] = authz.Capabilities(user.Id, user.Role)
-	return map[string]interface{}{
+
+	// 钱包限时额度：只返回当前仍有效的剩余额度，已过期按零返回；不依赖签到功能是否开启
+	temporaryQuota, _ := model.GetActiveTemporaryQuota(user.Id)
+	data := map[string]interface{}{
 		"id":                user.Id,
 		"username":          user.Username,
 		"display_name":      user.DisplayName,
@@ -563,6 +566,15 @@ func buildSelfUserData(user *model.User) map[string]interface{} {
 		"sidebar_modules":   userSetting.SidebarModules, // 正确提取sidebar_modules字段
 		"permissions":       permissions,
 	}
+	data["temporary_quota"] = temporaryQuota
+	if temporaryQuota > 0 {
+		if expiresAt := model.GetActiveTemporaryQuotaExpiresAt(user.Id); expiresAt > 0 {
+			data["temporary_quota_expires_at"] = expiresAt
+			// 按服务启动时区格式化，前端不自行换算浏览器时区
+			data["temporary_quota_expires_at_display"] = common.FormatInStartupTimezone(expiresAt, "01-02 15:04")
+		}
+	}
+	return data
 }
 
 // 计算用户权限的辅助函数

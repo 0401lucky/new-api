@@ -62,6 +62,7 @@ func TestMain(m *testing.M) {
 		&SystemInstance{},
 		&SystemTask{},
 		&SystemTaskLock{},
+		&Checkin{},
 	); err != nil {
 		panic("failed to migrate: " + err.Error())
 	}
@@ -100,6 +101,7 @@ func truncateTables(t *testing.T) {
 		DB.Exec("DELETE FROM system_instances")
 		DB.Exec("DELETE FROM system_task_locks")
 		DB.Exec("DELETE FROM system_tasks")
+		DB.Exec("DELETE FROM checkins")
 	})
 }
 
@@ -303,6 +305,7 @@ func TestRefundTaskQuotaAtomically_ConcurrentOnlyOnce(t *testing.T) {
 				user.Id,
 				0,
 				token.Id,
+				nil,
 			)
 		}(i)
 	}
@@ -348,7 +351,7 @@ func TestRefundTaskQuotaAtomically_NonFailureDoesNotRefund(t *testing.T) {
 	}
 	insertTask(t, task)
 
-	claimed, err := RefundTaskQuotaAtomically(task.ID, task.Quota, user.Id, 0, token.Id)
+	claimed, err := RefundTaskQuotaAtomically(task.ID, task.Quota, user.Id, 0, token.Id, nil)
 	require.NoError(t, err)
 	assert.False(t, claimed)
 
@@ -389,7 +392,7 @@ func TestRefundTaskQuotaAtomically_RefundsSubscription(t *testing.T) {
 	}
 	insertTask(t, task)
 
-	claimed, err := RefundTaskQuotaAtomically(task.ID, task.Quota, user.Id, subscription.Id, token.Id)
+	claimed, err := RefundTaskQuotaAtomically(task.ID, task.Quota, user.Id, subscription.Id, token.Id, nil)
 	require.NoError(t, err)
 	require.True(t, claimed)
 
@@ -436,7 +439,7 @@ func TestRefundTaskQuotaAtomically_FailureRollsBackAllChanges(t *testing.T) {
 		DB.Exec("DROP TRIGGER IF EXISTS fail_task_refund_token_update")
 	})
 
-	claimed, err := RefundTaskQuotaAtomically(task.ID, task.Quota, user.Id, 0, token.Id)
+	claimed, err := RefundTaskQuotaAtomically(task.ID, task.Quota, user.Id, 0, token.Id, nil)
 	require.Error(t, err)
 	assert.False(t, claimed)
 
@@ -479,10 +482,10 @@ func TestGetUnrefundedFailedTasks_FiltersLimitsAndNegativeQuota(t *testing.T) {
 func TestRefundTaskQuotaAtomically_RejectsNonPositiveQuota(t *testing.T) {
 	truncateTables(t)
 
-	claimed, err := RefundTaskQuotaAtomically(1, 0, 1, 0, 0)
+	claimed, err := RefundTaskQuotaAtomically(1, 0, 1, 0, 0, nil)
 	require.NoError(t, err)
 	assert.False(t, claimed)
-	claimed, err = RefundTaskQuotaAtomically(1, -1, 1, 0, 0)
+	claimed, err = RefundTaskQuotaAtomically(1, -1, 1, 0, 0, nil)
 	require.NoError(t, err)
 	assert.False(t, claimed)
 }

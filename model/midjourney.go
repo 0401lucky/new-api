@@ -1,5 +1,7 @@
 package model
 
+import "github.com/QuantumNous/new-api/common"
+
 type Midjourney struct {
 	Id          int    `json:"id"`
 	Code        int    `json:"code"`
@@ -23,6 +25,51 @@ type Midjourney struct {
 	Quota       int    `json:"quota"`
 	Buttons     string `json:"buttons"`
 	Properties  string `json:"properties"`
+
+	// 钱包限时额度资金拆分（用于失败退款按资金来源退还，防止限时额度被退进永久余额）
+	TemporaryQuotaConsumed int    `json:"temporary_quota_consumed" gorm:"default:0"`
+	PermanentQuotaConsumed int    `json:"permanent_quota_consumed" gorm:"default:0"`
+	TemporaryAllocations   string `json:"temporary_allocations"` // JSON: []TemporaryAllocation
+}
+
+// GetTemporaryAllocations 解析限时额度桶分配列表
+func (m *Midjourney) GetTemporaryAllocations() []TemporaryAllocation {
+	if m.TemporaryAllocations == "" {
+		return nil
+	}
+	var allocs []TemporaryAllocation
+	_ = common.UnmarshalJsonStr(m.TemporaryAllocations, &allocs)
+	return allocs
+}
+
+// SetTemporaryAllocations 序列化限时额度桶分配列表
+func (m *Midjourney) SetTemporaryAllocations(allocs []TemporaryAllocation) {
+	if len(allocs) == 0 {
+		m.TemporaryAllocations = ""
+		return
+	}
+	b, _ := common.Marshal(allocs)
+	m.TemporaryAllocations = string(b)
+}
+
+// UpdateMidjourneySplitByMjId 更新 MJ 任务的钱包资金拆分（消费成功后调用）。
+// 失败退款据此按资金来源退还。
+func UpdateMidjourneySplitByMjId(userId int, mjId string, split *WalletSplit) error {
+	if mjId == "" {
+		return nil
+	}
+	var allocsJSON string
+	if len(split.Allocations) > 0 {
+		b, _ := common.Marshal(split.Allocations)
+		allocsJSON = string(b)
+	}
+	return DB.Model(&Midjourney{}).
+		Where("user_id = ? AND mj_id = ?", userId, mjId).
+		Updates(map[string]interface{}{
+			"temporary_quota_consumed": split.Temporary,
+			"permanent_quota_consumed": split.Permanent,
+			"temporary_allocations":    allocsJSON,
+		}).Error
 }
 
 // TaskQueryParams 用于包含所有搜索条件的结构体，可以根据需求添加更多字段

@@ -129,6 +129,19 @@ export function Wallet(props: WalletProps) {
     fetchUser()
   }, [fetchUser])
 
+  // 限时额度在午夜自动失效：到达失效时间后自动刷新钱包数据
+  const tempExpiresAt = user?.temporary_quota_expires_at
+  useEffect(() => {
+    if (!tempExpiresAt) return
+    const nowSec = Math.floor(Date.now() / 1000)
+    const delayMs = Math.max((tempExpiresAt - nowSec) * 1000, 1000)
+    if (delayMs > 24 * 60 * 60 * 1000) return
+    const timer = window.setTimeout(() => {
+      fetchUser()
+    }, delayMs)
+    return () => window.clearTimeout(timer)
+  }, [tempExpiresAt, fetchUser])
+
   useEffect(() => {
     if (props.initialShowHistory) {
       setBillingDialogOpen(true)
@@ -288,7 +301,11 @@ export function Wallet(props: WalletProps) {
         <SectionPageLayout.Title>{t('Wallet')}</SectionPageLayout.Title>
         <SectionPageLayout.Content>
           <div className='mx-auto flex w-full max-w-7xl flex-col gap-4 sm:gap-5'>
-            <WalletStatsCard user={user} loading={userLoading} />
+            <WalletStatsCard
+              user={user}
+              loading={userLoading}
+              timezone={status?.checkin_timezone as string | undefined}
+            />
 
             <div
               className={

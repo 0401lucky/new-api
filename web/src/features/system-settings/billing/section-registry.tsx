@@ -199,6 +199,9 @@ const BILLING_SECTIONS = [
           maxQuota: settings['checkin_setting.max_quota'],
           fixedQuota: settings['checkin_setting.fixed_quota'],
           randomMode: settings['checkin_setting.random_mode'],
+          rewardType: settings['checkin_setting.reward_type'] ?? 'permanent',
+          availableFromMinutes:
+            settings['checkin_setting.available_from_minutes'] ?? 0,
           quotaPerUnit: settings.QuotaPerUnit,
         }}
       />

@@ -50,6 +50,7 @@ func TestMain(m *testing.M) {
 		&model.BlackroomBan{},
 		&model.SystemTask{},
 		&model.SystemTaskLock{},
+		&model.Checkin{},
 	); err != nil {
 		panic("failed to migrate: " + err.Error())
 	}
@@ -74,6 +75,7 @@ func truncate(t *testing.T) {
 		model.DB.Exec("DELETE FROM blackroom_bans")
 		model.DB.Exec("DELETE FROM system_task_locks")
 		model.DB.Exec("DELETE FROM system_tasks")
+		model.DB.Exec("DELETE FROM checkins")
 	})
 }
 

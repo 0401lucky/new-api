@@ -90,11 +90,16 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 	if relayInfo.UsePrice {
 		return nil
 	}
-	userQuota, err := model.GetUserQuota(relayInfo.UserId, false)
+	// relayInfo.UserQuota 保持永久额度语义；余额是否足够用钱包总可用额度判断
+	permanentQuota, err := model.GetUserQuota(relayInfo.UserId, false)
 	if err != nil {
 		return err
 	}
-	relayInfo.UserQuota = userQuota
+	walletQuota, err := model.GetWalletAvailableQuota(relayInfo.UserId)
+	if err != nil {
+		return err
+	}
+	relayInfo.UserQuota = permanentQuota
 
 	token, err := model.GetTokenByKey(strings.TrimPrefix(relayInfo.TokenKey, "sk-"), false)
 	if err != nil {
@@ -129,7 +134,7 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 	if ok {
 		groupRatioInfo.GroupSpecialRatio = userGroupRatio
 	}
-	dynamicMatch := model.GetMatchedDynamicRatioMatch(relayInfo.UsingGroup, relayInfo.OriginModelName, int64(userQuota))
+	dynamicMatch := model.GetMatchedDynamicRatioMatch(relayInfo.UsingGroup, relayInfo.OriginModelName, int64(permanentQuota))
 	if dynamicMatch.Ratio > 0 {
 		actualGroupRatio *= dynamicMatch.Ratio
 		groupRatioInfo.GroupRatio = actualGroupRatio
@@ -159,8 +164,8 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 	quota, clamp := calculateAudioQuota(quotaInfo)
 	noteQuotaClamp(relayInfo, clamp)
 
-	if userQuota < quota {
-		return fmt.Errorf("user quota is not enough, user quota: %s, need quota: %s", logger.FormatQuota(userQuota), logger.FormatQuota(quota))
+	if walletQuota < quota {
+		return fmt.Errorf("user quota is not enough, user quota: %s, need quota: %s", logger.FormatQuota(walletQuota), logger.FormatQuota(quota))
 	}
 
 	if !token.UnlimitedQuota && token.RemainQuota < quota {
@@ -443,14 +448,39 @@ func PostConsumeQuota(relayInfo *relaycommon.RelayInfo, quota int, preConsumedQu
 			relayInfo.SubscriptionPostDelta += delta
 		}
 	} else {
-		// Wallet
+		// Wallet: 优先使用有效限时额度，不足部分补永久额度
 		if quota > 0 {
-			err = model.DecreaseUserQuota(relayInfo.UserId, quota, false)
+			split, err := model.PreConsumeWallet(relayInfo.UserId, quota)
+			if err != nil {
+				return err
+			}
+			relayInfo.TemporaryQuotaConsumed = split.Temporary
+			relayInfo.PermanentQuotaConsumed = split.Permanent
+			relayInfo.TemporaryQuotaCheckinId = split.LastCheckinId()
+			relayInfo.TemporaryQuotaExpiresAt = split.LastExpiresAt()
+			relayInfo.TemporaryQuotaAllocations = modelAllocationsToRelay(split.Allocations)
 		} else {
-			err = model.IncreaseUserQuota(relayInfo.UserId, -quota, false)
-		}
-		if err != nil {
-			return err
+			// 退还：优先退永久额度，再退限时额度（过期不恢复），并按额度桶逐桶恢复
+			refundAmount := -quota
+			result, err := model.RefundWallet(relayInfo.UserId, refundAmount, &model.WalletSplit{
+				Temporary:   relayInfo.TemporaryQuotaConsumed,
+				Permanent:   relayInfo.PermanentQuotaConsumed,
+				Allocations: relayAllocationsToModel(relayInfo.TemporaryQuotaAllocations),
+			})
+			if err != nil {
+				return err
+			}
+			// 更新剩余可退拆分
+			relayInfo.TemporaryQuotaConsumed -= result.Temporary
+			relayInfo.PermanentQuotaConsumed -= result.Permanent
+			relayInfo.TemporaryQuotaAllocations = removeRelayAllocations(relayInfo.TemporaryQuotaAllocations, result.Allocations)
+			relayInfo.TemporaryQuotaCheckinId = 0
+			relayInfo.TemporaryQuotaExpiresAt = 0
+			if n := len(relayInfo.TemporaryQuotaAllocations); n > 0 {
+				last := relayInfo.TemporaryQuotaAllocations[n-1]
+				relayInfo.TemporaryQuotaCheckinId = last.CheckinId
+				relayInfo.TemporaryQuotaExpiresAt = last.ExpiresAt
+			}
 		}
 	}
 

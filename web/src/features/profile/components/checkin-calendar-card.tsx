@@ -23,6 +23,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Clock,
   Sparkles,
 } from 'lucide-react'
 import { useEffect, useState, useMemo, useCallback } from 'react'
@@ -59,7 +60,7 @@ export function CheckinCalendarCard({
   turnstileEnabled,
   turnstileSiteKey,
 }: CheckinCalendarCardProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1)
@@ -113,17 +114,55 @@ export function CheckinCalendarCard({
     )
   }, [checkinData?.stats?.records])
 
-  const todayString = useMemo(() => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  }, [])
+  // 后端返回的系统时区日期标识“今天”，前端不得用浏览器本地日期自行判断
+  const serverToday = checkinData?.current_date
+  const state = checkinData?.state
+  const rewardType = checkinData?.reward_type ?? 'permanent'
+  const isTemporaryReward = rewardType === 'temporary'
+  const checkedToday = state === 'checked'
+  const todayAward = serverToday ? checkinRecordsMap[serverToday] : undefined
 
-  const checkedToday = checkinData?.stats?.checked_in_today === true
-  const todayAward = checkinRecordsMap[todayString]
+  // 签到月份以服务端 current_date 为准（浏览器时区与系统时区不一致时也保持正确）
+  useEffect(() => {
+    if (!checkinData?.current_date) return
+    const parts = checkinData.current_date.split('-')
+    if (parts.length !== 3) return
+    const y = Number(parts[0])
+    const m = Number(parts[1]) - 1
+    if (!Number.isFinite(y) || !Number.isFinite(m)) return
+    const serverMonth = new Date(y, m, 1)
+    if (
+      serverMonth.getFullYear() !== currentMonth.getFullYear() ||
+      serverMonth.getMonth() !== currentMonth.getMonth()
+    ) {
+      setCurrentMonth(serverMonth)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkinData?.current_date])
+
   const rewardHint =
     checkinData?.random_mode === false
       ? t('Check in daily to receive fixed quota rewards')
       : t('Check in daily to receive random quota rewards')
+
+  // 开放前显示开放时间（服务端时区格式化，避免浏览器时区偏差）
+  const notOpenLabel = checkinData?.available_from_display
+    ? t('Check-in opens at {{time}}', { time: checkinData.available_from_display })
+    : t('Not open yet')
+
+  // 根据后端 next_transition_at 在开放时间/午夜自动刷新
+  useEffect(() => {
+    if (!checkinData?.next_transition_at) return
+    const next = checkinData.next_transition_at
+    const nowSec = Math.floor(Date.now() / 1000)
+    const delayMs = Math.max((next - nowSec) * 1000, 1000)
+    // 最长延迟上限，避免异常值造成长定时器
+    if (delayMs > 24 * 60 * 60 * 1000) return
+    const timer = window.setTimeout(() => {
+      refetch()
+    }, delayMs)
+    return () => window.clearTimeout(timer)
+  }, [checkinData?.next_transition_at, refetch])
 
   useEffect(() => {
     if (initialLoaded) return
@@ -148,9 +187,15 @@ export function CheckinCalendarCard({
       try {
         const res = await performCheckin(token)
         if (res.success && res.data) {
-          toast.success(
-            `${t('Check-in successful! Received')} ${formatQuotaWithCurrency(res.data.quota_awarded)}`
-          )
+          const quota = res.data.quota_awarded
+          const message = isTemporaryReward
+            ? t('Check-in successful! Received {{quota}} in limited-time quota', {
+                quota: formatQuotaWithCurrency(quota),
+              })
+            : t('Check-in successful! Received {{quota}}', {
+                quota: formatQuotaWithCurrency(quota),
+              })
+          toast.success(message)
           refetch()
           setTurnstileModalVisible(false)
         } else {
@@ -173,7 +218,7 @@ export function CheckinCalendarCard({
         setCheckinLoading(false)
       }
     },
-    [refetch, shouldTriggerTurnstile, t, turnstileSiteKey]
+    [isTemporaryReward, refetch, shouldTriggerTurnstile, t, turnstileSiteKey]
   )
 
   const handlePrevMonth = () => {
@@ -221,7 +266,23 @@ export function CheckinCalendarCard({
     return days
   }, [currentMonth])
 
-  const weekDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+  // 日历星期名称使用本地化格式（i18next language 需规范化为 BCP 47，否则 toLocaleDateString 抛异常）
+  const weekDays = useMemo(() => {
+    let lang = i18n.resolvedLanguage || i18n.language || 'en'
+    try {
+      new Intl.Locale(lang)
+    } catch {
+      lang = 'en'
+    }
+    // 2026-01-04 是周日，用其作为基准生成一周的短星期名
+    const base = new Date(2026, 0, 4)
+    return Array.from({ length: 7 }, (_, i) =>
+      new Date(base.getFullYear(), base.getMonth(), base.getDate() + i).toLocaleDateString(
+        lang,
+        { weekday: 'short' }
+      )
+    )
+  }, [i18n.language, i18n.resolvedLanguage])
 
   if (!checkinEnabled) {
     return null
@@ -247,10 +308,14 @@ export function CheckinCalendarCard({
   }
 
   let checkinButtonLabel = t('Check in now')
+  let checkinButtonDisabled = checkinLoading || checkedToday
   if (checkinLoading) {
     checkinButtonLabel = t('Loading...')
   } else if (checkedToday) {
     checkinButtonLabel = t('Checked in')
+  } else if (state === 'not_open') {
+    checkinButtonLabel = notOpenLabel
+    checkinButtonDisabled = true
   }
 
   return (
@@ -324,11 +389,17 @@ export function CheckinCalendarCard({
                     ? `${t('Today')} +${formatQuotaWithCurrency(todayAward)}`
                     : rewardHint}
                 </p>
+                {state === 'not_open' && checkinData?.available_from ? (
+                  <p className='text-muted-foreground mt-1 flex items-center gap-1 text-xs sm:text-sm'>
+                    <Clock className='size-3.5' />
+                    {notOpenLabel}
+                  </p>
+                ) : null}
               </div>
             </button>
             <Button
               onClick={() => doCheckin()}
-              disabled={checkinLoading || checkedToday}
+              disabled={checkinButtonDisabled}
               size='sm'
               className='w-full shrink-0 sm:w-auto'
             >
@@ -419,7 +490,7 @@ export function CheckinCalendarCard({
                     ).padStart(2, '0')}-${String(
                       dayObj.date.getDate()
                     ).padStart(2, '0')}`
-                    const isToday = dateStr === todayString
+                    const isToday = serverToday === dateStr
                     const quotaAwarded = checkinRecordsMap[dateStr]
                     const isCheckedIn = quotaAwarded !== undefined
                     const dayNum = dayObj.date.getDate()
@@ -473,9 +544,26 @@ export function CheckinCalendarCard({
                 <div className='bg-muted/30 text-muted-foreground rounded-lg border p-3 text-xs'>
                   <ul className='list-disc space-y-1 pl-5'>
                     <li>{rewardHint}</li>
-                    <li>
-                      {t('Rewards will be added directly to your balance')}
-                    </li>
+                    {isTemporaryReward ? (
+                      <>
+                        <li>
+                          {t(
+                            'This quota expires at midnight and does not increase your permanent balance.'
+                          )}
+                        </li>
+                        {checkedToday && checkinData?.expires_at_display ? (
+                          <li>
+                            {t('Expires at {{time}}', {
+                              time: checkinData.expires_at_display,
+                            })}
+                          </li>
+                        ) : null}
+                      </>
+                    ) : (
+                      <li>
+                        {t('Rewards will be added directly to your balance')}
+                      </li>
+                    )}
                     <li>{t('Do not repeat check-in; only once per day')}</li>
                   </ul>
                 </div>

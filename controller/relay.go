@@ -832,6 +832,17 @@ func RelayTask(c *gin.Context) {
 		task.PrivateData.SubscriptionId = relayInfo.SubscriptionId
 		task.PrivateData.TokenId = relayInfo.TokenId
 		task.PrivateData.NodeName = common.NodeName
+		// 钱包限时额度资金拆分快照（供轮询阶段结算/退款使用）
+		task.PrivateData.TemporaryQuotaConsumed = relayInfo.TemporaryQuotaConsumed
+		task.PrivateData.PermanentQuotaConsumed = relayInfo.PermanentQuotaConsumed
+		task.PrivateData.TemporaryQuotaCheckinId = relayInfo.TemporaryQuotaCheckinId
+		task.PrivateData.TemporaryQuotaExpiresAt = relayInfo.TemporaryQuotaExpiresAt
+		// 按额度桶拆分（refund 时逐桶恢复，防止跨午夜复活已过期额度）
+		if b, ok := relayInfo.Billing.(*service.BillingSession); ok && b != nil {
+			if wf, ok := b.WalletFundingSnapshot(); ok {
+				task.PrivateData.TemporaryAllocations = wf
+			}
+		}
 		task.PrivateData.BillingContext = &model.TaskBillingContext{
 			ModelPrice:                  relayInfo.PriceData.ModelPrice,
 			GroupRatio:                  relayInfo.PriceData.GroupRatioInfo.GroupRatio,

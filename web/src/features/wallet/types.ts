@@ -230,6 +230,12 @@ export interface UserWalletData {
   username: string
   /** Current quota balance */
   quota: number
+  /** Today's limited-time quota (expires at midnight) */
+  temporary_quota?: number
+  /** Limited-time quota expiry (unix seconds) */
+  temporary_quota_expires_at?: number
+  /** Limited-time quota expiry formatted in server timezone (MM-DD HH:mm) */
+  temporary_quota_expires_at_display?: string
   /** Total used quota */
   used_quota: number
   /** Total request count */

@@ -49,3 +49,12 @@ func StartupTimezoneName() string {
 func NowInStartupTimezone() time.Time {
 	return time.Now().In(StartupLocation())
 }
+
+// FormatInStartupTimezone 将 Unix 秒按服务启动时区格式化为字符串（用于前端展示）。
+// 前端不得用浏览器本地时区自行格式化服务端时间。
+func FormatInStartupTimezone(unix int64, layout string) string {
+	if unix <= 0 {
+		return ""
+	}
+	return time.Unix(unix, 0).In(StartupLocation()).Format(layout)
+}

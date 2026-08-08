@@ -26,6 +26,32 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// mjRelayAllocsToModel 将 relay 侧限时额度桶分配转换为 model 类型（用于任务拆分持久化）。
+func mjRelayAllocsToModel(allocs []relaycommon.TemporaryQuotaAllocation) []model.TemporaryAllocation {
+	if len(allocs) == 0 {
+		return nil
+	}
+	out := make([]model.TemporaryAllocation, 0, len(allocs))
+	for _, a := range allocs {
+		out = append(out, model.TemporaryAllocation{CheckinId: a.CheckinId, ExpiresAt: a.ExpiresAt, Amount: a.Amount})
+	}
+	return out
+}
+
+// mjPersistSplit 将本次 MJ 消费的资金拆分持久化到任务记录，供失败退款按资金来源退还。
+func mjPersistSplit(userId int, mjId string, info *relaycommon.RelayInfo) {
+	if mjId == "" || info == nil {
+		return
+	}
+	if err := model.UpdateMidjourneySplitByMjId(userId, mjId, &model.WalletSplit{
+		Temporary:   info.TemporaryQuotaConsumed,
+		Permanent:   info.PermanentQuotaConsumed,
+		Allocations: mjRelayAllocsToModel(info.TemporaryQuotaAllocations),
+	}); err != nil {
+		common.SysLog("failed to persist midjourney quota split: " + err.Error())
+	}
+}
+
 func RelayMidjourneyImage(c *gin.Context) {
 	taskId := c.Param("id")
 	midjourneyTask := model.GetByOnlyMJId(taskId)
@@ -211,7 +237,7 @@ func RelaySwapFace(c *gin.Context, info *relaycommon.RelayInfo) *dto.MidjourneyR
 		}
 	}
 
-	userQuota, err := model.GetUserQuota(info.UserId, false)
+	userQuota, err := model.GetWalletAvailableQuota(info.UserId)
 	if err != nil {
 		return &dto.MidjourneyResponse{
 			Code:        4,
@@ -238,6 +264,8 @@ func RelaySwapFace(c *gin.Context, info *relaycommon.RelayInfo) *dto.MidjourneyR
 			if err != nil {
 				common.SysLog("error consuming token remain quota: " + err.Error())
 			}
+			// 保存限时/永久资金拆分，供失败退款按资金来源退还
+			mjPersistSplit(info.UserId, mjResp.Response.Result, info)
 
 			tokenName := c.GetString("token_name")
 			logContent := fmt.Sprintf("模型固定价格 %.2f，分组倍率 %.2f，操作 %s", priceData.ModelPrice, priceData.GroupRatioInfo.GroupRatio, constant.MjActionSwapFace)
@@ -518,7 +546,7 @@ func RelayMidjourneySubmit(c *gin.Context, relayInfo *relaycommon.RelayInfo) *dt
 		}
 	}
 
-	userQuota, err := model.GetUserQuota(relayInfo.UserId, false)
+	userQuota, err := model.GetWalletAvailableQuota(relayInfo.UserId)
 	if err != nil {
 		return &dto.MidjourneyResponse{
 			Code:        4,
@@ -545,6 +573,9 @@ func RelayMidjourneySubmit(c *gin.Context, relayInfo *relaycommon.RelayInfo) *dt
 			if err != nil {
 				common.SysLog("error consuming token remain quota: " + err.Error())
 			}
+			// 保存限时/永久资金拆分，供失败退款按资金来源退还
+			mjPersistSplit(relayInfo.UserId, midjResponseWithStatus.Response.Result, relayInfo)
+
 			tokenName := c.GetString("token_name")
 			logContent := fmt.Sprintf("模型固定价格 %.2f，分组倍率 %.2f，操作 %s，ID %s", priceData.ModelPrice, priceData.GroupRatioInfo.GroupRatio, midjRequest.Action, midjResponse.Result)
 			other := service.GenerateMjOtherInfo(relayInfo, priceData)

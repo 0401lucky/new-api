@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -111,6 +112,14 @@ type TaskPrivateData struct {
 	TokenId        int                 `json:"token_id,omitempty"`        // 令牌 ID，用于令牌额度退款
 	NodeName       string              `json:"node_name,omitempty"`       // 发起任务的节点名，轮询结算阶段据此归属日志而非最后查询节点
 	BillingContext *TaskBillingContext `json:"billing_context,omitempty"` // 计费参数快照（用于轮询阶段重新计算）
+
+	// 钱包限时额度资金拆分（用于异步结算/退款）。
+	// 预扣时优先限时额度，拆分随任务持久化，退款时仅在未过期时可恢复限时部分。
+	TemporaryQuotaConsumed  int                   `json:"temporary_quota_consumed,omitempty"`  // 累计限时额度扣除量
+	PermanentQuotaConsumed  int                   `json:"permanent_quota_consumed,omitempty"`  // 累计永久额度扣除量
+	TemporaryQuotaCheckinId int                   `json:"temporary_quota_checkin_id,omitempty"` // 最后使用的签到记录 ID（日志展示）
+	TemporaryQuotaExpiresAt int64                 `json:"temporary_quota_expires_at,omitempty"` // 限时额度失效时间（日志展示）
+	TemporaryAllocations    []TemporaryAllocation `json:"temporary_allocations,omitempty"`      // 按额度桶拆分（退款时逐桶恢复）
 }
 
 // TaskBillingContext 记录任务提交时的计费参数，以便轮询阶段可以重新计算额度。
@@ -161,7 +170,7 @@ func (p *TaskPrivateData) Scan(val interface{}) error {
 }
 
 func (p TaskPrivateData) Value() (driver.Value, error) {
-	if (p == TaskPrivateData{}) {
+	if reflect.DeepEqual(p, TaskPrivateData{}) {
 		return nil, nil
 	}
 	return common.Marshal(p)
@@ -454,11 +463,36 @@ func (t *Task) UpdateQuota() error {
 	return DB.Model(t).Update("quota", t.Quota).Error
 }
 
+// UpdateQuotaAndPrivateData 更新任务额度与私有计费数据（含资金拆分快照）。
+// 异步差额结算后拆分变化必须随任务持久化，供后续退款使用。
+func (t *Task) UpdateQuotaAndPrivateData() error {
+	return DB.Model(t).Updates(map[string]interface{}{
+		"quota":        t.Quota,
+		"private_data": t.PrivateData,
+	}).Error
+}
+
 // RefundTaskQuotaAtomically 在同一事务内认领失败任务并完成额度退款。
+// split 为任务预扣时的钱包资金拆分（限时/永久），用于按资金来源退款；
+// 限时部分仅在未过期时可恢复，过期直接丢弃（不转为永久余额）。
 // 返回 false 且 error 为 nil 表示任务状态或额度已变化，本次未获得退款执行权。
-func RefundTaskQuotaAtomically(taskId int64, expectedQuota int, userId int, subscriptionId int, tokenId int) (bool, error) {
+func RefundTaskQuotaAtomically(taskId int64, expectedQuota int, userId int, subscriptionId int, tokenId int, split *WalletSplit) (bool, error) {
 	if expectedQuota <= 0 {
 		return false, nil
+	}
+
+	// 计算钱包退款拆分：优先退永久额度，再退限时额度。
+	// 旧任务（改造前创建）没有拆分信息，全额按永久额度退还。
+	refundPerm := expectedQuota
+	refundTemp := 0
+	if split != nil && split.Temporary+split.Permanent > 0 {
+		if refundPerm > split.Permanent {
+			refundPerm = split.Permanent
+		}
+		refundTemp = expectedQuota - refundPerm
+		if refundTemp > split.Temporary {
+			refundTemp = split.Temporary
+		}
 	}
 
 	claimed := false
@@ -479,14 +513,40 @@ func RefundTaskQuotaAtomically(taskId int64, expectedQuota int, userId int, subs
 				return err
 			}
 		} else {
-			result = tx.Model(&User{}).
-				Where("id = ?", userId).
-				Update("quota", gorm.Expr("quota + ?", expectedQuota))
-			if result.Error != nil {
-				return result.Error
+			// 钱包：永久额度部分直接退还
+			if refundPerm > 0 {
+				result = tx.Model(&User{}).
+					Where("id = ?", userId).
+					Update("quota", gorm.Expr("quota + ?", refundPerm))
+				if result.Error != nil {
+					return result.Error
+				}
+				if result.RowsAffected == 0 {
+					return fmt.Errorf("refund task quota: user %d not found", userId)
+				}
 			}
-			if result.RowsAffected == 0 {
-				return fmt.Errorf("refund task quota: user %d not found", userId)
+			// 限时额度部分按额度桶逆序（后扣的先退）逐桶恢复，仅在未过期时可恢复，
+			// 已过期桶直接丢弃（不转为永久余额，也不复活）。
+			if refundTemp > 0 && split != nil && len(split.Allocations) > 0 {
+				now := common.NowInStartupTimezone().Unix()
+				remaining := refundTemp
+				for i := len(split.Allocations) - 1; i >= 0 && remaining > 0; i-- {
+					alloc := split.Allocations[i]
+					restore := alloc.Amount
+					if restore > remaining {
+						restore = remaining
+					}
+					if alloc.ExpiresAt > now {
+						res := lockForUpdate(tx).Model(&Checkin{}).
+							Where("id = ? AND quota_type = ? AND quota_expires_at > ?",
+								alloc.CheckinId, CheckinQuotaTypeTemporary, now).
+							Update("quota_remaining", gorm.Expr("quota_remaining + ?", restore))
+						if res.Error != nil {
+							return res.Error
+						}
+					}
+					remaining -= restore
+				}
 			}
 		}
 
@@ -525,8 +585,8 @@ func RefundTaskQuotaAtomically(taskId int64, expectedQuota int, userId int, subs
 	}
 
 	// 缓存不属于账务事务；提交成功后尽力同步，失败只记录日志。
-	if subscriptionId <= 0 {
-		if err := cacheIncrUserQuota(userId, int64(expectedQuota)); err != nil {
+	if subscriptionId <= 0 && refundPerm > 0 {
+		if err := cacheIncrUserQuota(userId, int64(refundPerm)); err != nil {
 			common.SysLog("failed to sync user quota cache after task refund: " + err.Error())
 		}
 	}

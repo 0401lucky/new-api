@@ -213,9 +213,13 @@ func runMidjourneyTaskUpdateOnce(ctx context.Context, report func(processed, tot
 			if err != nil {
 				logger.LogError(ctx, "UpdateMidjourneyTask task error: "+err.Error())
 			} else if won && shouldReturnQuota {
-				err = model.IncreaseUserQuota(task.UserId, task.Quota, false)
-				if err != nil {
-					logger.LogError(ctx, "fail to increase user quota: "+err.Error())
+				// 按限时/永久资金拆分退款，防止把限时额度错误恢复为永久余额
+				if _, err := model.RefundWallet(task.UserId, task.Quota, &model.WalletSplit{
+					Temporary:   task.TemporaryQuotaConsumed,
+					Permanent:   task.PermanentQuotaConsumed,
+					Allocations: task.GetTemporaryAllocations(),
+				}); err != nil {
+					logger.LogError(ctx, "fail to refund midjourney quota by split: "+err.Error())
 				}
 				model.RecordTaskBillingLog(model.RecordTaskBillingLogParams{
 					UserId:    task.UserId,

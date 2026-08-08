@@ -113,6 +113,20 @@ func GetOptions(c *gin.Context) {
 		Key:   "CompletionRatioMeta",
 		Value: buildCompletionRatioMetaValue(optionValues),
 	})
+
+	// 签到配置新字段始终返回（首次启动尚未保存时注入默认值）
+	cs := operation_setting.GetCheckinSetting()
+	ensureCheckinOption := func(key, value string) {
+		common.OptionMapRWMutex.RLock()
+		_, exists := common.OptionMap[key]
+		common.OptionMapRWMutex.RUnlock()
+		if !exists {
+			options = append(options, &model.Option{Key: key, Value: value})
+		}
+	}
+	ensureCheckinOption("checkin_setting.reward_type", cs.RewardType)
+	ensureCheckinOption("checkin_setting.available_from_minutes", strconv.Itoa(cs.AvailableFromMinutes))
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
@@ -328,11 +342,35 @@ func UpdateOption(c *gin.Context) {
 			})
 			return
 		}
+		if quota > common.MaxQuota {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "签到额度不能超过上限",
+			})
+			return
+		}
 	case "checkin_setting.random_mode":
 		if _, err := strconv.ParseBool(strings.TrimSpace(option.Value.(string))); err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
 				"message": "签到随机模式必须是布尔值",
+			})
+			return
+		}
+	case "checkin_setting.reward_type":
+		if !operation_setting.IsValidRewardType(strings.TrimSpace(option.Value.(string))) {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "签到奖励类型无效",
+			})
+			return
+		}
+	case "checkin_setting.available_from_minutes":
+		minutes, err := strconv.Atoi(strings.TrimSpace(option.Value.(string)))
+		if err != nil || !operation_setting.IsValidAvailableFromMinutes(minutes) {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "签到开放时间必须在 00:00-23:59 之间",
 			})
 			return
 		}
@@ -400,6 +438,69 @@ func UpdateOption(c *gin.Context) {
 	recordManageAudit(c, "option.update", map[string]interface{}{
 		"key": option.Key,
 	})
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+	})
+}
+
+// UpdateCheckinSettingRequest 签到配置整组保存请求。
+type UpdateCheckinSettingRequest struct {
+	Enabled               bool   `json:"enabled"`
+	MinQuota              int    `json:"min_quota"`
+	MaxQuota              int    `json:"max_quota"`
+	FixedQuota            int    `json:"fixed_quota"`
+	RandomMode            bool   `json:"random_mode"`
+	RewardType            string `json:"reward_type"`
+	AvailableFromMinutes  int    `json:"available_from_minutes"`
+}
+
+// UpdateCheckinSetting 整组保存签到配置，一次性校验并原子写入，
+// 避免逐项保存形成无效中间状态（例如先启用签到但奖励仍为零）。
+func UpdateCheckinSetting(c *gin.Context) {
+	var req UpdateCheckinSettingRequest
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "无效的参数",
+		})
+		return
+	}
+
+	config := operation_setting.CheckinSetting{
+		Enabled:               req.Enabled,
+		MinQuota:              req.MinQuota,
+		MaxQuota:              req.MaxQuota,
+		FixedQuota:            req.FixedQuota,
+		RandomMode:            req.RandomMode,
+		RewardType:            req.RewardType,
+		AvailableFromMinutes:  req.AvailableFromMinutes,
+	}
+	if err := config.ValidateCheckinConfig(); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	values := map[string]string{
+		"checkin_setting.enabled":                strconv.FormatBool(config.Enabled),
+		"checkin_setting.min_quota":              strconv.Itoa(config.MinQuota),
+		"checkin_setting.max_quota":              strconv.Itoa(config.MaxQuota),
+		"checkin_setting.fixed_quota":            strconv.Itoa(config.FixedQuota),
+		"checkin_setting.random_mode":            strconv.FormatBool(config.RandomMode),
+		"checkin_setting.reward_type":            config.RewardType,
+		"checkin_setting.available_from_minutes": strconv.Itoa(config.AvailableFromMinutes),
+	}
+	// 先在同一数据库事务内持久化全部配置，再单次原子替换内存配置，
+	// 避免逐项更新内存导致并发请求读到混合中间态。
+	if err := model.UpdateOptionsBulkDBOnly(values); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	operation_setting.ReplaceCheckinSetting(config)
+	recordManageAudit(c, "option.update_checkin", map[string]interface{}{})
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",

@@ -29,18 +29,54 @@ type FundingSource interface {
 type WalletFunding struct {
 	userId   int
 	consumed int // 实际预扣的用户额度
+
+	// 限时额度资金拆分（累计）：记录本次消费中限时/永久额度的实际扣费拆分，
+	// 用于结算补扣、退款和消费日志审计。Allocations 按额度桶记录，
+	// 退款时逐桶恢复，避免跨午夜复活已过期额度。
+	tempConsumed int                       // 累计限时额度扣除量
+	permConsumed int                       // 累计永久额度扣除量
+	allocations  []model.TemporaryAllocation // 累计限时额度桶分配
 }
 
 func (w *WalletFunding) Source() string { return BillingSourceWallet }
+
+// split 返回当前累计资金拆分（供退款与日志使用）
+func (w *WalletFunding) split() *model.WalletSplit {
+	return &model.WalletSplit{
+		Temporary:   w.tempConsumed,
+		Permanent:   w.permConsumed,
+		Allocations: w.allocations,
+	}
+}
+
+// checkinId 返回最后一个限时额度桶的签到记录 ID（日志展示用），无则 0
+func (w *WalletFunding) checkinId() int {
+	if n := len(w.allocations); n > 0 {
+		return w.allocations[n-1].CheckinId
+	}
+	return 0
+}
+
+// tempExpiresAt 返回最后一个限时额度桶的失效时间（日志展示用），无则 0
+func (w *WalletFunding) tempExpiresAt() int64 {
+	if n := len(w.allocations); n > 0 {
+		return w.allocations[n-1].ExpiresAt
+	}
+	return 0
+}
 
 func (w *WalletFunding) PreConsume(amount int) error {
 	if amount <= 0 {
 		return nil
 	}
-	if err := model.DecreaseUserQuota(w.userId, amount, false); err != nil {
+	split, err := model.PreConsumeWallet(w.userId, amount)
+	if err != nil {
 		return err
 	}
 	w.consumed = amount
+	w.tempConsumed = split.Temporary
+	w.permConsumed = split.Permanent
+	w.allocations = split.Allocations
 	return nil
 }
 
@@ -49,18 +85,59 @@ func (w *WalletFunding) Settle(delta int) error {
 		return nil
 	}
 	if delta > 0 {
-		return model.DecreaseUserQuota(w.userId, delta, false)
+		// 补扣：继续限时优先、永久补足（允许欠费）
+		split, err := model.TopUpWallet(w.userId, delta)
+		if err != nil {
+			return err
+		}
+		w.consumed += delta
+		w.tempConsumed += split.Temporary
+		w.permConsumed += split.Permanent
+		w.allocations = append(w.allocations, split.Allocations...)
+		return nil
 	}
-	return model.IncreaseUserQuota(w.userId, -delta, false)
+	// 退还：优先退永久额度，再退限时额度（过期不恢复）
+	return w.refund(-delta)
 }
 
 func (w *WalletFunding) Refund() error {
 	if w.consumed <= 0 {
 		return nil
 	}
-	// IncreaseUserQuota 是 quota += N 的非幂等操作，不能重试，否则会多退额度。
-	// 订阅的 RefundSubscriptionPreConsume 有 requestId 幂等保护所以可以重试。
-	return model.IncreaseUserQuota(w.userId, w.consumed, false)
+	return w.refund(w.consumed)
+}
+
+// refund 退还 amount：优先退永久额度，其次退限时额度（仅未过期可恢复）。
+// 退款本身在数据库事务内完成，可安全重试；过期限时部分直接丢弃。
+// 退款后同步累计拆分与额度桶列表，保证后续退款不会重复退已退部分。
+func (w *WalletFunding) refund(amount int) error {
+	result, err := model.RefundWallet(w.userId, amount, w.split())
+	if err != nil {
+		return err
+	}
+	w.tempConsumed -= result.Temporary
+	w.permConsumed -= result.Permanent
+	w.consumed -= result.Temporary + result.Permanent
+	w.allocations = removeRefundedAllocations(w.allocations, result.Allocations)
+	return nil
+}
+
+// removeRefundedAllocations 从累计额度桶列表中移除本次退款已恢复的桶。
+// RefundWallet 逆序退还（后扣的先退），此处也从尾部匹配移除。
+func removeRefundedAllocations(all, removed []model.TemporaryAllocation) []model.TemporaryAllocation {
+	if len(removed) == 0 || len(all) == 0 {
+		return all
+	}
+	result := all
+	for _, rm := range removed {
+		for i := len(result) - 1; i >= 0; i-- {
+			if result[i].CheckinId == rm.CheckinId && result[i].Amount == rm.Amount {
+				result = append(result[:i], result[i+1:]...)
+				break
+			}
+		}
+	}
+	return result
 }
 
 // ---------------------------------------------------------------------------

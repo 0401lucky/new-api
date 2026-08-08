@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -74,6 +75,7 @@ func (s *BillingSession) Settle(actualQuota int) error {
 	if s.funding.Source() == BillingSourceSubscription {
 		s.relayInfo.SubscriptionPostDelta += int64(delta)
 	}
+	s.syncRelayInfo()
 	s.settled = true
 	return tokenErr
 }
@@ -149,6 +151,17 @@ func (s *BillingSession) GetPreConsumedQuota() int {
 	return s.preConsumedQuota
 }
 
+// WalletFundingSnapshot 返回钱包资金来源的限时额度桶分配快照（用于异步任务持久化）。
+// 非钱包计费时返回 false。调用方应在请求完成、Settle/Refund 提交后调用。
+func (s *BillingSession) WalletFundingSnapshot() ([]model.TemporaryAllocation, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if wf, ok := s.funding.(*WalletFunding); ok {
+		return wf.allocations, true
+	}
+	return nil, false
+}
+
 func (s *BillingSession) Reserve(targetQuota int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -213,6 +226,13 @@ func (s *BillingSession) preConsume(c *gin.Context, quota int) *types.NewAPIErro
 			}
 			s.tokenConsumed = 0
 		}
+		// 钱包余额不足：事务内校验失败，转 403 拒绝请求（不产生负余额）
+		if errors.Is(err, model.ErrInsufficientWalletBalance) {
+			return types.NewErrorWithStatusCode(
+				fmt.Errorf("用户额度不足, 需要预扣费额度: %s", logger.FormatQuota(effectiveQuota)),
+				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
+				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+		}
 		// TODO: model 层应定义哨兵错误（如 ErrNoActiveSubscription），用 errors.Is 替代字符串匹配
 		errMsg := err.Error()
 		if strings.Contains(errMsg, "no active subscription") || strings.Contains(errMsg, "subscription quota insufficient") {
@@ -232,14 +252,17 @@ func (s *BillingSession) preConsume(c *gin.Context, quota int) *types.NewAPIErro
 func (s *BillingSession) reserveFunding(delta int) error {
 	switch funding := s.funding.(type) {
 	case *WalletFunding:
-		// 与结算补扣（SettleBilling 正差额 → WalletFunding.Settle）语义一致：
-		// 全额无条件扣减，余额不足的部分记为欠费（余额可为负），不中断请求，
-		// 保证日志记录的预扣额度与用户余额的实际变动始终对账一致。
-		// DecreaseUserQuota 仅在数据库错误时失败。
-		if err := model.DecreaseUserQuota(funding.userId, delta, false); err != nil {
+		// 发送前补充预扣：与结算补扣（SettleBilling 正差额）语义一致，
+		// 允许余额不足记为欠费（余额可为负），不中断已开始的请求。
+		// 限时额度扣减在事务内锁定签到记录，防止并发重复消费。
+		split, err := model.TopUpWallet(funding.userId, delta)
+		if err != nil {
 			return types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
 		}
 		funding.consumed += delta
+		funding.tempConsumed += split.Temporary
+		funding.permConsumed += split.Permanent
+		funding.allocations = append(funding.allocations, split.Allocations...)
 		return nil
 	case *SubscriptionFunding:
 		if err := model.PostConsumeUserSubscriptionDelta(funding.subscriptionId, int64(delta)); err != nil {
@@ -260,10 +283,17 @@ func (s *BillingSession) reserveFunding(delta int) error {
 func (s *BillingSession) rollbackFundingReserve(delta int) {
 	switch funding := s.funding.(type) {
 	case *WalletFunding:
-		if err := model.IncreaseUserQuota(funding.userId, delta, false); err != nil {
+		// 回滚本次 reserve 的扣费：优先退永久额度，再退限时额度（过期不恢复）。
+		// 退款成功后必须同步累计拆分与额度桶列表，否则后续完整退款会按过期的
+		// 累计拆分重复退永久额度，造成资金来源转换。
+		result, err := model.RefundWallet(funding.userId, delta, funding.split())
+		if err != nil {
 			common.SysLog("error rolling back wallet funding reserve: " + err.Error())
 		} else {
 			funding.consumed -= delta
+			funding.tempConsumed -= result.Temporary
+			funding.permConsumed -= result.Permanent
+			funding.allocations = removeRefundedAllocations(funding.allocations, result.Allocations)
 		}
 	case *SubscriptionFunding:
 		if err := model.PostConsumeUserSubscriptionDelta(funding.subscriptionId, -int64(delta)); err != nil {
@@ -306,6 +336,11 @@ func (s *BillingSession) shouldTrust(c *gin.Context) bool {
 
 	switch s.funding.Source() {
 	case BillingSourceWallet:
+		// 存在有效限时额度时禁用信任额度旁路：避免请求在零点前开始、零点后结算
+		// 时失去明确的资金来源（限时部分必须在预扣时锁定）。
+		if hasTemp, err := model.HasActiveTemporaryQuota(s.relayInfo.UserId); err == nil && hasTemp {
+			return false
+		}
 		return s.relayInfo.UserQuota > trustQuota
 	case BillingSourceSubscription:
 		// 订阅不能启用信任旁路。原因：
@@ -336,6 +371,21 @@ func (s *BillingSession) syncRelayInfo() {
 		info.SubscriptionId = 0
 		info.SubscriptionPreConsumed = 0
 	}
+
+	// 钱包限时额度资金拆分（用于消费日志审计）
+	if wf, ok := s.funding.(*WalletFunding); ok {
+		info.TemporaryQuotaConsumed = wf.tempConsumed
+		info.PermanentQuotaConsumed = wf.permConsumed
+		info.TemporaryQuotaCheckinId = wf.checkinId()
+		info.TemporaryQuotaExpiresAt = wf.tempExpiresAt()
+		info.TemporaryQuotaAllocations = modelAllocationsToRelay(wf.allocations)
+	} else {
+		info.TemporaryQuotaConsumed = 0
+		info.PermanentQuotaConsumed = 0
+		info.TemporaryQuotaCheckinId = 0
+		info.TemporaryQuotaExpiresAt = 0
+		info.TemporaryQuotaAllocations = nil
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -352,19 +402,27 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 
 	// 钱包路径需要先检查用户额度
 	tryWallet := func() (*BillingSession, *types.NewAPIError) {
+		// 永久额度保持 relayInfo.UserQuota 语义（动态倍率、余额通知只用永久余额）；
+		// 余额是否足够用钱包总可用额度（永久 + 有效限时）判断。
 		userQuota, err := model.GetUserQuota(relayInfo.UserId, false)
 		if err != nil {
 			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
 		}
-		if userQuota <= 0 {
+		walletQuota := userQuota
+		tempQuota, err := model.GetActiveTemporaryQuota(relayInfo.UserId)
+		if err != nil {
+			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+		}
+		walletQuota += tempQuota
+		if walletQuota <= 0 {
 			return nil, types.NewErrorWithStatusCode(
-				fmt.Errorf("用户额度不足, 剩余额度: %s", logger.FormatQuota(userQuota)),
+				fmt.Errorf("用户额度不足, 剩余额度: %s", logger.FormatQuota(walletQuota)),
 				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
 				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}
-		if userQuota-preConsumedQuota < 0 {
+		if walletQuota-preConsumedQuota < 0 {
 			return nil, types.NewErrorWithStatusCode(
-				fmt.Errorf("预扣费额度失败, 用户剩余额度: %s, 需要预扣费额度: %s", logger.FormatQuota(userQuota), logger.FormatQuota(preConsumedQuota)),
+				fmt.Errorf("预扣费额度失败, 用户剩余额度: %s, 需要预扣费额度: %s", logger.FormatQuota(walletQuota), logger.FormatQuota(preConsumedQuota)),
 				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
 				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}

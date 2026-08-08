@@ -299,6 +299,33 @@ func UpdateOptionsBulk(values map[string]string) error {
 	return nil
 }
 
+// UpdateOptionsBulkDBOnly 仅在同一数据库事务内持久化多个 key/value 对，不更新内存。
+// 调用方需自行保证内存一致性（例如先提交 DB 再用单次原子赋值替换内存配置），
+// 避免逐项更新内存时被并发请求读到混合中间态。
+func UpdateOptionsBulkDBOnly(values map[string]string) error {
+	if len(values) == 0 {
+		return nil
+	}
+	for key, value := range values {
+		if err := validateOptionValue(key, value); err != nil {
+			return err
+		}
+	}
+	return DB.Transaction(func(tx *gorm.DB) error {
+		for k, v := range values {
+			option := Option{Key: k}
+			if err := tx.FirstOrCreate(&option, Option{Key: k}).Error; err != nil {
+				return err
+			}
+			option.Value = v
+			if err := tx.Save(&option).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func updateOptionMap(key string, value string) (err error) {
 	if key == retiredThemeOptionKey {
 		common.OptionMapRWMutex.Lock()

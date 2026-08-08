@@ -223,6 +223,18 @@ func appendBillingInfo(relayInfo *relaycommon.RelayInfo, other map[string]interf
 		}
 		// Wallet quota is not deducted when billed from subscription.
 		other["wallet_quota_deducted"] = 0
+	} else {
+		// 钱包消费的资金拆分：本次消费总额 + 限时额度拆分（用于账务审计）
+		walletConsumed := relayInfo.TemporaryQuotaConsumed + relayInfo.PermanentQuotaConsumed
+		if walletConsumed > 0 {
+			other["wallet_quota_consumed"] = walletConsumed
+			if relayInfo.TemporaryQuotaConsumed > 0 {
+				other["temporary_quota_consumed"] = relayInfo.TemporaryQuotaConsumed
+				if relayInfo.TemporaryQuotaCheckinId != 0 {
+					other["temporary_quota_checkin_id"] = relayInfo.TemporaryQuotaCheckinId
+				}
+			}
+		}
 	}
 }
 
@@ -323,6 +335,7 @@ func GenerateMjOtherInfo(relayInfo *relaycommon.RelayInfo, priceData types.Price
 		other["user_group_ratio"] = priceData.GroupRatioInfo.GroupSpecialRatio
 	}
 	appendRequestPath(nil, relayInfo, other)
+	appendBillingInfo(relayInfo, other)
 	return other
 }
 

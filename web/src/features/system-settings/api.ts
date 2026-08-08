@@ -42,6 +42,32 @@ export async function updateSystemOption(request: UpdateOptionRequest) {
   return res.data
 }
 
+export type UpdateCheckinSettingRequest = {
+  enabled: boolean
+  min_quota: number
+  max_quota: number
+  fixed_quota: number
+  random_mode: boolean
+  reward_type: 'permanent' | 'temporary'
+  available_from_minutes: number
+}
+
+export type UpdateCheckinSettingResponse = {
+  success: boolean
+  message: string
+}
+
+/** 整组原子保存签到配置 */
+export async function updateCheckinSetting(
+  request: UpdateCheckinSettingRequest
+) {
+  const res = await api.put<UpdateCheckinSettingResponse>(
+    '/api/option/checkin',
+    request
+  )
+  return res.data
+}
+
 export async function confirmPaymentCompliance() {
   const res = await api.post<ConfirmPaymentComplianceResponse>(
     '/api/option/payment_compliance',

@@ -92,14 +92,66 @@ func taskIsSubscription(task *model.Task) bool {
 }
 
 // taskAdjustFunding 调整任务的资金来源（钱包或订阅），delta > 0 表示扣费，delta < 0 表示退还。
+// 钱包路径优先使用有效限时额度，不足补永久额度；退还时优先退永久额度，
+// 限时部分仅在未过期时可恢复。拆分变动会更新到 task.PrivateData 并持久化。
 func taskAdjustFunding(task *model.Task, delta int) error {
 	if taskIsSubscription(task) {
 		return model.PostConsumeUserSubscriptionDelta(task.PrivateData.SubscriptionId, int64(delta))
 	}
 	if delta > 0 {
-		return model.DecreaseUserQuota(task.UserId, delta, false)
+		// 补扣：继续限时优先、永久补足（允许欠费，结算语义）
+		split, err := model.TopUpWallet(task.UserId, delta)
+		if err != nil {
+			return err
+		}
+		task.PrivateData.TemporaryQuotaConsumed += split.Temporary
+		task.PrivateData.PermanentQuotaConsumed += split.Permanent
+		if len(split.Allocations) > 0 {
+			task.PrivateData.TemporaryQuotaCheckinId = split.Allocations[len(split.Allocations)-1].CheckinId
+			task.PrivateData.TemporaryQuotaExpiresAt = split.Allocations[len(split.Allocations)-1].ExpiresAt
+			task.PrivateData.TemporaryAllocations = append(task.PrivateData.TemporaryAllocations, split.Allocations...)
+		}
+		return nil
 	}
-	return model.IncreaseUserQuota(task.UserId, -delta, false)
+	// 退还：优先退永久额度，再退限时额度（过期不恢复），并按额度桶逐桶恢复
+	refundAmount := -delta
+	result, err := model.RefundWallet(task.UserId, refundAmount, &model.WalletSplit{
+		Temporary:   task.PrivateData.TemporaryQuotaConsumed,
+		Permanent:   task.PrivateData.PermanentQuotaConsumed,
+		Allocations: task.PrivateData.TemporaryAllocations,
+	})
+	if err != nil {
+		return err
+	}
+	task.PrivateData.TemporaryQuotaConsumed -= result.Temporary
+	task.PrivateData.PermanentQuotaConsumed -= result.Permanent
+	task.PrivateData.TemporaryAllocations = removeTaskAllocations(task.PrivateData.TemporaryAllocations, result.Allocations)
+	if len(task.PrivateData.TemporaryAllocations) > 0 {
+		last := task.PrivateData.TemporaryAllocations[len(task.PrivateData.TemporaryAllocations)-1]
+		task.PrivateData.TemporaryQuotaCheckinId = last.CheckinId
+		task.PrivateData.TemporaryQuotaExpiresAt = last.ExpiresAt
+	} else {
+		task.PrivateData.TemporaryQuotaCheckinId = 0
+		task.PrivateData.TemporaryQuotaExpiresAt = 0
+	}
+	return nil
+}
+
+// removeTaskAllocations 从累计额度桶列表中移除本次退款已恢复的桶（逆序匹配）。
+func removeTaskAllocations(all, removed []model.TemporaryAllocation) []model.TemporaryAllocation {
+	if len(removed) == 0 || len(all) == 0 {
+		return all
+	}
+	result := all
+	for _, rm := range removed {
+		for i := len(result) - 1; i >= 0; i-- {
+			if result[i].CheckinId == rm.CheckinId && result[i].Amount == rm.Amount {
+				result = append(result[:i], result[i+1:]...)
+				break
+			}
+		}
+	}
+	return result
 }
 
 // taskAdjustTokenQuota 调整任务的令牌额度，delta > 0 表示扣费，delta < 0 表示退还。
@@ -154,6 +206,22 @@ func taskBillingOther(task *model.Task) map[string]interface{} {
 		other["is_model_mapped"] = true
 		other["upstream_model_name"] = props.UpstreamModelName
 	}
+	// 钱包限时额度资金拆分（用于任务账务审计）
+	if taskIsSubscription(task) {
+		other["billing_source"] = BillingSourceSubscription
+	} else {
+		other["billing_source"] = BillingSourceWallet
+	}
+	walletConsumed := task.PrivateData.TemporaryQuotaConsumed + task.PrivateData.PermanentQuotaConsumed
+	if walletConsumed > 0 {
+		other["wallet_quota_consumed"] = walletConsumed
+		if task.PrivateData.TemporaryQuotaConsumed > 0 {
+			other["temporary_quota_consumed"] = task.PrivateData.TemporaryQuotaConsumed
+			if task.PrivateData.TemporaryQuotaCheckinId != 0 {
+				other["temporary_quota_checkin_id"] = task.PrivateData.TemporaryQuotaCheckinId
+			}
+		}
+	}
 	return other
 }
 
@@ -198,6 +266,11 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) bool 
 		task.UserId,
 		subscriptionId,
 		task.PrivateData.TokenId,
+		&model.WalletSplit{
+			Temporary:   task.PrivateData.TemporaryQuotaConsumed,
+			Permanent:   task.PrivateData.PermanentQuotaConsumed,
+			Allocations: task.PrivateData.TemporaryAllocations,
+		},
 	)
 	if err != nil {
 		logger.LogWarn(ctx, fmt.Sprintf("原子退款失败 task %s: %s", task.TaskID, err.Error()))
@@ -208,6 +281,14 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) bool 
 		return false
 	}
 	task.Quota = 0
+	// 退款后拆分清零并持久化，避免后续重复退款或对账时残留
+	task.PrivateData.TemporaryQuotaConsumed = 0
+	task.PrivateData.PermanentQuotaConsumed = 0
+	task.PrivateData.TemporaryQuotaCheckinId = 0
+	task.PrivateData.TemporaryQuotaExpiresAt = 0
+	if err := task.UpdateQuotaAndPrivateData(); err != nil {
+		logger.LogError(ctx, fmt.Sprintf("退款后回写任务额度失败 task %s: %s", task.TaskID, err.Error()))
+	}
 
 	// 日志库可能与主库分离，因此在资金事务成功后记录；退款本身已具备幂等性。
 	other := taskBillingOther(task)
@@ -263,7 +344,7 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	taskAdjustTokenQuota(ctx, task, quotaDelta)
 
 	task.Quota = actualQuota
-	if err := task.UpdateQuota(); err != nil {
+	if err := task.UpdateQuotaAndPrivateData(); err != nil {
 		logger.LogError(ctx, fmt.Sprintf("差额结算回写 quota 失败 task %s: %s", task.TaskID, err.Error()))
 	}
 
