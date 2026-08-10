@@ -865,6 +865,7 @@
     "Check-in opening time must be between 00:00 and 23:59": "チェックイン開始時間は 00:00〜23:59 の間である必要があります",
     "Check-in opens at {{time}}": "{{time}} にチェックイン開始",
     "Check-in opens daily at this time": "毎日この時間にチェックインを開始します",
+    "Check-in opens daily at this time (check-in timezone: {{timezone}})": "毎日この時刻にチェックインを開始します（チェックインのタイムゾーン：{{timezone}}）",
     "Check-in opens daily at this time (server timezone: {{timezone}})": "毎日この時間にチェックインを開始します（サーバータイムゾーン: {{timezone}}）",
     "Check-in reward exceeds the allowed maximum": "チェックイン報酬が上限を超えています",
     "Check-in reward type": "チェックイン報酬の種類",

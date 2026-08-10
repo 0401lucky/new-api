@@ -304,7 +304,7 @@ export function Wallet(props: WalletProps) {
             <WalletStatsCard
               user={user}
               loading={userLoading}
-              timezone={status?.checkin_timezone as string | undefined}
+              timezone={status?.checkin_timezone}
             />
 
             <div

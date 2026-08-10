@@ -114,7 +114,7 @@ export function CheckinCalendarCard({
     )
   }, [checkinData?.stats?.records])
 
-  // 后端返回的系统时区日期标识“今天”，前端不得用浏览器本地日期自行判断
+  // 后端返回的北京时间日期标识“今天”，前端不得用浏览器本地日期自行判断
   const serverToday = checkinData?.current_date
   const state = checkinData?.state
   const rewardType = checkinData?.reward_type ?? 'permanent'
@@ -122,7 +122,7 @@ export function CheckinCalendarCard({
   const checkedToday = state === 'checked'
   const todayAward = serverToday ? checkinRecordsMap[serverToday] : undefined
 
-  // 签到月份以服务端 current_date 为准（浏览器时区与系统时区不一致时也保持正确）
+  // 签到月份以服务端 current_date 为准（浏览器或服务器时区与北京时间不一致时也保持正确）
   useEffect(() => {
     if (!checkinData?.current_date) return
     const parts = checkinData.current_date.split('-')
@@ -145,7 +145,7 @@ export function CheckinCalendarCard({
       ? t('Check in daily to receive fixed quota rewards')
       : t('Check in daily to receive random quota rewards')
 
-  // 开放前显示开放时间（服务端时区格式化，避免浏览器时区偏差）
+  // 开放前显示开放时间（后端按北京时间格式化，避免浏览器时区偏差）
   const notOpenLabel = checkinData?.available_from_display
     ? t('Check-in opens at {{time}}', { time: checkinData.available_from_display })
     : t('Not open yet')

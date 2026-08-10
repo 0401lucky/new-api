@@ -17,7 +17,7 @@ func TestBillingSessionReserveRollbackSyncsSplit(t *testing.T) {
 	seedUser(t, 1, 10000)
 	// 令牌额度为 0，导致 Reserve 阶段的 reserveToken 失败
 	seedToken(t, 1, 1, "sk-reserve-rollback", 0)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	c := seedTemporaryCheckinOn(t, 1, 3000, now+3600, "2026-08-08")
 
 	// 初始预扣 5000（限时 3000 + 永久 2000），模拟已完成的 preConsume
@@ -27,9 +27,9 @@ func TestBillingSessionReserveRollbackSyncsSplit(t *testing.T) {
 	assert.Equal(t, 2000, funding.permConsumed)
 
 	relayInfo := &relaycommon.RelayInfo{
-		UserId:     1,
-		TokenId:    1,
-		TokenKey:   "sk-reserve-rollback",
+		UserId:       1,
+		TokenId:      1,
+		TokenKey:     "sk-reserve-rollback",
 		IsPlayground: false,
 	}
 	session := &BillingSession{

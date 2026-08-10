@@ -21,7 +21,7 @@ func GetCheckinStatus(c *gin.Context) {
 	}
 	userId := c.GetInt("id")
 	// 获取月份参数，默认为当前月份
-	month := c.DefaultQuery("month", common.NowInStartupTimezone().Format("2006-01"))
+	month := c.DefaultQuery("month", common.NowInCheckinTimezone().Format("2006-01"))
 
 	stats, err := model.GetUserCheckinStats(userId, month)
 	if err != nil {
@@ -56,24 +56,24 @@ func GetCheckinStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"enabled":                 setting.Enabled,
-			"min_quota":               setting.MinQuota,
-			"max_quota":               setting.MaxQuota,
-			"fixed_quota":             setting.FixedQuota,
-			"random_mode":             setting.RandomMode,
-			"reward_type":             rewardType,
-			"available_from_minutes":  setting.AvailableFromMinutes,
-			"timezone":                timeInfo.Timezone,
-			"current_date":            timeInfo.CurrentDate,
-			"server_time":             timeInfo.ServerTime,
-			"state":                   timeInfo.State,
-			"available_from":          timeInfo.AvailableFrom,
-			"expires_at":              timeInfo.ExpiresAt,
-			"next_transition_at":      timeInfo.NextTransitionAt,
-			"temporary_quota":         timeInfo.TemporaryQuota,
-			"available_from_display":  timeInfo.AvailableFromDisplay,
-			"expires_at_display":      timeInfo.ExpiresAtDisplay,
-			"stats":                   stats,
+			"enabled":                setting.Enabled,
+			"min_quota":              setting.MinQuota,
+			"max_quota":              setting.MaxQuota,
+			"fixed_quota":            setting.FixedQuota,
+			"random_mode":            setting.RandomMode,
+			"reward_type":            rewardType,
+			"available_from_minutes": setting.AvailableFromMinutes,
+			"timezone":               timeInfo.Timezone,
+			"current_date":           timeInfo.CurrentDate,
+			"server_time":            timeInfo.ServerTime,
+			"state":                  timeInfo.State,
+			"available_from":         timeInfo.AvailableFrom,
+			"expires_at":             timeInfo.ExpiresAt,
+			"next_transition_at":     timeInfo.NextTransitionAt,
+			"temporary_quota":        timeInfo.TemporaryQuota,
+			"available_from_display": timeInfo.AvailableFromDisplay,
+			"expires_at_display":     timeInfo.ExpiresAtDisplay,
+			"stats":                  stats,
 		},
 	})
 }

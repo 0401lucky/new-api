@@ -21,7 +21,7 @@ type Checkin struct {
 	QuotaType string `json:"quota_type" gorm:"type:varchar(16);index;default:permanent"`
 	// QuotaRemaining 限时额度剩余量（仅 temporary 记录使用）
 	QuotaRemaining int `json:"quota_remaining" gorm:"not null;default:0"`
-	// QuotaExpiresAt 限时额度失效时间（Unix 秒，系统时区次日 00:00），0 表示不失效
+	// QuotaExpiresAt 限时额度失效时间（Unix 秒，北京时间次日 00:00），0 表示不失效
 	QuotaExpiresAt int64 `json:"quota_expires_at" gorm:"bigint;default:0"`
 
 	CreatedAt int64 `json:"created_at" gorm:"bigint"`
@@ -52,9 +52,9 @@ func GetUserCheckinRecords(userId int, startDate, endDate string) ([]Checkin, er
 	return records, err
 }
 
-// HasCheckedInToday 检查用户今天是否已签到（按系统时区判断）
+// HasCheckedInToday 检查用户今天是否已签到（按北京时间判断）
 func HasCheckedInToday(userId int) (bool, error) {
-	today := common.NowInStartupTimezone().Format("2006-01-02")
+	today := common.NowInCheckinTimezone().Format("2006-01-02")
 	var count int64
 	err := DB.Model(&Checkin{}).
 		Where("user_id = ? AND checkin_date = ?", userId, today).
@@ -62,9 +62,9 @@ func HasCheckedInToday(userId int) (bool, error) {
 	return count > 0, err
 }
 
-// GetTodayCheckin 获取用户今天的签到记录（按系统时区），无则返回 nil。
+// GetTodayCheckin 获取用户今天的签到记录（按北京时间），无则返回 nil。
 func GetTodayCheckin(userId int) (*Checkin, error) {
-	today := common.NowInStartupTimezone().Format("2006-01-02")
+	today := common.NowInCheckinTimezone().Format("2006-01-02")
 	var checkin Checkin
 	err := DB.Where("user_id = ? AND checkin_date = ?", userId, today).
 		Order("id DESC").
@@ -93,8 +93,8 @@ func UserCheckin(userId int) (*Checkin, error) {
 		return nil, errors.New("签到奖励配置无效: " + err.Error())
 	}
 
-	// 检查是否已到开放时间（按系统时区）
-	now := common.NowInStartupTimezone()
+	// 检查是否已到开放时间（按北京时间）
+	now := common.NowInCheckinTimezone()
 	if err := checkinAvailableCheck(setting, now); err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ func UserCheckin(userId int) (*Checkin, error) {
 
 	temporary := setting.IsTemporaryReward()
 	if temporary {
-		// 限时模式：写入签到额度桶，失效时间为系统时区次日 00:00
+		// 限时模式：写入签到额度桶，失效时间为北京时间次日 00:00
 		checkin.QuotaType = CheckinQuotaTypeTemporary
 		checkin.QuotaRemaining = quotaAwarded
 		checkin.QuotaExpiresAt = nextDayMidnightUnix(now)
@@ -145,7 +145,8 @@ func UserCheckin(userId int) (*Checkin, error) {
 
 // checkinAvailableCheck 校验当前时间是否已到签到开放时间。
 func checkinAvailableCheck(setting *operation_setting.CheckinSetting, now time.Time) error {
-	loc := common.StartupLocation()
+	loc := common.CheckinLocation()
+	now = now.In(loc)
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	availableFrom := todayStart.Add(time.Duration(setting.AvailableFromMinutes) * time.Minute)
 	if now.Before(availableFrom) {
@@ -154,9 +155,10 @@ func checkinAvailableCheck(setting *operation_setting.CheckinSetting, now time.T
 	return nil
 }
 
-// nextDayMidnightUnix 返回系统时区次日 00:00 的 Unix 秒。
+// nextDayMidnightUnix 返回北京时间次日 00:00 的 Unix 秒。
 func nextDayMidnightUnix(now time.Time) int64 {
-	loc := common.StartupLocation()
+	loc := common.CheckinLocation()
+	now = now.In(loc)
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	return todayStart.AddDate(0, 0, 1).Unix()
 }

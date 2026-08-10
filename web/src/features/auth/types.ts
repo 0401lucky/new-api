@@ -131,6 +131,8 @@ export interface SystemStatus {
     demo_site_enabled?: boolean
     user_agreement_enabled?: boolean
     privacy_policy_enabled?: boolean
+    checkin_timezone?: string
+    checkin_enabled?: boolean
     oauth_register_enabled?: boolean
     invitation_code_enabled?: boolean
     register_enabled?: boolean
@@ -177,6 +179,8 @@ export interface SystemStatus {
   demo_site_enabled?: boolean
   user_agreement_enabled?: boolean
   privacy_policy_enabled?: boolean
+  checkin_timezone?: string
+  checkin_enabled?: boolean
   oauth_register_enabled?: boolean
   invitation_code_enabled?: boolean
   register_enabled?: boolean

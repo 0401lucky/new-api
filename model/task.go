@@ -115,8 +115,8 @@ type TaskPrivateData struct {
 
 	// 钱包限时额度资金拆分（用于异步结算/退款）。
 	// 预扣时优先限时额度，拆分随任务持久化，退款时仅在未过期时可恢复限时部分。
-	TemporaryQuotaConsumed  int                   `json:"temporary_quota_consumed,omitempty"`  // 累计限时额度扣除量
-	PermanentQuotaConsumed  int                   `json:"permanent_quota_consumed,omitempty"`  // 累计永久额度扣除量
+	TemporaryQuotaConsumed  int                   `json:"temporary_quota_consumed,omitempty"`   // 累计限时额度扣除量
+	PermanentQuotaConsumed  int                   `json:"permanent_quota_consumed,omitempty"`   // 累计永久额度扣除量
 	TemporaryQuotaCheckinId int                   `json:"temporary_quota_checkin_id,omitempty"` // 最后使用的签到记录 ID（日志展示）
 	TemporaryQuotaExpiresAt int64                 `json:"temporary_quota_expires_at,omitempty"` // 限时额度失效时间（日志展示）
 	TemporaryAllocations    []TemporaryAllocation `json:"temporary_allocations,omitempty"`      // 按额度桶拆分（退款时逐桶恢复）
@@ -528,7 +528,7 @@ func RefundTaskQuotaAtomically(taskId int64, expectedQuota int, userId int, subs
 			// 限时额度部分按额度桶逆序（后扣的先退）逐桶恢复，仅在未过期时可恢复，
 			// 已过期桶直接丢弃（不转为永久余额，也不复活）。
 			if refundTemp > 0 && split != nil && len(split.Allocations) > 0 {
-				now := common.NowInStartupTimezone().Unix()
+				now := common.NowInCheckinTimezone().Unix()
 				remaining := refundTemp
 				for i := len(split.Allocations) - 1; i >= 0 && remaining > 0; i-- {
 					alloc := split.Allocations[i]

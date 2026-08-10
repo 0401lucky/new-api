@@ -570,8 +570,8 @@ func buildSelfUserData(user *model.User) map[string]interface{} {
 	if temporaryQuota > 0 {
 		if expiresAt := model.GetActiveTemporaryQuotaExpiresAt(user.Id); expiresAt > 0 {
 			data["temporary_quota_expires_at"] = expiresAt
-			// 按服务启动时区格式化，前端不自行换算浏览器时区
-			data["temporary_quota_expires_at_display"] = common.FormatInStartupTimezone(expiresAt, "01-02 15:04")
+			// 按签到时区（北京时间）格式化，前端不自行换算浏览器时区
+			data["temporary_quota_expires_at_display"] = common.FormatInCheckinTimezone(expiresAt, "01-02 15:04")
 		}
 	}
 	return data

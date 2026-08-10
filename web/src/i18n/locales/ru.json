@@ -865,6 +865,7 @@
     "Check-in opening time must be between 00:00 and 23:59": "Время начала регистрации должно быть между 00:00 и 23:59",
     "Check-in opens at {{time}}": "Регистрация открывается в {{time}}",
     "Check-in opens daily at this time": "Регистрация открывается каждый день в это время",
+    "Check-in opens daily at this time (check-in timezone: {{timezone}})": "Ежедневная отметка открывается в это время (часовой пояс отметки: {{timezone}})",
     "Check-in opens daily at this time (server timezone: {{timezone}})": "Регистрация открывается каждый день в это время (часовой пояс сервера: {{timezone}})",
     "Check-in reward exceeds the allowed maximum": "Награда за регистрацию превышает допустимый максимум",
     "Check-in reward type": "Тип награды за регистрацию",

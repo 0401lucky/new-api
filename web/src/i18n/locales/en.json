@@ -865,6 +865,7 @@
     "Check-in opening time must be between 00:00 and 23:59": "Check-in opening time must be between 00:00 and 23:59",
     "Check-in opens at {{time}}": "Check-in opens at {{time}}",
     "Check-in opens daily at this time": "Check-in opens daily at this time",
+    "Check-in opens daily at this time (check-in timezone: {{timezone}})": "Check-in opens daily at this time (check-in timezone: {{timezone}})",
     "Check-in opens daily at this time (server timezone: {{timezone}})": "Check-in opens daily at this time (server timezone: {{timezone}})",
     "Check-in reward exceeds the allowed maximum": "Check-in reward exceeds the allowed maximum",
     "Check-in reward type": "Check-in reward type",

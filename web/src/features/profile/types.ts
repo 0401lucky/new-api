@@ -236,9 +236,9 @@ export interface CheckinStatusResponse {
   reward_type?: 'permanent' | 'temporary'
   /** Minutes from midnight when check-in opens (0-1439) */
   available_from_minutes?: number
-  /** Server startup timezone */
+  /** Check-in timezone */
   timezone?: string
-  /** Today's date in server timezone (YYYY-MM-DD) */
+  /** Today's date in check-in timezone (YYYY-MM-DD) */
   current_date?: string
   /** Server current time (unix seconds) */
   server_time?: number
@@ -250,9 +250,9 @@ export interface CheckinStatusResponse {
   expires_at?: number
   /** Next state transition time (unix seconds) for auto refresh */
   next_transition_at?: number
-  /** Today's opening time formatted in server timezone (HH:mm) */
+  /** Today's opening time formatted in check-in timezone (HH:mm) */
   available_from_display?: string
-  /** Temporary quota expiry formatted in server timezone (MM-DD HH:mm) */
+  /** Temporary quota expiry formatted in check-in timezone (MM-DD HH:mm) */
   expires_at_display?: string
   /** Currently valid temporary quota */
   temporary_quota?: number
@@ -266,7 +266,7 @@ export interface CheckinStatusResponse {
 export interface CheckinResponse {
   /** Quota awarded for this check-in */
   quota_awarded: number
-  /** Check-in date (server timezone) */
+  /** Check-in date (check-in timezone) */
   checkin_date?: string
   /** Reward type: permanent or temporary */
   quota_type?: 'permanent' | 'temporary'

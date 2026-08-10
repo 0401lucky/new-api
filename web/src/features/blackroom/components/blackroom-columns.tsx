@@ -16,35 +16,24 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { type ColumnDef } from '@tanstack/react-table'
+import type { ColumnDef } from '@tanstack/react-table'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { formatNumber, formatTimestampToDate } from '@/lib/format'
+
 import { DataTableColumnHeader } from '@/components/data-table'
 import { StatusBadge } from '@/components/status-badge'
 import { TableId } from '@/components/table-id'
+import { formatNumber } from '@/lib/format'
+
 import {
   BLACKROOM_SOURCES,
   BLACKROOM_STATUSES,
   normalizeBlackroomSource,
   normalizeBlackroomStatus,
 } from '../constants'
+import { formatBlackroomTimeValue } from '../lib/blackroom-time'
 import type { BlackroomEntry } from '../types'
 import { DataTableRowActions } from './data-table-row-actions'
-
-function formatTimeValue(value: unknown): string {
-  if (typeof value === 'number') {
-    return formatTimestampToDate(value)
-  }
-  if (typeof value === 'string' && value.trim()) {
-    const numeric = Number(value)
-    if (Number.isFinite(numeric)) {
-      return formatTimestampToDate(numeric)
-    }
-    return value
-  }
-  return '-'
-}
 
 function formatHours(seconds: number | null | undefined, t: TFunction) {
   if (!seconds || seconds <= 0) return ''
@@ -60,7 +49,7 @@ function formatBanDuration(entry: BlackroomEntry, t: TFunction) {
     return t('Permanent')
   }
   const duration = formatHours(entry.ban_duration_seconds, t)
-  const until = formatTimeValue(entry.banned_until)
+  const until = formatBlackroomTimeValue(entry.banned_until)
   if (duration && until !== '-') {
     return `${duration} / ${until}`
   }
@@ -70,15 +59,15 @@ function formatBanDuration(entry: BlackroomEntry, t: TFunction) {
 function formatTerminalTime(entry: BlackroomEntry, t: TFunction) {
   const status = normalizeBlackroomStatus(entry.status)
   if (status === 'released') {
-    return formatTimeValue(entry.released_at)
+    return formatBlackroomTimeValue(entry.released_at)
   }
   if (status === 'expired') {
-    return formatTimeValue(entry.banned_until)
+    return formatBlackroomTimeValue(entry.banned_until)
   }
   if (entry.banned_until === 0) {
     return t('Permanent')
   }
-  return formatTimeValue(entry.banned_until)
+  return formatBlackroomTimeValue(entry.banned_until)
 }
 
 export function useBlackroomColumns(): ColumnDef<BlackroomEntry>[] {
@@ -225,7 +214,7 @@ export function useBlackroomColumns(): ColumnDef<BlackroomEntry>[] {
       ),
       cell: ({ row }) => (
         <div className='min-w-[140px] font-mono text-sm'>
-          {formatTimeValue(row.getValue('created_at'))}
+          {formatBlackroomTimeValue(row.getValue('created_at'))}
         </div>
       ),
     },

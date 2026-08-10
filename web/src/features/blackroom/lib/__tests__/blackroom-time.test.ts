@@ -16,13 +16,19 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import dayjs from 'dayjs'
-import relativeTime from 'dayjs/plugin/relativeTime'
-import timezone from 'dayjs/plugin/timezone'
-import utc from 'dayjs/plugin/utc'
+import assert from 'node:assert/strict'
+import { describe, test } from 'node:test'
 
-dayjs.extend(relativeTime)
-dayjs.extend(utc)
-dayjs.extend(timezone)
+import { formatBlackroomTimeValue } from '../blackroom-time'
 
-export default dayjs
+describe('blackroom time formatting', () => {
+  test('always formats Unix timestamps as Beijing time', () => {
+    const timestamp = Date.UTC(2026, 7, 8, 0, 0, 0) / 1000
+
+    assert.equal(formatBlackroomTimeValue(timestamp), '2026-08-08 08:00:00')
+    assert.equal(
+      formatBlackroomTimeValue(String(timestamp)),
+      '2026-08-08 08:00:00'
+    )
+  })
+})

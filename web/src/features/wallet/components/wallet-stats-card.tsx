@@ -28,7 +28,7 @@ import type { UserWalletData } from '../types'
 interface WalletStatsCardProps {
   user: UserWalletData | null
   loading?: boolean
-  /** 服务启动时区（用于展示限时额度失效时间） */
+  /** 签到时区（用于展示限时额度失效时间） */
   timezone?: string
 }
 

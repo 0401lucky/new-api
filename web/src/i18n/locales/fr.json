@@ -865,6 +865,7 @@
     "Check-in opening time must be between 00:00 and 23:59": "L'heure d'ouverture du check-in doit être comprise entre 00:00 et 23:59",
     "Check-in opens at {{time}}": "Le check-in ouvre à {{time}}",
     "Check-in opens daily at this time": "Le check-in ouvre chaque jour à cette heure",
+    "Check-in opens daily at this time (check-in timezone: {{timezone}})": "Les inscriptions ouvrent chaque jour à cette heure (fuseau horaire d'inscription : {{timezone}})",
     "Check-in opens daily at this time (server timezone: {{timezone}})": "Le check-in ouvre chaque jour à cette heure (fuseau horaire du serveur : {{timezone}})",
     "Check-in reward exceeds the allowed maximum": "La récompense de check-in dépasse le maximum autorisé",
     "Check-in reward type": "Type de récompense du check-in",

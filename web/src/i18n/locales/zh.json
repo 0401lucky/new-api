@@ -865,6 +865,7 @@
     "Check-in opening time must be between 00:00 and 23:59": "签到开放时间必须在 00:00-23:59 之间",
     "Check-in opens at {{time}}": "{{time}} 开放签到",
     "Check-in opens daily at this time": "每天在此时开放签到",
+    "Check-in opens daily at this time (check-in timezone: {{timezone}})": "每天在此时开放签到（签到时区：{{timezone}}）",
     "Check-in opens daily at this time (server timezone: {{timezone}})": "每天在此时开放签到（服务器时区：{{timezone}}）",
     "Check-in reward exceeds the allowed maximum": "签到奖励超过允许的最大值",
     "Check-in reward type": "签到奖励类型",

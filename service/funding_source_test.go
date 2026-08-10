@@ -28,7 +28,7 @@ func seedTemporaryCheckin(t *testing.T, userId, remaining int, expiresAt int64) 
 func TestWalletFunding_PreConsumeTemporaryFirst(t *testing.T) {
 	truncate(t)
 	seedUser(t, 1, 10000)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	seedTemporaryCheckin(t, 1, 3000, now+3600)
 
 	funding := &WalletFunding{userId: 1}
@@ -41,7 +41,7 @@ func TestWalletFunding_PreConsumeTemporaryFirst(t *testing.T) {
 func TestWalletFunding_SettleTopUpAndPartialRefund(t *testing.T) {
 	truncate(t)
 	seedUser(t, 1, 10000)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	seedTemporaryCheckin(t, 1, 3000, now+3600)
 
 	funding := &WalletFunding{userId: 1}
@@ -61,7 +61,7 @@ func TestWalletFunding_SettleTopUpAndPartialRefund(t *testing.T) {
 func TestWalletFunding_RefundRestoresPermanentFirst(t *testing.T) {
 	truncate(t)
 	seedUser(t, 1, 10000)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	seedTemporaryCheckin(t, 1, 3000, now+3600)
 
 	funding := &WalletFunding{userId: 1}
@@ -80,7 +80,7 @@ func TestWalletFunding_RefundRestoresPermanentFirst(t *testing.T) {
 func TestWalletFunding_RefundExpiredTemporaryNotRestored(t *testing.T) {
 	truncate(t)
 	seedUser(t, 1, 10000)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	c := seedTemporaryCheckin(t, 1, 3000, now+3600)
 
 	funding := &WalletFunding{userId: 1}
@@ -117,7 +117,7 @@ func TestWalletFunding_SourceAndIdempotentRefund(t *testing.T) {
 func TestWalletFunding_MultiBucketRefundSyncsAllocations(t *testing.T) {
 	truncate(t)
 	seedUser(t, 1, 10000)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	// 两个有效额度桶（跨午夜场景）
 	c1 := seedTemporaryCheckinOn(t, 1, 2000, now+3600, "2026-08-07")
 	c2 := seedTemporaryCheckinOn(t, 1, 3000, now+7200, "2026-08-08")
@@ -156,7 +156,7 @@ func TestWalletFunding_MultiBucketRefundSyncsAllocations(t *testing.T) {
 func TestWalletFunding_PartialRefundKeepsRemainingAllocation(t *testing.T) {
 	truncate(t)
 	seedUser(t, 1, 10000)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	c := seedTemporaryCheckinOn(t, 1, 3000, now+3600, "2026-08-08")
 
 	funding := &WalletFunding{userId: 1}

@@ -47,7 +47,7 @@ func getPermanentQuota(t *testing.T, userId int) int {
 func TestGetActiveTemporaryQuota_ExpiredExcluded(t *testing.T) {
 	truncateTables(t)
 	user := seedWalletUser(t, 1000)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 
 	// 有效记录（今天）
 	seedActiveTemporary(t, int64(user.Id), 500, now+3600, "2026-08-08")
@@ -66,7 +66,7 @@ func TestGetActiveTemporaryQuota_ExpiredExcluded(t *testing.T) {
 func TestPreConsumeWallet_TemporaryFirst(t *testing.T) {
 	truncateTables(t)
 	user := seedWalletUser(t, 10000)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	c := seedActiveTemporary(t, int64(user.Id), 3000, now+3600, "2026-08-08")
 
 	// 扣 5000：限时 3000 + 永久 2000
@@ -102,7 +102,7 @@ func TestPreConsumeWallet_PermanentOnly(t *testing.T) {
 func TestPreConsumeWallet_TemporaryEnough(t *testing.T) {
 	truncateTables(t)
 	user := seedWalletUser(t, 10000)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	seedActiveTemporary(t, int64(user.Id), 3000, now+3600, "2026-08-08")
 
 	// 扣 2000：全部从限时扣，永久不变
@@ -121,7 +121,7 @@ func TestPreConsumeWallet_InsufficientBalance(t *testing.T) {
 	truncateTables(t)
 	// 永久 0 + 限时 1000，预扣 1500 应失败且不产生负余额
 	user := seedWalletUser(t, 0)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	seedActiveTemporary(t, int64(user.Id), 1000, now+3600, "2026-08-08")
 
 	split, err := PreConsumeWallet(user.Id, 1500)
@@ -138,7 +138,7 @@ func TestPreConsumeWallet_InsufficientBalance(t *testing.T) {
 func TestPreConsumeWallet_MultiBucketAllocation(t *testing.T) {
 	truncateTables(t)
 	user := seedWalletUser(t, 10000)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	// 两个有效额度桶（跨午夜场景：昨天的桶未过期 + 今天的桶）
 	c1 := seedActiveTemporary(t, int64(user.Id), 2000, now+3600, "2026-08-07")
 	c2 := seedActiveTemporary(t, int64(user.Id), 3000, now+7200, "2026-08-08")
@@ -157,7 +157,7 @@ func TestPreConsumeWallet_MultiBucketAllocation(t *testing.T) {
 func TestRefundWallet_PermanentFirst(t *testing.T) {
 	truncateTables(t)
 	user := seedWalletUser(t, 10000)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	seedActiveTemporary(t, int64(user.Id), 3000, now+3600, "2026-08-08")
 
 	split, err := PreConsumeWallet(user.Id, 5000)
@@ -181,7 +181,7 @@ func TestRefundWallet_PermanentFirst(t *testing.T) {
 func TestRefundWallet_ExpiredTemporaryNotRestored(t *testing.T) {
 	truncateTables(t)
 	user := seedWalletUser(t, 10000)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	c := seedActiveTemporary(t, int64(user.Id), 3000, now+3600, "2026-08-08")
 
 	split, err := PreConsumeWallet(user.Id, 5000)
@@ -205,7 +205,7 @@ func TestRefundWallet_ExpiredTemporaryNotRestored(t *testing.T) {
 func TestRefundWallet_MultiBucketExpiredNotRestored(t *testing.T) {
 	truncateTables(t)
 	user := seedWalletUser(t, 10000)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	// 昨天的桶（预扣后过期）+ 今天的桶（预扣后仍有效）
 	c1 := seedActiveTemporary(t, int64(user.Id), 2000, now+3600, "2026-08-07")
 	c2 := seedActiveTemporary(t, int64(user.Id), 3000, now+7200, "2026-08-08")
@@ -248,7 +248,7 @@ func TestRefundWallet_NoSplitRefundsPermanent(t *testing.T) {
 func TestPreConsumeWallet_ConcurrentNoDoubleSpend(t *testing.T) {
 	truncateTables(t)
 	user := seedWalletUser(t, 100000)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	seedActiveTemporary(t, int64(user.Id), 3000, now+3600, "2026-08-08")
 
 	const goroutines = 10
@@ -278,7 +278,7 @@ func TestPreConsumeWallet_ConcurrentNoNegativeBalance(t *testing.T) {
 	truncateTables(t)
 	// 永久 0 + 限时 1000：并发预扣 1000，只允许一个成功消耗限时，不会把永久扣成负数
 	user := seedWalletUser(t, 0)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	seedActiveTemporary(t, int64(user.Id), 1000, now+3600, "2026-08-08")
 
 	const goroutines = 5
@@ -314,7 +314,7 @@ func TestPreConsumeWallet_ConcurrentNoNegativeBalance(t *testing.T) {
 func TestTopUpWallet_ContinuesTemporaryFirst(t *testing.T) {
 	truncateTables(t)
 	user := seedWalletUser(t, 10000)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	seedActiveTemporary(t, int64(user.Id), 3000, now+3600, "2026-08-08")
 
 	// 预扣 5000：限时 3000 + 永久 2000
@@ -334,7 +334,7 @@ func TestTopUpWallet_AllowsArrears(t *testing.T) {
 	truncateTables(t)
 	// 永久 1000 + 限时 2000，预扣 2500（限时 2000 + 永久 500），补扣 2000 允许欠费
 	user := seedWalletUser(t, 1000)
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	seedActiveTemporary(t, int64(user.Id), 2000, now+3600, "2026-08-08")
 
 	split, err := PreConsumeWallet(user.Id, 2500)

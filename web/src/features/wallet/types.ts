@@ -234,7 +234,7 @@ export interface UserWalletData {
   temporary_quota?: number
   /** Limited-time quota expiry (unix seconds) */
   temporary_quota_expires_at?: number
-  /** Limited-time quota expiry formatted in server timezone (MM-DD HH:mm) */
+  /** Limited-time quota expiry formatted in check-in timezone (MM-DD HH:mm) */
   temporary_quota_expires_at_display?: string
   /** Total used quota */
   used_quota: number

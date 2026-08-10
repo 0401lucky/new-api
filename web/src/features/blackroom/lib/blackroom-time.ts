@@ -16,13 +16,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import dayjs from 'dayjs'
-import relativeTime from 'dayjs/plugin/relativeTime'
-import timezone from 'dayjs/plugin/timezone'
-import utc from 'dayjs/plugin/utc'
+import { formatTimestampToDate } from '@/lib/format'
 
-dayjs.extend(relativeTime)
-dayjs.extend(utc)
-dayjs.extend(timezone)
+const BLACKROOM_TIMEZONE = 'Asia/Shanghai'
 
-export default dayjs
+export function formatBlackroomTimeValue(value: unknown): string {
+  if (typeof value === 'number') {
+    return formatTimestampToDate(value, 'seconds', BLACKROOM_TIMEZONE)
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const numeric = Number(value)
+    if (Number.isFinite(numeric)) {
+      return formatTimestampToDate(numeric, 'seconds', BLACKROOM_TIMEZONE)
+    }
+    return value
+  }
+  return '-'
+}

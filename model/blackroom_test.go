@@ -2,10 +2,30 @@ package model
 
 import (
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/stretchr/testify/require"
 )
+
+func TestBlackroomBanBlockMessageUsesBeijingTime(t *testing.T) {
+	previousLocation := time.Local
+	time.Local = time.FixedZone("server-local", -5*60*60)
+	t.Cleanup(func() {
+		time.Local = previousLocation
+	})
+
+	ban := &BlackroomBan{
+		Reason:      "测试封禁",
+		BannedUntil: time.Date(2026, time.August, 8, 0, 0, 0, 0, time.UTC).Unix(),
+	}
+
+	require.Equal(
+		t,
+		"账号已进入小黑屋：测试封禁，解封时间：2026-08-08 08:00:00（北京时间）",
+		ban.BlockMessage(),
+	)
+}
 
 func TestBlackroomBanLifecycle(t *testing.T) {
 	truncateTables(t)

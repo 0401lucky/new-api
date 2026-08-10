@@ -105,7 +105,11 @@ func (ban *BlackroomBan) BlockMessage() string {
 	if ban.BannedUntil == 0 {
 		return fmt.Sprintf("账号已进入小黑屋：%s，封禁类型：永久", reason)
 	}
-	return fmt.Sprintf("账号已进入小黑屋：%s，解封时间：%s", reason, time.Unix(ban.BannedUntil, 0).Format("2006-01-02 15:04:05"))
+	return fmt.Sprintf(
+		"账号已进入小黑屋：%s，解封时间：%s（北京时间）",
+		reason,
+		common.FormatInBeijingTimezone(ban.BannedUntil, "2006-01-02 15:04:05"),
+	)
 }
 
 func ListBlackroomBans(keyword string, status string, source string, userID int, startIdx int, num int) ([]*BlackroomBan, int64, error) {

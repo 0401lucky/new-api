@@ -865,6 +865,7 @@
     "Check-in opening time must be between 00:00 and 23:59": "Giờ mở đăng ký phải nằm trong khoảng 00:00 đến 23:59",
     "Check-in opens at {{time}}": "Đăng ký mở lúc {{time}}",
     "Check-in opens daily at this time": "Đăng ký mở mỗi ngày vào thời điểm này",
+    "Check-in opens daily at this time (check-in timezone: {{timezone}})": "Điểm danh mở hằng ngày vào giờ này (múi giờ điểm danh: {{timezone}})",
     "Check-in opens daily at this time (server timezone: {{timezone}})": "Đăng ký mở mỗi ngày vào thời điểm này (múi giờ máy chủ: {{timezone}})",
     "Check-in reward exceeds the allowed maximum": "Phần thưởng đăng ký vượt quá mức tối đa cho phép",
     "Check-in reward type": "Loại phần thưởng đăng ký",

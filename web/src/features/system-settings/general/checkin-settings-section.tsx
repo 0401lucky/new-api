@@ -114,7 +114,7 @@ export function CheckinSettingsSection({
   const { status } = useStatus()
   const schema = createSchema(t)
   const quotaPerUnit = normalizeQuotaPerUnit(defaultValues.quotaPerUnit)
-  const timezone = status?.checkin_timezone as string | undefined
+  const timezone = status?.checkin_timezone
 
   const form = useForm<Values>({
     resolver: zodResolver(schema) as unknown as Resolver<Values>,
@@ -275,7 +275,7 @@ export function CheckinSettingsSection({
                     </FormControl>
                     <FormDescription className='max-w-xl whitespace-normal'>
                       {timezone
-                        ? t('Check-in opens daily at this time (server timezone: {{timezone}})', {
+                        ? t('Check-in opens daily at this time (check-in timezone: {{timezone}})', {
                             timezone,
                           })
                         : t('Check-in opens daily at this time')}

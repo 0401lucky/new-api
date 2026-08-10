@@ -163,16 +163,20 @@ export function formatTimestamp(timestamp: number): string {
  * Format timestamp to YYYY-MM-DD HH:mm:ss
  * @param timestamp - Timestamp in seconds or milliseconds
  * @param unit - Unit of the timestamp ('seconds' or 'milliseconds')
+ * @param timeZone - Optional IANA timezone used for display
  */
 export function formatTimestampToDate(
   timestamp?: number,
-  unit: 'seconds' | 'milliseconds' = 'seconds'
+  unit: 'seconds' | 'milliseconds' = 'seconds',
+  timeZone?: string
 ): string {
   if (!timestamp || timestamp === -1 || timestamp === 0) {
     return '-'
   }
   const ms = unit === 'seconds' ? timestamp * 1000 : timestamp
-  return dayjs(ms).format('YYYY-MM-DD HH:mm:ss')
+  return (timeZone ? dayjs(ms).tz(timeZone) : dayjs(ms)).format(
+    'YYYY-MM-DD HH:mm:ss'
+  )
 }
 
 /**

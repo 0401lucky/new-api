@@ -60,7 +60,7 @@ func (s *WalletSplit) LastExpiresAt() int64 {
 // GetActiveTemporaryQuota 返回当前仍有效的限时额度总和。
 // 已过期记录按零处理（通过 quota_expires_at 判断，不依赖定时清理任务）。
 func GetActiveTemporaryQuota(userId int) (int, error) {
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	var total int64
 	err := DB.Model(&Checkin{}).
 		Where("user_id = ? AND quota_type = ? AND quota_remaining > 0 AND quota_expires_at > ?",
@@ -72,7 +72,7 @@ func GetActiveTemporaryQuota(userId int) (int, error) {
 
 // HasActiveTemporaryQuota 判断用户是否存在有效限时额度。
 func HasActiveTemporaryQuota(userId int) (bool, error) {
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	var count int64
 	err := DB.Model(&Checkin{}).
 		Where("user_id = ? AND quota_type = ? AND quota_remaining > 0 AND quota_expires_at > ?",
@@ -83,7 +83,7 @@ func HasActiveTemporaryQuota(userId int) (bool, error) {
 
 // GetActiveTemporaryQuotaExpiresAt 返回当前有效限时额度的失效时间（Unix 秒），无有效额度时返回 0。
 func GetActiveTemporaryQuotaExpiresAt(userId int) int64 {
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	var expiresAt int64
 	_ = DB.Model(&Checkin{}).
 		Where("user_id = ? AND quota_type = ? AND quota_remaining > 0 AND quota_expires_at > ?",
@@ -110,7 +110,7 @@ func GetWalletAvailableQuota(userId int) (int, error) {
 // activeTemporaryCheckinsTx 在事务内查询并锁定用户所有有效限时签到记录。
 // 按失效时间与 ID 排序，保证并发扣费确定性。
 func activeTemporaryCheckinsTx(tx *gorm.DB, userId int) ([]Checkin, error) {
-	now := common.NowInStartupTimezone().Unix()
+	now := common.NowInCheckinTimezone().Unix()
 	var records []Checkin
 	err := lockForUpdate(tx).
 		Where("user_id = ? AND quota_type = ? AND quota_remaining > 0 AND quota_expires_at > ?",
@@ -332,7 +332,7 @@ func RefundWallet(userId, amount int, split *WalletSplit) (*WalletSplit, error) 
 			}
 		}
 		if refundTemp > 0 && split != nil && len(split.Allocations) > 0 {
-			now := common.NowInStartupTimezone().Unix()
+			now := common.NowInCheckinTimezone().Unix()
 			remaining := refundTemp
 			// 逆序遍历（后扣的先退），未过期桶可恢复，过期桶直接丢弃
 			for i := len(split.Allocations) - 1; i >= 0 && remaining > 0; i-- {
