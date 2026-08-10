@@ -74,6 +74,7 @@ import {
   isViolationFeeLog,
   getFirstResponseTimeColor,
   getResponseTimeColor,
+  getReasoningEffortVariant,
   renderAuditContent,
 } from '../../lib/format'
 import {
@@ -227,14 +228,6 @@ function quotaSaturationKindLabel(
   if (kind === 'overflow') return t('Overflow')
   if (kind === 'underflow') return t('Underflow')
   return t('Invalid (NaN)')
-}
-
-function getReasoningEffortVariant(
-  effort: string
-): StatusBadgeProps['variant'] {
-  if (effort === 'high') return 'orange'
-  if (effort === 'medium') return 'yellow'
-  return 'green'
 }
 
 function BillingBreakdown(props: {
