@@ -619,6 +619,7 @@
     "Balance upper limit must be greater than lower limit": "残高の上限は下限より大きい必要があります",
     "Ban Duration / Release Time": "封禁期間 / 解除時刻",
     "Ban Duration / Until": "封禁期間 / 期限",
+    "Ban Released": "解除済み",
     "Ban user": "ユーザーを封禁",
     "Banned": "封禁中",
     "Bar Chart": "棒グラフ",

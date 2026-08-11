@@ -149,7 +149,26 @@ func handleBlackroomCandidate(setting *operation_setting.BlackroomSetting, candi
 		return false, false, true, nil
 	}
 
-	rule, ok := operation_setting.MatchBlackroomRule(setting, candidate.IpCount)
+	// 上次封禁已覆盖的日志不再参与定罪：旧日志会在回看窗口内反复命中，
+	// 导致到期后被重新封禁、生效中被误续期、升级计数被重复累加。
+	effectiveStart := windowStart
+	lastWindowEnd, err := model.GetLatestBlackroomBanWindowEnd(user.Id)
+	if err != nil {
+		return false, false, false, err
+	}
+	if lastWindowEnd >= windowStart {
+		effectiveStart = lastWindowEnd + 1
+	}
+	ips, err := model.GetDistinctIPsForUser(user.Id, effectiveStart, windowEnd, 200)
+	if err != nil {
+		return false, false, false, err
+	}
+	ipCount := candidate.IpCount
+	if effectiveStart != windowStart {
+		ipCount = len(ips)
+	}
+
+	rule, ok := operation_setting.MatchBlackroomRule(setting, ipCount)
 	if !ok {
 		return false, false, true, nil
 	}
@@ -162,7 +181,7 @@ func handleBlackroomCandidate(setting *operation_setting.BlackroomSetting, candi
 		return false, false, true, nil
 	}
 
-	decision, err := resolveBlackroomBanDecision(setting, user.Id, candidate.IpCount, windowEnd, existingErr != nil)
+	decision, err := resolveBlackroomBanDecision(setting, user.Id, ipCount, windowEnd, existingErr != nil)
 	if err != nil {
 		return false, false, false, err
 	}
@@ -170,23 +189,22 @@ func handleBlackroomCandidate(setting *operation_setting.BlackroomSetting, candi
 	bannedUntil := decision.BannedUntil
 	escalated := decision.Escalated
 
-	ips, err := model.GetDistinctIPsForUser(user.Id, windowStart, windowEnd, 200)
-	if err != nil {
-		return false, false, false, err
-	}
 	ipListBytes, err := common.Marshal(ips)
 	if err != nil {
 		return false, false, false, err
 	}
-	reason := fmt.Sprintf("%d 小时内使用了 %d 个不同 IP", setting.LookbackHours, candidate.IpCount)
+	reason := fmt.Sprintf("%d 小时内使用了 %d 个不同 IP", setting.LookbackHours, ipCount)
+	if effectiveStart != windowStart {
+		reason = fmt.Sprintf("上次封禁后使用了 %d 个不同 IP", ipCount)
+	}
 	if escalated {
 		reason += "，已触发多次封禁升级"
 	}
 	evidenceBytes, err := common.Marshal(map[string]any{
-		"window_start":   windowStart,
+		"window_start":   effectiveStart,
 		"window_end":     windowEnd,
 		"lookback_hours": setting.LookbackHours,
-		"ip_count":       candidate.IpCount,
+		"ip_count":       ipCount,
 		"request_count":  candidate.RequestCount,
 		"quota":          candidate.Quota,
 		"ips":            ips,
@@ -203,9 +221,9 @@ func handleBlackroomCandidate(setting *operation_setting.BlackroomSetting, candi
 		Source:             model.BlackroomBanSourceAuto,
 		Reason:             reason,
 		Evidence:           string(evidenceBytes),
-		IpCount:            candidate.IpCount,
+		IpCount:            ipCount,
 		IpList:             string(ipListBytes),
-		WindowStart:        windowStart,
+		WindowStart:        effectiveStart,
 		WindowEnd:          windowEnd,
 		BanDurationSeconds: durationSeconds,
 		BannedUntil:        bannedUntil,

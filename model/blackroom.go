@@ -386,7 +386,7 @@ func ExpireDueBlackroomBans() (int64, error) {
 	now := common.GetTimestamp()
 	var bans []BlackroomBan
 	if err := DB.Model(&BlackroomBan{}).
-		Select("id", "user_id").
+		Select("id", "user_id", "source").
 		Where("status = ? AND banned_until > 0 AND banned_until <= ?", BlackroomBanStatusActive, now).
 		Find(&bans).Error; err != nil {
 		return 0, err
@@ -394,9 +394,22 @@ func ExpireDueBlackroomBans() (int64, error) {
 	if len(bans) == 0 {
 		return 0, nil
 	}
+	// external 来源封禁时联动了 users.status，到期需先恢复账号再标记过期；
+	// 恢复失败的记录留给下一轮重试，避免记录过期后账号永远停在禁用状态。
 	ids := make([]int, 0, len(bans))
+	userIDs := make([]int, 0, len(bans))
 	for _, ban := range bans {
+		if ban.Source == BlackroomBanSourceExternal {
+			if err := SetBlackroomUserStatus(ban.UserId, common.UserStatusEnabled); err != nil {
+				common.SysError(fmt.Sprintf("blackroom expire restore user status failed: user_id=%d error=%v", ban.UserId, err))
+				continue
+			}
+		}
 		ids = append(ids, ban.Id)
+		userIDs = append(userIDs, ban.UserId)
+	}
+	if len(ids) == 0 {
+		return 0, nil
 	}
 	result := DB.Model(&BlackroomBan{}).
 		Where("id IN ? AND status = ? AND banned_until > 0 AND banned_until <= ?", ids, BlackroomBanStatusActive, now).
@@ -408,10 +421,31 @@ func ExpireDueBlackroomBans() (int64, error) {
 	if result.Error != nil {
 		return 0, result.Error
 	}
-	for _, ban := range bans {
-		InvalidateBlackroomUserAuthCache(ban.UserId)
+	for _, userID := range userIDs {
+		InvalidateBlackroomUserAuthCache(userID)
 	}
 	return result.RowsAffected, nil
+}
+
+// GetLatestBlackroomBanWindowEnd 返回用户最近一条小黑屋记录的 window_end（无记录时为 0）。
+// 扫描定罪时以它为界排除上次封禁已覆盖的日志，避免同一批日志被重复处罚。
+func GetLatestBlackroomBanWindowEnd(userID int) (int64, error) {
+	if userID <= 0 {
+		return 0, nil
+	}
+	var windowEnds []int64
+	err := DB.Model(&BlackroomBan{}).
+		Where("user_id = ?", userID).
+		Order("id desc").
+		Limit(1).
+		Pluck("window_end", &windowEnds).Error
+	if err != nil {
+		return 0, err
+	}
+	if len(windowEnds) == 0 {
+		return 0, nil
+	}
+	return windowEnds[0], nil
 }
 
 func CountRecentTemporaryBlackroomBans(userID int, since int64) (int64, error) {

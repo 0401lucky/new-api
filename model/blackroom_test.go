@@ -157,6 +157,111 @@ func TestUpsertActiveBlackroomBanKeepsSingleActiveRecord(t *testing.T) {
 	require.NotNil(t, third.ActiveKey)
 }
 
+func TestGetLatestBlackroomBanWindowEnd(t *testing.T) {
+	truncateTables(t)
+
+	user := User{
+		Username: "blackroom-window-user",
+		Password: "password",
+		Role:     common.RoleCommonUser,
+		Status:   common.UserStatusEnabled,
+		Group:    "default",
+	}
+	require.NoError(t, DB.Create(&user).Error)
+
+	windowEnd, err := GetLatestBlackroomBanWindowEnd(user.Id)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), windowEnd)
+
+	require.NoError(t, DB.Create(&BlackroomBan{
+		UserId:      user.Id,
+		Username:    user.Username,
+		Status:      BlackroomBanStatusExpired,
+		Source:      BlackroomBanSourceAuto,
+		WindowStart: 500,
+		WindowEnd:   1000,
+	}).Error)
+	require.NoError(t, DB.Create(&BlackroomBan{
+		UserId:      user.Id,
+		Username:    user.Username,
+		Status:      BlackroomBanStatusReleased,
+		Source:      BlackroomBanSourceManual,
+		WindowStart: 1500,
+		WindowEnd:   2000,
+	}).Error)
+
+	windowEnd, err = GetLatestBlackroomBanWindowEnd(user.Id)
+	require.NoError(t, err)
+	require.Equal(t, int64(2000), windowEnd)
+}
+
+func TestExpireDueBlackroomBansRestoresExternalUserStatus(t *testing.T) {
+	truncateTables(t)
+
+	user := User{
+		Username: "blackroom-expire-external-user",
+		Password: "password",
+		Role:     common.RoleCommonUser,
+		Status:   common.UserStatusDisabled,
+		Group:    "default",
+	}
+	require.NoError(t, DB.Create(&user).Error)
+
+	ban, _, err := UpsertActiveBlackroomBan(BlackroomBanInput{
+		UserId:             user.Id,
+		Username:           user.Username,
+		Source:             BlackroomBanSourceExternal,
+		Reason:             "外部封禁到期",
+		BanDurationSeconds: 1,
+		BannedUntil:        common.GetTimestamp() - 1,
+	})
+	require.NoError(t, err)
+
+	count, err := ExpireDueBlackroomBans()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+
+	expired, err := GetBlackroomBanByID(ban.Id)
+	require.NoError(t, err)
+	require.Equal(t, BlackroomBanStatusExpired, expired.Status)
+
+	var reloaded User
+	require.NoError(t, DB.First(&reloaded, "id = ?", user.Id).Error)
+	require.Equal(t, common.UserStatusEnabled, reloaded.Status)
+}
+
+func TestExpireDueBlackroomBansKeepsNonExternalUserStatus(t *testing.T) {
+	truncateTables(t)
+
+	// status 预置为禁用，验证 auto 来源到期不会误恢复账号状态
+	user := User{
+		Username: "blackroom-expire-auto-user",
+		Password: "password",
+		Role:     common.RoleCommonUser,
+		Status:   common.UserStatusDisabled,
+		Group:    "default",
+	}
+	require.NoError(t, DB.Create(&user).Error)
+
+	_, _, err := UpsertActiveBlackroomBan(BlackroomBanInput{
+		UserId:             user.Id,
+		Username:           user.Username,
+		Source:             BlackroomBanSourceAuto,
+		Reason:             "自动封禁到期",
+		BanDurationSeconds: 1,
+		BannedUntil:        common.GetTimestamp() - 1,
+	})
+	require.NoError(t, err)
+
+	count, err := ExpireDueBlackroomBans()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+
+	var reloaded User
+	require.NoError(t, DB.First(&reloaded, "id = ?", user.Id).Error)
+	require.Equal(t, common.UserStatusDisabled, reloaded.Status)
+}
+
 func TestSetBlackroomUserStatus(t *testing.T) {
 	truncateTables(t)
 

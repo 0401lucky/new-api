@@ -30,6 +30,7 @@ import {
   BLACKROOM_STATUSES,
   normalizeBlackroomSource,
   normalizeBlackroomStatus,
+  resolveBlackroomDisplayStatus,
 } from '../constants'
 import { formatBlackroomTimeValue } from '../lib/blackroom-time'
 import type { BlackroomEntry } from '../types'
@@ -112,7 +113,7 @@ export function useBlackroomColumns(): ColumnDef<BlackroomEntry>[] {
         <DataTableColumnHeader column={column} title={t('Status')} />
       ),
       cell: ({ row }) => {
-        const status = normalizeBlackroomStatus(row.getValue('status'))
+        const status = resolveBlackroomDisplayStatus(row.original)
         const config = BLACKROOM_STATUSES[status] ?? {
           labelKey: String(row.getValue('status') ?? '-'),
           variant: 'neutral' as const,
@@ -125,8 +126,8 @@ export function useBlackroomColumns(): ColumnDef<BlackroomEntry>[] {
           />
         )
       },
-      filterFn: (row, id, value) =>
-        value.includes(normalizeBlackroomStatus(row.getValue(id))),
+      filterFn: (row, _id, value) =>
+        value.includes(resolveBlackroomDisplayStatus(row.original)),
     },
     {
       accessorKey: 'source',

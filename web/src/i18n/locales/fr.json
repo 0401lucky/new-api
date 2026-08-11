@@ -619,6 +619,7 @@
     "Balance upper limit must be greater than lower limit": "La limite supérieure du solde doit être supérieure à la limite inférieure",
     "Ban Duration / Release Time": "Durée du bannissement / Heure de libération",
     "Ban Duration / Until": "Durée du bannissement / Jusqu’à",
+    "Ban Released": "Levé",
     "Ban user": "Bannir l'utilisateur",
     "Banned": "Banni",
     "Bar Chart": "Graphique en barres",

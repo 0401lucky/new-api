@@ -31,7 +31,7 @@ export const BLACKROOM_STATUSES: Record<
   { labelKey: string; variant: 'success' | 'warning' | 'danger' | 'neutral' }
 > = {
   active: { labelKey: 'Active', variant: 'danger' },
-  released: { labelKey: 'Released', variant: 'success' },
+  released: { labelKey: 'Ban Released', variant: 'success' },
   expired: { labelKey: 'Expired', variant: 'warning' },
 }
 
@@ -61,6 +61,20 @@ export function getBlackroomSourceOptions(t: TFunction) {
 export function normalizeBlackroomStatus(value: unknown): string {
   const normalized = String(value ?? 'active').toLowerCase()
   return normalized
+}
+
+// 后台任务把到期记录标记为 expired 前有最多一个检查周期的延迟，
+// 展示层直接按 banned_until 判定，避免"已到期仍显示生效"。
+export function resolveBlackroomDisplayStatus(
+  entry: { status?: unknown; banned_until?: number | null },
+  nowSeconds: number = Math.floor(Date.now() / 1000)
+): string {
+  const status = normalizeBlackroomStatus(entry.status)
+  const bannedUntil = entry.banned_until ?? 0
+  if (status === 'active' && bannedUntil > 0 && bannedUntil <= nowSeconds) {
+    return 'expired'
+  }
+  return status
 }
 
 export function normalizeBlackroomSource(value: unknown): string {

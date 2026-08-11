@@ -119,7 +119,7 @@ export const STATIC_I18N_KEYS = [
 
   // Blackroom
   'Banned',
-  'Released',
+  'Ban Released',
   'Manual',
   'Scan',
   'Blackroom scan completed',

@@ -619,6 +619,7 @@
     "Balance upper limit must be greater than lower limit": "余额上限必须大于余额下限",
     "Ban Duration / Release Time": "封禁时长 / 解封时间",
     "Ban Duration / Until": "封禁时长 / 截止时间",
+    "Ban Released": "已解封",
     "Ban user": "封禁用户",
     "Banned": "已封禁",
     "Bar Chart": "柱状图",
