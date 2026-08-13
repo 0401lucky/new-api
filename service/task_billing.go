@@ -245,7 +245,8 @@ func taskModelName(task *model.Task) string {
 }
 
 // RefundTaskQuota 统一的任务失败退款逻辑。
-// 资金、令牌额度与任务退款标记在同一数据库事务内提交，避免重复退款或永久漏退。
+// 资金、令牌额度与任务退款标记在同一数据库事务内提交；成功后回减用户和渠道用量。
+// 返回资金来源是否已成功退还；失败时保留 quota，供显式重试或人工对账。
 func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) bool {
 	quota := task.Quota
 	if quota == 0 {
@@ -286,9 +287,14 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) bool 
 	task.PrivateData.PermanentQuotaConsumed = 0
 	task.PrivateData.TemporaryQuotaCheckinId = 0
 	task.PrivateData.TemporaryQuotaExpiresAt = 0
+	task.PrivateData.TemporaryAllocations = nil
 	if err := task.UpdateQuotaAndPrivateData(); err != nil {
 		logger.LogError(ctx, fmt.Sprintf("退款后回写任务额度失败 task %s: %s", task.TaskID, err.Error()))
 	}
+
+	// 回减预扣时累计的用户和渠道用量，请求次数保持不变。
+	model.UpdateUserUsedQuota(task.UserId, -quota)
+	model.UpdateChannelUsedQuota(task.ChannelId, -quota)
 
 	// 日志库可能与主库分离，因此在资金事务成功后记录；退款本身已具备幂等性。
 	other := taskBillingOther(task)
@@ -348,13 +354,15 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 		logger.LogError(ctx, fmt.Sprintf("差额结算回写 quota 失败 task %s: %s", task.TaskID, err.Error()))
 	}
 
+	// 提交阶段已经累计过一次请求；结算阶段只调整最终用量。
+	model.UpdateUserUsedQuota(task.UserId, quotaDelta)
+	model.UpdateChannelUsedQuota(task.ChannelId, quotaDelta)
+
 	var logType int
 	var logQuota int
 	if quotaDelta > 0 {
 		logType = model.LogTypeConsume
 		logQuota = quotaDelta
-		model.UpdateUserUsedQuotaAndRequestCount(task.UserId, quotaDelta)
-		model.UpdateChannelUsedQuota(task.ChannelId, quotaDelta)
 	} else {
 		logType = model.LogTypeRefund
 		logQuota = -quotaDelta
