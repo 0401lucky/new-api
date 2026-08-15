@@ -16,152 +16,28 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { CheckCircle, Search, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Activity, CheckCircle, RefreshCw, Search, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { PublicLayout } from '@/components/layout'
-import { getPublicModelHealthLast24h } from './api'
-import type {
-  PublicModelHealthHourlyStat,
-  PublicModelHealthPayload,
-} from './types'
-import {
-  formatRate,
-  formatTokens,
-  hourLabel,
-} from './utils'
+import { cn } from '@/lib/utils'
+import { getPublicModelHealthOverview } from './api'
+import { ModelHealthCard } from './components/model-health-card'
+import { GLOBAL_STATUS_META } from './status'
+import type { ModelHealthOverviewPayload, ModelHealthPeriod } from './types'
+import { formatRate, formatTokens, timestamp2string } from './utils'
 
-type RateLevel = {
-  level: 'excellent' | 'good' | 'warning' | 'poor' | 'critical'
-  color: string
-  bg: string
-  text: string
-}
+const REFRESH_INTERVAL_MS = 30_000
 
-function getRateLevel(rate: number): RateLevel {
-  const v = Number(rate) || 0
-  if (v >= 0.95) {
-    return {
-      level: 'excellent',
-      color: '#22c7d8',
-      bg: 'rgba(34, 199, 216, 0.16)',
-      text: 'Excellent',
-    }
-  }
-  if (v >= 0.8) {
-    return {
-      level: 'good',
-      color: '#34b567',
-      bg: 'rgba(52, 181, 103, 0.16)',
-      text: 'Good',
-    }
-  }
-  if (v >= 0.6) {
-    return {
-      level: 'warning',
-      color: '#9ac447',
-      bg: 'rgba(154, 196, 71, 0.17)',
-      text: 'Average',
-    }
-  }
-  if (v >= 0.2) {
-    return {
-      level: 'poor',
-      color: '#f5a524',
-      bg: 'rgba(245, 165, 36, 0.18)',
-      text: 'Poor',
-    }
-  }
-  return {
-    level: 'critical',
-    color: '#f36b4f',
-    bg: 'rgba(243, 107, 79, 0.18)',
-    text: 'Abnormal',
-  }
-}
-
-function HealthCell(props: {
-  cell: PublicModelHealthHourlyStat
-  isLatest: boolean
-}) {
-  const { t } = useTranslation()
-  const rate = Number(props.cell?.success_rate) || 0
-  const hasHealthData =
-    (Number(props.cell?.total_requests) || 0) > 0 ||
-    (Number(props.cell?.total_slices) || 0) > 0
-  const isFilled = props.cell?.is_filled || !hasHealthData
-  const tokens = Number(props.cell?.success_tokens) || 0
-  const { color } = getRateLevel(rate)
-
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <div
-            className={
-              isFilled
-                ? 'h-[28px] w-[18px] cursor-pointer rounded-[6px] border border-slate-300/80 bg-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:h-[32px] sm:w-[22px] dark:border-slate-700 dark:bg-slate-800/70'
-                : 'h-[28px] w-[18px] cursor-pointer rounded-[6px] border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:h-[32px] sm:w-[22px]'
-            }
-            style={{
-              borderColor: isFilled ? undefined : color,
-              backgroundColor: isFilled ? undefined : color,
-              boxShadow: isFilled
-                ? undefined
-                : `0 8px 18px ${color}2e, inset 0 1px 0 rgba(255,255,255,0.32)`,
-            }}
-          />
-        }
-      />
-      <TooltipContent className='block max-w-xs p-3 text-xs'>
-        <div className='mb-1.5 text-sm font-semibold'>
-          {hourLabel(props.cell?.hour_start_ts)}
-        </div>
-        <div className='space-y-1'>
-          <div>
-            {t('Success rate')}:{' '}
-            <span className='font-medium'>
-              {isFilled ? t('No data') : formatRate(rate)}
-            </span>
-          </div>
-          <div>
-            {t('Total tokens')}:{' '}
-            <span className='font-medium'>{formatTokens(tokens)}</span>
-          </div>
-          {!isFilled && (
-            <>
-              <div>
-                {t('Successful requests')}:{' '}
-                <span className='font-medium'>
-                  {Number(props.cell?.success_requests) || 0}
-                </span>
-              </div>
-              <div>
-                {t('Error')}:{' '}
-                <span className='font-medium'>
-                  {Number(props.cell?.error_requests) || 0}
-                </span>
-              </div>
-            </>
-          )}
-          {isFilled && (
-            <div className='text-muted-foreground italic'>
-              {t('No data')}
-            </div>
-          )}
-        </div>
-      </TooltipContent>
-    </Tooltip>
-  )
+const PERIOD_LABEL_KEYS: Record<ModelHealthPeriod, string> = {
+  '7d': '7 days',
+  '15d': '15 days',
+  '30d': '30 days',
 }
 
 function StatCard(props: {
@@ -226,101 +102,6 @@ function StatCardSkeleton(props: {
   )
 }
 
-function LegendItem(props: { color: string; label: string }) {
-  return (
-    <div className='flex items-center gap-2 px-1 py-0.5'>
-      <div
-        className='h-3.5 w-3.5 rounded-full border border-white/10 shadow-sm'
-        style={{ backgroundColor: props.color }}
-      />
-      <span className='text-xs font-medium text-gray-500 dark:text-gray-400'>
-        {props.label}
-      </span>
-    </div>
-  )
-}
-
-function LegendSkeleton() {
-  return (
-    <div className='bg-card mb-6 rounded-lg border px-5 py-4 shadow-sm'>
-      <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
-        <div className='flex flex-wrap items-center gap-3'>
-          <Skeleton className='h-3.5 w-[72px] rounded-lg' />
-          <div className='flex flex-wrap items-center gap-2'>
-            {[86, 92, 78, 96, 82, 64].map((w, idx) => (
-              <div
-                key={idx}
-                className='flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-1.5 dark:bg-gray-800/50'
-              >
-                <Skeleton className='h-4 w-4 rounded-md' />
-                <Skeleton className='h-5 rounded-lg' style={{ width: w }} />
-              </div>
-            ))}
-          </div>
-        </div>
-        <Skeleton className='h-8 w-[220px] rounded-[10px]' />
-      </div>
-    </div>
-  )
-}
-
-function TimeLabelsSkeleton() {
-  return (
-    <div className='mb-3 overflow-x-auto pl-[200px] sm:pl-[260px]'>
-      <div className='flex min-w-max gap-1'>
-        {Array.from({ length: 24 }).map((_, idx) => (
-          <div
-            key={idx}
-            className='w-[22px] flex-shrink-0 text-center sm:w-[26px]'
-          >
-            {idx % 3 === 0 && (
-              <Skeleton className='mx-auto h-3 w-[14px] rounded-md' />
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function ModelListSkeleton() {
-  return (
-    <div className='space-y-4'>
-      {Array.from({ length: 6 }).map((_, idx) => (
-        <div
-          key={idx}
-          className='bg-card rounded-[20px] border border-gray-100 px-5 py-4 shadow-sm dark:border-gray-800/60'
-        >
-          <div className='flex items-center gap-4'>
-            <div className='w-[180px] flex-shrink-0 sm:w-[240px]'>
-              <div className='flex items-center gap-3'>
-                <Skeleton className='h-10 w-2.5 rounded-full bg-slate-200 dark:bg-slate-800' />
-                <div className='min-w-0 flex-1'>
-                  <Skeleton className='mb-2.5 h-4 w-40 rounded-lg' />
-                  <div className='flex flex-wrap items-center gap-3'>
-                    <Skeleton className='h-[20px] w-[60px] rounded-[6px]' />
-                    <Skeleton className='h-3.5 w-[52px] rounded-md' />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className='flex-1 overflow-x-auto'>
-              <div className='flex min-w-max gap-1'>
-                {Array.from({ length: 24 }).map((__, jdx) => (
-                  <div
-                    key={jdx}
-                    className='h-[28px] w-[18px] animate-pulse rounded-[6px] bg-gray-100 sm:h-[32px] sm:w-[22px] dark:bg-gray-800'
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 function LoadingOverlay() {
   return (
     <div className='pointer-events-none fixed inset-x-0 top-20 z-40 flex justify-center'>
@@ -335,184 +116,83 @@ export function ModelHealthPublicPage() {
   const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [errorText, setErrorText] = useState('')
-  const [payload, setPayload] = useState<PublicModelHealthPayload | null>(null)
+  const [payload, setPayload] = useState<ModelHealthOverviewPayload | null>(
+    null
+  )
   const [searchText, setSearchText] = useState('')
+  const [period, setPeriod] = useState<ModelHealthPeriod>('7d')
+  const [nextRefreshAt, setNextRefreshAt] = useState(
+    () => Date.now() + REFRESH_INTERVAL_MS
+  )
+  const [countdown, setCountdown] = useState(REFRESH_INTERVAL_MS / 1000)
 
-  async function load(options: { silent?: boolean } = {}) {
-    const silent = Boolean(options.silent)
-    if (!silent) {
-      setLoading(true)
-      setErrorText('')
-    }
-    try {
-      const res = await getPublicModelHealthLast24h()
-      const { success, message, data } = res || {}
-      if (!success) {
-        const errMsg = message || t('Load failed')
-        if (!silent) {
-          setErrorText(errMsg)
-          toast.error(errMsg)
-        }
-        return
-      }
-      if (!data || typeof data !== 'object') {
-        const errMsg = t('Unexpected API response')
-        if (!silent) {
-          setErrorText(errMsg)
-          toast.error(errMsg)
-        }
-        return
-      }
-      setPayload(data)
-    } catch (error) {
-      const errMsg = error instanceof Error ? error.message : t('Load failed')
+  const load = useCallback(
+    async (options: { silent?: boolean } = {}) => {
+      const silent = Boolean(options.silent)
       if (!silent) {
-        setErrorText(t('Load failed'))
-        toast.error(errMsg)
+        setLoading(true)
+        setErrorText('')
       }
-    } finally {
-      if (!silent) setLoading(false)
-    }
-  }
+      try {
+        const res = await getPublicModelHealthOverview(period)
+        const { success, message, data } = res || {}
+        if (!success) {
+          const errMsg = message || t('Load failed')
+          if (!silent) {
+            setErrorText(errMsg)
+            toast.error(errMsg)
+          }
+          return
+        }
+        if (!data || typeof data !== 'object') {
+          const errMsg = t('Unexpected API response')
+          if (!silent) {
+            setErrorText(errMsg)
+            toast.error(errMsg)
+          }
+          return
+        }
+        setPayload(data)
+        setNextRefreshAt(Date.now() + REFRESH_INTERVAL_MS)
+      } catch (error) {
+        const errMsg = error instanceof Error ? error.message : t('Load failed')
+        if (!silent) {
+          setErrorText(t('Load failed'))
+          toast.error(errMsg)
+        }
+      } finally {
+        if (!silent) setLoading(false)
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [period]
+  )
 
   useEffect(() => {
     load().catch(() => undefined)
     const timer = window.setInterval(() => {
       load({ silent: true }).catch(() => undefined)
-    }, 30_000)
+    }, REFRESH_INTERVAL_MS)
     return () => window.clearInterval(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [load])
 
-  const hourStarts = useMemo(() => {
-    const start = Number(payload?.start_hour)
-    const end = Number(payload?.end_hour)
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
-      return []
-    }
-    const hours: number[] = []
-    for (let ts = start; ts < end; ts += 3600) {
-      hours.push(ts)
-    }
-    return hours
-  }, [payload?.start_hour, payload?.end_hour])
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCountdown(Math.max(0, Math.ceil((nextRefreshAt - Date.now()) / 1000)))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [nextRefreshAt])
 
-  const { modelData, stats } = useMemo(() => {
-    const rows = Array.isArray(payload?.rows) ? payload.rows : []
-    const byModel = new Map<string, Map<number, PublicModelHealthHourlyStat>>()
-    for (const row of rows) {
-      const name = row?.model_name || ''
-      if (!name) continue
-      if (!byModel.has(name)) byModel.set(name, new Map())
-      byModel.get(name)?.set(Number(row.hour_start_ts), row)
-    }
-
-    const models = Array.from(byModel.keys())
-    const totalModels = models.length
-    let healthyModels = 0
-    let warningModels = 0
-    let criticalModels = 0
-    let totalQualifiedRequests = 0
-    let totalRequests = 0
-    let totalSuccessTokens = 0
-
-    const modelData = models.map((modelName) => {
-      const hourMap = byModel.get(modelName)
-      let modelQualifiedRequests = 0
-      let modelTotalRequests = 0
-      let modelTotalSuccessSlices = 0
-      let modelTotalSlices = 0
-      let modelTotalTokens = 0
-
-      for (const ts of hourStarts) {
-        const stat = hourMap?.get(ts)
-        const hourTokens = Number(stat?.success_tokens) || 0
-        const hasData = Boolean(stat && Number(stat.total_requests) > 0)
-        if (hasData) {
-          modelQualifiedRequests +=
-            Number(stat?.qualified_success_requests) || 0
-          modelTotalRequests += Number(stat?.total_requests) || 0
-          modelTotalSuccessSlices += Number(stat?.success_slices) || 0
-          modelTotalSlices += Number(stat?.total_slices) || 0
-        }
-        modelTotalTokens += hourTokens
-      }
-
-      const avgRate =
-        modelTotalRequests > 0
-          ? modelQualifiedRequests / modelTotalRequests
-          : 0
-      totalQualifiedRequests += modelQualifiedRequests
-      totalRequests += modelTotalRequests
-      totalSuccessTokens += modelTotalTokens
-
-      const { level } = getRateLevel(avgRate)
-      if (modelTotalRequests > 0) {
-        if (level === 'excellent' || level === 'good') healthyModels++
-        else if (level === 'warning') warningModels++
-        else if (level === 'critical') criticalModels++
-      }
-
-      const hourlyData = hourStarts.map((ts) => {
-        const stat = hourMap?.get(ts)
-        const hourTokens = Number(stat?.success_tokens) || 0
-        const hasData = Boolean(stat && Number(stat.total_requests) > 0)
-        if (stat && hasData) return stat
-        return {
-          hour_start_ts: ts,
-          model_name: modelName,
-          success_slices: 0,
-          total_slices: 0,
-          success_rate: 0,
-          total_requests: 0,
-          error_requests: 0,
-          success_requests: 0,
-          qualified_success_requests: 0,
-          success_tokens: hourTokens,
-          is_filled: true,
-        }
-      })
-
-      return {
-        model_name: modelName,
-        avg_rate: avgRate,
-        has_health_data: modelTotalRequests > 0,
-        total_success: modelQualifiedRequests,
-        total_success_slices: modelTotalSuccessSlices,
-        total_slices: modelTotalSlices,
-        total_requests: modelTotalRequests,
-        total_tokens: modelTotalTokens,
-        hourly: hourlyData.reverse(),
-      }
-    })
-
-    modelData.sort((a, b) => (b.total_tokens || 0) - (a.total_tokens || 0))
-    const overallRate =
-      totalRequests > 0 ? totalQualifiedRequests / totalRequests : 0
-
-    return {
-      modelData,
-      stats: {
-        totalModels,
-        healthyModels,
-        warningModels,
-        criticalModels,
-        overallRate,
-        totalSuccessSlices: totalQualifiedRequests,
-        totalSlices: totalRequests,
-        totalSuccessTokens,
-      },
-    }
-  }, [payload?.rows, hourStarts])
-
-  const filteredModelData = useMemo(() => {
-    if (!searchText.trim()) return modelData
+  const filteredModels = useMemo(() => {
+    const list = Array.isArray(payload?.models) ? payload.models : []
+    if (!searchText.trim()) return list
     const keyword = searchText.toLowerCase().trim()
-    return modelData.filter((m) => m.model_name.toLowerCase().includes(keyword))
-  }, [modelData, searchText])
+    return list.filter((m) => m.model_name.toLowerCase().includes(keyword))
+  }, [payload?.models, searchText])
 
-  const latestHour =
-    hourStarts.length > 0 ? hourStarts[hourStarts.length - 1] : null
+  const stats = payload?.stats
+  const globalMeta = payload ? GLOBAL_STATUS_META[payload.global_status] : null
+  const periodLabel = t(PERIOD_LABEL_KEYS[period])
   const isInitialLoading = loading && !payload
   const showSpin = loading && Boolean(payload)
 
@@ -520,17 +200,49 @@ export function ModelHealthPublicPage() {
     <PublicLayout showMainContainer={false}>
       <TooltipProvider>
         <div className='mx-auto mt-[60px] max-w-6xl px-3 pb-10 sm:px-6 lg:px-8'>
-          <div className='mb-8'>
-            <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
-              <div>
-                <h1 className='text-xl font-bold tracking-tight text-gray-800 sm:text-2xl dark:text-gray-100'>
-                  {t('Model health overview for the last 24 hours')}
-                </h1>
-                <p className='mt-1.5 text-xs text-gray-500 sm:text-sm dark:text-gray-500'>
-                  {t(
-                    'Model health status for the last 24 hours, monitoring all requests (including errors caused by malformed requests)'
+          <div className='mb-8 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between'>
+            <div>
+              <div className='text-muted-foreground mb-3 flex items-center gap-2 text-xs font-bold tracking-[0.2em] uppercase'>
+                <Activity className='size-4' />
+                {t('System status')}
+              </div>
+              <h1 className='text-4xl leading-[1.05] font-extrabold tracking-tight sm:text-5xl'>
+                {t('Model health')}
+              </h1>
+              <p className='text-muted-foreground mt-3 max-w-xl text-sm'>
+                {t(
+                  'Real-time availability, latency and trends aggregated from live traffic.'
+                )}
+              </p>
+            </div>
+            <div className='flex flex-col items-start gap-2 lg:items-end'>
+              {payload && globalMeta && (
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold',
+                    globalMeta.badgeClass
                   )}
-                </p>
+                >
+                  <span
+                    className={cn(
+                      'size-2 animate-pulse rounded-full',
+                      globalMeta.dotClass
+                    )}
+                  />
+                  {t(globalMeta.labelKey)}
+                </span>
+              )}
+              <div className='text-muted-foreground flex items-center gap-2 text-xs'>
+                <RefreshCw className='size-3' />
+                {payload && (
+                  <span>
+                    {t('Updated at {{time}}', {
+                      time: timestamp2string(payload.updated_at),
+                    })}
+                  </span>
+                )}
+                <span className='opacity-60'>·</span>
+                <span>{t('Refresh in {{seconds}}s', { seconds: countdown })}</span>
               </div>
             </div>
           </div>
@@ -544,7 +256,7 @@ export function ModelHealthPublicPage() {
           {showSpin && <LoadingOverlay />}
 
           <div className='mb-8 grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4'>
-            {isInitialLoading ? (
+            {isInitialLoading || !stats ? (
               <>
                 <StatCardSkeleton
                   title={t('Monitored models')}
@@ -571,175 +283,97 @@ export function ModelHealthPublicPage() {
               <>
                 <StatCard
                   title={t('Monitored models')}
-                  value={stats.totalModels}
+                  value={stats.total_models}
                   subtitle={t('{{count}} healthy', {
-                    count: stats.healthyModels,
+                    count: stats.healthy_models,
                   })}
                   bgGradient='linear-gradient(135deg, #2ec4b6 0%, #0ea5e9 100%)'
                 />
                 <StatCard
                   title={t('Overall success rate')}
-                  value={formatRate(stats.overallRate)}
+                  value={formatRate(stats.overall_rate_24h)}
                   subtitle={t('Past 24 hours')}
                   bgGradient='linear-gradient(135deg, #4caf50 0%, #8bc34a 100%)'
                 />
                 <StatCard
                   title={t('Total tokens')}
-                  value={formatTokens(stats.totalSuccessTokens)}
+                  value={formatTokens(stats.total_tokens_24h)}
                   subtitle={t('Past 24 hours')}
                   bgGradient='linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)'
                 />
                 <StatCard
                   title={t('Healthy models')}
-                  value={stats.healthyModels}
-                  subtitle={t('Success rate >= 80%')}
+                  value={stats.healthy_models}
+                  subtitle={t('Status operational')}
                   bgGradient='linear-gradient(135deg, #14b8a6 0%, #10b981 100%)'
                 />
               </>
             )}
           </div>
 
-          {isInitialLoading ? (
-            <LegendSkeleton />
-          ) : (
-            <div className='mb-6 border-b border-gray-200/70 pb-5 dark:border-gray-800/80'>
-              <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
-                <div className='flex flex-wrap items-center gap-3.5'>
-                  <span className='mr-1.5 text-sm font-semibold text-gray-700 dark:text-gray-300'>
-                    {t('Status legend')}
-                  </span>
-                  <div className='flex flex-wrap items-center gap-3'>
-                    <LegendItem
-                      color='#22c7d8'
-                      label={t('Excellent (>=95%)')}
-                    />
-                    <LegendItem color='#34b567' label={t('Good (80-95%)')} />
-                    <LegendItem color='#9ac447' label={t('Average (60-80%)')} />
-                    <LegendItem color='#f5a524' label={t('Poor (20-60%)')} />
-                    <LegendItem color='#f36b4f' label={t('Abnormal (<20%)')} />
-                    <LegendItem color='#cbd5e1' label={t('No data')} />
-                  </div>
-                </div>
-                <div className='relative w-full sm:w-[220px]'>
-                  <Search className='pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-gray-400' />
-                  <input
-                    className='focus:bg-background focus:ring-primary/20 h-9 w-full rounded-full border border-transparent bg-gray-100/70 pr-8 pl-9.5 text-xs transition-all outline-none focus:border-gray-200 focus:ring-2 dark:bg-gray-800/60 dark:focus:border-gray-700'
-                    placeholder={t('Search models...')}
-                    value={searchText}
-                    onChange={(event) => setSearchText(event.target.value)}
-                  />
-                  {searchText && (
-                    <button
-                      type='button'
-                      className='text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 rounded p-1'
-                      onClick={() => setSearchText('')}
-                      aria-label={t('Clear search')}
-                    >
-                      <X className='size-3.5' />
-                    </button>
-                  )}
-                </div>
-              </div>
+          <div className='mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
+            <div className='relative w-full sm:w-[220px]'>
+              <Search className='pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-gray-400' />
+              <input
+                className='focus:bg-background focus:ring-primary/20 h-9 w-full rounded-full border border-transparent bg-gray-100/70 pr-8 pl-9.5 text-xs transition-all outline-none focus:border-gray-200 focus:ring-2 dark:bg-gray-800/60 dark:focus:border-gray-700'
+                placeholder={t('Search models...')}
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+              />
+              {searchText && (
+                <button
+                  type='button'
+                  className='text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 rounded p-1'
+                  onClick={() => setSearchText('')}
+                  aria-label={t('Clear search')}
+                >
+                  <X className='size-3.5' />
+                </button>
+              )}
             </div>
-          )}
-
-          {isInitialLoading ? (
-            <TimeLabelsSkeleton />
-          ) : (
-            hourStarts.length > 0 && (
-              <div className='mb-3 overflow-x-auto pl-[200px] sm:pl-[260px]'>
-                <div className='flex min-w-max gap-1'>
-                  {[...hourStarts].reverse().map((ts, idx) => (
-                    <div
-                      key={ts}
-                      className='w-[22px] flex-shrink-0 text-center sm:w-[26px]'
-                    >
-                      {idx % 3 === 0 && (
-                        <div className='text-[11px] font-medium text-gray-400'>
-                          {hourLabel(ts)}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          )}
-
-          {isInitialLoading ? (
-            <ModelListSkeleton />
-          ) : (
-            <div className='space-y-4'>
-              {filteredModelData.map((item) => {
-                const { color, bg } = getRateLevel(item.avg_rate)
-                const indicatorColor = item.has_health_data
-                  ? color
-                  : 'rgb(148 163 184)'
-                return (
-                  <div
-                    key={item.model_name}
-                    className='bg-white dark:bg-slate-900 rounded-[20px] border border-gray-200/40 px-5 py-4 transition-all duration-300 hover:border-gray-300/80 hover:shadow-md dark:border-gray-800 dark:hover:border-gray-700'
+            <ToggleGroup
+              variant='outline'
+              size='sm'
+              value={[period]}
+              onValueChange={(value: string[]) => {
+                const next = value[0] as ModelHealthPeriod | undefined
+                if (next && next !== period) setPeriod(next)
+              }}
+              aria-label={t('Availability')}
+            >
+              {(Object.keys(PERIOD_LABEL_KEYS) as ModelHealthPeriod[]).map(
+                (p) => (
+                  <ToggleGroupItem
+                    key={p}
+                    value={p}
+                    aria-label={t(PERIOD_LABEL_KEYS[p])}
                   >
-                    <div className='flex items-center gap-4'>
-                      <div className='w-[180px] flex-shrink-0 sm:w-[240px]'>
-                        <div className='flex items-center gap-3'>
-                          <div
-                            className='h-10 w-2.5 flex-shrink-0 rounded-full shadow-sm'
-                            style={{ backgroundColor: indicatorColor }}
-                          />
-                          <div className='min-w-0 flex-1'>
-                            <Tooltip>
-                              <TooltipTrigger className='hover:text-primary block w-full truncate text-left text-sm font-semibold text-gray-800 transition-colors sm:text-base dark:text-gray-100'>
-                                {item.model_name}
-                              </TooltipTrigger>
-                              <TooltipContent className='break-all'>
-                                {item.model_name}
-                              </TooltipContent>
-                            </Tooltip>
-                            <div className='mt-1.5 flex flex-wrap items-center gap-3 text-xs sm:text-sm'>
-                              <span
-                                className={
-                                  item.has_health_data
-                                    ? 'rounded-[6px] px-2 py-0.5 text-xs font-bold'
-                                    : 'rounded-[6px] bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                                }
-                                style={
-                                  item.has_health_data
-                                    ? { color, backgroundColor: bg }
-                                    : undefined
-                                }
-                              >
-                                {item.has_health_data
-                                  ? formatRate(item.avg_rate)
-                                  : t('No data')}
-                              </span>
-                              <span className='font-medium text-gray-400 dark:text-gray-500'>
-                                {formatTokens(item.total_tokens)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className='flex-1 overflow-x-auto'>
-                        <div className='flex min-w-max gap-1'>
-                          {item.hourly.map((cell) => (
-                            <HealthCell
-                              key={cell.hour_start_ts}
-                              cell={cell}
-                              isLatest={cell.hour_start_ts === latestHour}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    {t(PERIOD_LABEL_KEYS[p])}
+                  </ToggleGroupItem>
                 )
-              })}
+              )}
+            </ToggleGroup>
+          </div>
+
+          {isInitialLoading ? (
+            <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3'>
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <Skeleton key={idx} className='h-[280px] rounded-xl' />
+              ))}
+            </div>
+          ) : (
+            <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3'>
+              {filteredModels.map((m) => (
+                <ModelHealthCard
+                  key={m.model_name}
+                  model={m}
+                  periodLabel={periodLabel}
+                />
+              ))}
             </div>
           )}
 
-          {!loading && !isInitialLoading && filteredModelData.length === 0 && (
+          {payload && filteredModels.length === 0 && (
             <div className='bg-card rounded-lg border shadow-sm'>
               <div className='py-16 text-center'>
                 <div className='mb-6 text-7xl'>📊</div>
