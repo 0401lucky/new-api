@@ -108,6 +108,46 @@ SUM(success_tokens) as success_tokens`, hourStartExprSQL(db), successSliceExprSQ
 	return rows, nil
 }
 
+type ModelHealthTotals struct {
+	ModelName                string `json:"model_name"`
+	TotalRequests            int64  `json:"total_requests"`
+	QualifiedSuccessRequests int64  `json:"qualified_success_requests"`
+}
+
+// GetAllModelsHealthTotals aggregates per-model request counters over
+// [startTs, endTs) without bucketing. Used for both N-day availability and the
+// most recent 60-minute status window on the public overview endpoint.
+func GetAllModelsHealthTotals(db *gorm.DB, startTs int64, endTs int64) ([]ModelHealthTotals, error) {
+	if db == nil {
+		return nil, fmt.Errorf("db is nil")
+	}
+	if startTs <= 0 || endTs <= 0 || endTs <= startTs {
+		return nil, fmt.Errorf("invalid time range")
+	}
+
+	var rows []ModelHealthTotals
+	err := db.Table((&ModelHealthSlice5m{}).TableName()).
+		Select("model_name as model_name, SUM(total_requests) as total_requests, SUM(success_qualified_requests) as qualified_success_requests").
+		Where("slice_start_ts >= ? AND slice_start_ts < ?", startTs, endTs).
+		Group("model_name").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+func DeleteModelHealthSlicesBefore(db *gorm.DB, cutoffTs int64) (int64, error) {
+	if db == nil {
+		return 0, fmt.Errorf("db is nil")
+	}
+	if cutoffTs <= 0 {
+		return 0, nil
+	}
+	res := db.Where("slice_start_ts < ?", cutoffTs).Delete(&ModelHealthSlice5m{})
+	return res.RowsAffected, res.Error
+}
+
 func dbDialectName(db *gorm.DB) string {
 	if db == nil || db.Dialector == nil {
 		return ""
