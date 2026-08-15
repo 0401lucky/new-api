@@ -88,3 +88,16 @@ export function dateTimeLocalValueToHour(value: string) {
   const ts = Math.floor(new Date(value).getTime() / 1000)
   return floorToHour(ts)
 }
+
+export function formatLatencyMs(value: number | null | undefined) {
+  if (
+    value === null ||
+    value === undefined ||
+    !Number.isFinite(value) ||
+    value <= 0
+  ) {
+    return '—'
+  }
+  if (value >= 10_000) return `${(value / 1000).toFixed(1)}s`
+  return `${Math.round(value)}ms`
+}

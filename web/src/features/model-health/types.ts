@@ -45,3 +45,48 @@ export type ApiEnvelope<T> = {
   message?: string
   data: T
 }
+
+export type ModelHealthStatus =
+  | 'operational'
+  | 'degraded'
+  | 'outage'
+  | 'no_data'
+
+export type ModelHealthGlobalStatus = 'operational' | 'degraded' | 'outage'
+
+export type ModelHealthPeriod = '7d' | '15d' | '30d'
+
+export type ModelHealthOverviewTimelineItem = {
+  hour_start_ts: number
+  success_rate: number
+  total_requests: number
+  error_requests: number
+  success_tokens: number
+}
+
+export type ModelHealthOverviewModel = {
+  model_name: string
+  status: ModelHealthStatus
+  availability: number | null
+  availability_success: number
+  availability_total: number
+  avg_latency_ms: number | null
+  avg_ttft_ms: number | null
+  success_tokens_24h: number
+  timeline: ModelHealthOverviewTimelineItem[]
+}
+
+export type ModelHealthOverviewStats = {
+  total_models: number
+  healthy_models: number
+  overall_rate_24h: number
+  total_tokens_24h: number
+}
+
+export type ModelHealthOverviewPayload = {
+  updated_at: number
+  period: ModelHealthPeriod
+  global_status: ModelHealthGlobalStatus
+  stats: ModelHealthOverviewStats
+  models: ModelHealthOverviewModel[]
+}

@@ -20,6 +20,8 @@ import { api } from '@/lib/api'
 import type {
   ApiEnvelope,
   ModelHealthHourlyStat,
+  ModelHealthOverviewPayload,
+  ModelHealthPeriod,
   PublicModelHealthPayload,
 } from './types'
 
@@ -47,6 +49,18 @@ export async function getEnabledModelNames() {
   const res = await api.get<ApiEnvelope<unknown>>(
     '/api/channel/models_enabled',
     {
+      skipErrorHandler: true,
+      skipBusinessError: true,
+    }
+  )
+  return res.data
+}
+
+export async function getPublicModelHealthOverview(period: ModelHealthPeriod) {
+  const res = await api.get<ApiEnvelope<ModelHealthOverviewPayload>>(
+    '/api/public/model_health/overview',
+    {
+      params: { period },
       skipErrorHandler: true,
       skipBusinessError: true,
     }
