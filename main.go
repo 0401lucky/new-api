@@ -143,6 +143,25 @@ func main() {
 		return a
 	}
 
+	// Backfill model health slices from logs once at startup (last 35 days, in
+	// 5-day segments to bound query cost). Replaces the old per-request backfill
+	// on the model health APIs. Insert-only on missing slices, so concurrent
+	// multi-node startup is safe.
+	gopool.Go(func() {
+		const segmentSeconds = int64(5 * 24 * 3600)
+		endTs := time.Now().Unix()
+		startTs := endTs - 35*24*3600
+		for segStart := startTs; segStart < endTs; segStart += segmentSeconds {
+			segEnd := segStart + segmentSeconds
+			if segEnd > endTs {
+				segEnd = endTs
+			}
+			if err := model.BackfillModelHealthSlicesFromLogs(context.Background(), model.DB, model.LOG_DB, segStart, segEnd); err != nil {
+				common.SysLog(fmt.Sprintf("model health startup backfill failed for segment [%d, %d): %s", segStart, segEnd, err.Error()))
+			}
+		}
+	})
+
 	// Register the periodic channel test, upstream model update, and async task
 	// polling (Midjourney / Suno / video) jobs as scheduled system tasks
 	// (DB-lease dedup across masters + run history), then start the runner that

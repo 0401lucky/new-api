@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"net/http"
 	"sort"
 	"strconv"
@@ -106,10 +105,6 @@ func GetModelHealthHourlyStatsAPI(c *gin.Context) {
 		}
 	}
 
-	if err := model.BackfillModelHealthSlicesFromLogs(context.Background(), model.DB, model.LOG_DB, startHourTs, endHourTs); err != nil {
-		common.SysLog("model health log backfill failed: " + err.Error())
-	}
-
 	rows, err := model.GetModelHealthHourlyStats(model.DB, modelName, startHourTs, endHourTs)
 	if err != nil {
 		common.ApiError(c, err)
@@ -201,10 +196,6 @@ func GetPublicModelsHealthHourlyLast24hAPI(c *gin.Context) {
 	now := time.Now().Unix()
 	endHourTs := now - (now % 3600) + 3600
 	startHourTs := endHourTs - 24*3600
-
-	if err := model.BackfillModelHealthSlicesFromLogs(context.Background(), model.DB, model.LOG_DB, startHourTs, endHourTs); err != nil {
-		common.SysLog("model health log backfill failed: " + err.Error())
-	}
 
 	rows, err := model.GetAllModelsHealthHourlyStats(model.DB, startHourTs, endHourTs)
 	if err != nil {

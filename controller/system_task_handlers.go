@@ -22,6 +22,7 @@ func RegisterScheduledSystemTasks() {
 	service.RegisterSystemTaskHandler(modelUpdateHandler{})
 	service.RegisterSystemTaskHandler(midjourneyPollHandler{})
 	service.RegisterSystemTaskHandler(asyncTaskPollHandler{})
+	service.RegisterSystemTaskHandler(modelHealthCleanupHandler{})
 }
 
 // channelTestHandler runs the scheduled "test all channels" job. Enablement and
@@ -150,6 +151,31 @@ func (asyncTaskPollHandler) NewPayload() any { return nil }
 func (asyncTaskPollHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
 	summary := service.RunTaskPollingOnce(ctx, service.NewSystemTaskProgressReporter(task, runnerID))
 	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, summary, nil)
+}
+
+// modelHealthCleanupHandler prunes model_health_slice_5m rows past the
+// retention window so the table stops growing unbounded. 35 days keeps the
+// 30-day availability view fully covered with margin.
+const modelHealthSliceRetentionDays = 35
+
+type modelHealthCleanupHandler struct{}
+
+func (modelHealthCleanupHandler) Type() string { return model.SystemTaskTypeModelHealthCleanup }
+
+func (modelHealthCleanupHandler) Enabled() bool { return true }
+
+func (modelHealthCleanupHandler) Interval() time.Duration { return 24 * time.Hour }
+
+func (modelHealthCleanupHandler) NewPayload() any { return nil }
+
+func (modelHealthCleanupHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
+	cutoff := time.Now().AddDate(0, 0, -modelHealthSliceRetentionDays).Unix()
+	deleted, err := model.DeleteModelHealthSlicesBefore(model.DB, cutoff)
+	if err != nil {
+		finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusFailed, nil, err)
+		return
+	}
+	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, map[string]any{"deleted_slices": deleted}, nil)
 }
 
 func finishSystemTaskHandler(task *model.SystemTask, runnerID string, status model.SystemTaskStatus, result any, runErr error) {
