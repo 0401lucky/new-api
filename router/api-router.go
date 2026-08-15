@@ -53,6 +53,7 @@ func SetApiRouter(router *gin.Engine) {
 		publicModelHealthRoute.Use(middleware.HeaderNavModuleAuth("model_health"))
 		{
 			publicModelHealthRoute.GET("/hourly_last24h", controller.GetPublicModelsHealthHourlyLast24hAPI)
+			publicModelHealthRoute.GET("/overview", controller.GetPublicModelHealthOverviewAPI)
 		}
 		apiRouter.GET("/rankings", middleware.HeaderNavModuleAuth("rankings"), controller.GetRankings)
 		apiRouter.GET("/verification", middleware.EmailVerificationRateLimit(), middleware.TurnstileCheck(), controller.SendEmailVerification)
