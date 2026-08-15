@@ -69,7 +69,7 @@
 
 ### 4.4 延迟
 
-- 平均延迟 = 近 24h `SUM(total_latency_ms) / SUM(success_count)`（`perf_metrics` 跨 group 聚合）。
+- 平均延迟 = 近 24h `SUM(total_latency_ms) / SUM(request_count)`（`perf_metrics` 跨 group 聚合；分母为总请求数，与模型广场 `QuerySummaryAll` 现有口径一致）。
 - TTFT = 近 24h `SUM(ttft_sum_ms) / SUM(ttft_count)`。
 - 分母为 0（perf_metrics 停用、无流式数据、无流量）时返回 `null`，前端显示「—」。
 - 只依赖 perf 表近 24h 数据，不受其 RetentionDays 配置影响。
@@ -98,6 +98,12 @@ GET /api/public/model_health/overview?period=7d|15d|30d
   "updated_at": 1755244800,        // 服务端生成时间（秒）
   "period": "7d",
   "global_status": "operational",  // operational | degraded | outage
+  "stats": {                        // 顶部统计卡数据（24h 口径，后端预聚合）
+    "total_models": 42,
+    "healthy_models": 40,           // status == operational 的模型数
+    "overall_rate_24h": 0.9954,     // 24h 跨模型 Σqualified / Σtotal
+    "total_tokens_24h": 987654321
+  },
   "models": [
     {
       "model_name": "gpt-4o",
@@ -128,13 +134,13 @@ GET /api/public/model_health/overview?period=7d|15d|30d
 
 1. **24h 时间线**：复用 `GetAllModelsHealthHourlyStats`。
 2. **N 天可用性汇总**：新增 `GetAllModelsHealthTotals(db, startTs, endTs)`——按模型 `SUM(success_qualified_requests), SUM(total_requests)`，不分时间桶（无方言分支需求，纯 GORM 聚合）。同一函数以 `startTs = now - 3600` 复调一次，得到状态判定所需的最近 60 分钟汇总。
-3. **延迟**：扩展 `PerfMetricSummary` 与 `GetPerfMetricsSummaryAll` 增加 `TtftSumMs`/`TtftCount` 两列（对现有 `/api/perf-metrics/summary` 消费者是纯增量 JSON 字段，向后兼容）。
+3. **延迟**：复用 `pkg/perf_metrics` 的 `QuerySummaryAll(24, nil)`（`groups = nil` 表示跨全部分组，已合并内存热桶）。它内部已累加 TTFT，但 DB 行来源 `GetPerfMetricsSummaryBucketsAll` 漏查 TTFT 两列、输出 `ModelSummary` 未暴露 TTFT——扩展点：`model.PerfMetricSummaryBucket` 增加 `TtftSumMs`/`TtftCount` 列，`QuerySummaryAll` 的 DB 行合并补上这两个字段，`ModelSummary` 增加 `AvgTtftMs`（对现有 `/api/perf-metrics/summary` 消费者是纯增量 JSON 字段，向后兼容）。
 4. **Token 兜底**：复用 `getModelHealthQuotaAggRows`。
 
 ### 5.3 治理修复（随本次一并落地）
 
 1. **切片表保留期清理**：新增 `modelHealthCleanupHandler` 注册进 `system_task` 框架（`controller/system_task_handlers.go`，DB 租约多实例去重）。每 24 小时删除 `slice_start_ts < now - 35 天` 的行（35 = 30 天视图 + 余量，代码常量；`Enabled()` 恒真）。新增 `model.DeleteModelHealthSlicesBefore(cutoffTs)`。
-2. **回填移出请求路径**：删除两个现有 API 内的同步 `BackfillModelHealthSlicesFromLogs` 调用；改为 `main.go` 启动时 `gopool.Go` 异步回填一次最近 48 小时（保留「升级后立即有数据」的原始目的；`OnConflict DoNothing` 幂等，多实例重复执行安全）。
+2. **回填移出请求路径**：删除两个现有 API 内的同步 `BackfillModelHealthSlicesFromLogs` 调用；改为 `main.go` 启动时 `gopool.Go` 异步回填最近 **35 天**（与保留期一致，分 5 天一段共 7 段顺序执行，控制单次查询与内存开销）。35 天而非 48 小时的原因：请求路径回填删除后，管理员页查询历史区间的按需补数据能力消失，启动回填补齐保留期内全部缺口即可无损替代。`OnConflict DoNothing` 幂等，多实例重复执行安全。
 3. **状态分档常量统一**：新页面使用单一状态元数据源（见 6.2）；管理员页维持现状。
 
 ## 6. 前端设计
