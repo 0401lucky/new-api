@@ -409,10 +409,29 @@ func GetUser(c *gin.Context) {
 		return
 	}
 	user.AdminPermissions = authz.Capabilities(user.Id, user.Role)
+
+	// 钱包限时额度：只返回当前仍有效的剩余额度，已过期按零返回；不依赖签到功能是否开启
+	temporaryQuota, _ := model.GetActiveTemporaryQuota(user.Id)
+	data := struct {
+		*model.User
+		TemporaryQuota                 int    `json:"temporary_quota"`
+		TemporaryQuotaExpiresAt        int64  `json:"temporary_quota_expires_at,omitempty"`
+		TemporaryQuotaExpiresAtDisplay string `json:"temporary_quota_expires_at_display,omitempty"`
+	}{
+		User:           user,
+		TemporaryQuota: temporaryQuota,
+	}
+	if temporaryQuota > 0 {
+		if expiresAt := model.GetActiveTemporaryQuotaExpiresAt(user.Id); expiresAt > 0 {
+			data.TemporaryQuotaExpiresAt = expiresAt
+			data.TemporaryQuotaExpiresAtDisplay = common.FormatInCheckinTimezone(expiresAt, "01-02 15:04")
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
-		"data":    user,
+		"data":    data,
 	})
 	return
 }

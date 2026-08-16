@@ -447,4 +447,7 @@ export interface UserInfo {
   aff_count?: number
   aff_quota?: number
   remark?: string
+  temporary_quota?: number
+  temporary_quota_expires_at?: number
+  temporary_quota_expires_at_display?: string
 }
