@@ -591,7 +591,7 @@ func RefundTaskQuotaAtomically(taskId int64, expectedQuota int, userId int, subs
 		}
 	}
 	if common.RedisEnabled && updatedTokenKey != "" {
-		if err := cacheIncrTokenQuota(updatedTokenKey, int64(expectedQuota)); err != nil {
+		if _, err := cacheApplyTokenQuotaDelta(tokenId, updatedTokenKey, int64(expectedQuota)); err != nil {
 			common.SysLog("failed to sync token cache after task refund: " + err.Error())
 		}
 	}

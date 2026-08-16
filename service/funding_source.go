@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"time"
 
 	"github.com/QuantumNous/new-api/model"
@@ -26,6 +27,11 @@ type FundingSource interface {
 // WalletFunding — 钱包资金来源实现
 // ---------------------------------------------------------------------------
 
+// ErrInsufficientWalletQuota 钱包原子预扣失败（余额不足），未发生任何扣减。
+// BillingSession 据此映射为 ErrorCodeInsufficientUserQuota，
+// 使 wallet_first 等计费偏好可以回退到订阅。
+var ErrInsufficientWalletQuota = errors.New("wallet quota insufficient")
+
 type WalletFunding struct {
 	userId   int
 	consumed int // 实际预扣的用户额度
@@ -33,8 +39,8 @@ type WalletFunding struct {
 	// 限时额度资金拆分（累计）：记录本次消费中限时/永久额度的实际扣费拆分，
 	// 用于结算补扣、退款和消费日志审计。Allocations 按额度桶记录，
 	// 退款时逐桶恢复，避免跨午夜复活已过期额度。
-	tempConsumed int                       // 累计限时额度扣除量
-	permConsumed int                       // 累计永久额度扣除量
+	tempConsumed int                         // 累计限时额度扣除量
+	permConsumed int                         // 累计永久额度扣除量
 	allocations  []model.TemporaryAllocation // 累计限时额度桶分配
 }
 
@@ -71,6 +77,9 @@ func (w *WalletFunding) PreConsume(amount int) error {
 	}
 	split, err := model.PreConsumeWallet(w.userId, amount)
 	if err != nil {
+		if errors.Is(err, model.ErrInsufficientWalletBalance) {
+			return ErrInsufficientWalletQuota
+		}
 		return err
 	}
 	w.consumed = amount

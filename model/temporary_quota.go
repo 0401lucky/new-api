@@ -182,8 +182,14 @@ func PreConsumeWallet(userId, amount int) (*WalletSplit, error) {
 		return nil, err
 	}
 	if !hasTemp {
-		// 快速路径：单条原子条件扣减，余额不足不扣、不产生负余额
-		return consumePermanentAtomic(userId, amount)
+		reserved, err := TryReserveUserQuota(userId, amount)
+		if err != nil {
+			return nil, err
+		}
+		if !reserved {
+			return nil, ErrInsufficientWalletBalance
+		}
+		return &WalletSplit{Permanent: amount}, nil
 	}
 
 	return consumeWalletTx(userId, amount, true)
@@ -207,26 +213,6 @@ func TopUpWallet(userId, amount int) (*WalletSplit, error) {
 		return &WalletSplit{Permanent: amount}, nil
 	}
 	return consumeWalletTx(userId, amount, false)
-}
-
-// consumePermanentAtomic 无有效限时额度时的预扣：原子条件扣减永久额度。
-// 保证预扣不足时返回 ErrInsufficientWalletBalance，不会产生负余额。
-func consumePermanentAtomic(userId, amount int) (*WalletSplit, error) {
-	result := DB.Model(&User{}).
-		Where("id = ? AND quota >= ?", userId, amount).
-		Update("quota", gorm.Expr("quota - ?", amount))
-	if result.Error != nil {
-		return nil, result.Error
-	}
-	if result.RowsAffected == 0 {
-		return nil, ErrInsufficientWalletBalance
-	}
-	gopool.Go(func() {
-		if err := cacheDecrUserQuota(userId, int64(amount)); err != nil {
-			common.SysLog("failed to sync user quota cache after atomic pre-consume: " + err.Error())
-		}
-	})
-	return &WalletSplit{Permanent: amount}, nil
 }
 
 // consumeWalletTx 在事务内完成限时优先、永久补足的扣费。
@@ -290,13 +276,12 @@ func consumeWalletTx(userId, amount int, checkBalance bool) (*WalletSplit, error
 	if err != nil {
 		return nil, err
 	}
-	// 永久额度部分直写数据库（绕过批量更新），提交后手动同步缓存
-	if split.Permanent > 0 {
-		gopool.Go(func() {
-			if err := cacheDecrUserQuota(userId, int64(split.Permanent)); err != nil {
-				common.SysLog("failed to sync user quota cache after wallet temp pre-consume: " + err.Error())
-			}
-		})
+	// 永久额度部分已在事务内直写数据库，提交后只更新完整且版本匹配的缓存。
+	if common.RedisEnabled && split.Permanent > 0 {
+		_, cacheErr := cacheApplyUserQuotaDelta(userId, int64(-split.Permanent))
+		if cacheErr != nil {
+			common.SysLog("failed to sync user quota cache after wallet temp pre-consume: " + cacheErr.Error())
+		}
 	}
 	return split, nil
 }

@@ -30,6 +30,9 @@ type Midjourney struct {
 	TemporaryQuotaConsumed int    `json:"temporary_quota_consumed" gorm:"default:0"`
 	PermanentQuotaConsumed int    `json:"permanent_quota_consumed" gorm:"default:0"`
 	TemporaryAllocations   string `json:"temporary_allocations"` // JSON: []TemporaryAllocation
+
+	TokenId          int `json:"-" gorm:"default:0"`
+	BillingChannelId int `json:"-" gorm:"default:0"`
 }
 
 // GetTemporaryAllocations 解析限时额度桶分配列表
@@ -50,26 +53,6 @@ func (m *Midjourney) SetTemporaryAllocations(allocs []TemporaryAllocation) {
 	}
 	b, _ := common.Marshal(allocs)
 	m.TemporaryAllocations = string(b)
-}
-
-// UpdateMidjourneySplitByMjId 更新 MJ 任务的钱包资金拆分（消费成功后调用）。
-// 失败退款据此按资金来源退还。
-func UpdateMidjourneySplitByMjId(userId int, mjId string, split *WalletSplit) error {
-	if mjId == "" {
-		return nil
-	}
-	var allocsJSON string
-	if len(split.Allocations) > 0 {
-		b, _ := common.Marshal(split.Allocations)
-		allocsJSON = string(b)
-	}
-	return DB.Model(&Midjourney{}).
-		Where("user_id = ? AND mj_id = ?", userId, mjId).
-		Updates(map[string]interface{}{
-			"temporary_quota_consumed": split.Temporary,
-			"permanent_quota_consumed": split.Permanent,
-			"temporary_allocations":    allocsJSON,
-		}).Error
 }
 
 // TaskQueryParams 用于包含所有搜索条件的结构体，可以根据需求添加更多字段
@@ -215,6 +198,20 @@ func (midjourney *Midjourney) Update() error {
 	var err error
 	err = DB.Save(midjourney).Error
 	return err
+}
+
+func (midjourney *Midjourney) UpdateBillingState() error {
+	return DB.Model(midjourney).
+		Select("quota", "token_id", "billing_channel_id", "temporary_quota_consumed",
+			"permanent_quota_consumed", "temporary_allocations").
+		Updates(midjourney).Error
+}
+
+func (midjourney *Midjourney) GetBillingChannelId() int {
+	if midjourney.BillingChannelId > 0 {
+		return midjourney.BillingChannelId
+	}
+	return midjourney.ChannelId
 }
 
 // UpdateWithStatus performs a conditional UPDATE guarded by fromStatus (CAS).
