@@ -374,15 +374,15 @@ func ChatCompletionsRequestToResponsesRequest(req *dto.GeneralOpenAIRequest) (*d
 
 	var frequencyPenaltyRaw, presencePenaltyRaw json.RawMessage
 	if req.FrequencyPenalty != nil {
-		frequencyPenaltyRaw, _ = kitutil.Marshal(req.FrequencyPenalty)
+		frequencyPenaltyRaw, _ = common.Marshal(req.FrequencyPenalty)
 	}
 	if req.PresencePenalty != nil {
-		presencePenaltyRaw, _ = kitutil.Marshal(req.PresencePenalty)
+		presencePenaltyRaw, _ = common.Marshal(req.PresencePenalty)
 	}
 
 	var promptCacheKeyRaw json.RawMessage
 	if req.PromptCacheKey != "" {
-		promptCacheKeyRaw, err = kitutil.Marshal(req.PromptCacheKey)
+		promptCacheKeyRaw, err = common.Marshal(req.PromptCacheKey)
 		if err != nil {
 			return nil, fmt.Errorf("marshal prompt_cache_key: %w", err)
 		}

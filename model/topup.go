@@ -641,12 +641,13 @@ func CompleteEpayTopUp(tradeNo string, opts CompleteEpayTopUpOptions) error {
 			return errors.New("易支付订单金额不匹配")
 		}
 
-		quotaToAdd, err = common.QuotaFromDecimalStrict(
+		calculatedQuota, quotaErr := common.QuotaFromDecimalStrict(
 			decimal.NewFromInt(topUp.Amount).Mul(decimal.NewFromFloat(common.QuotaPerUnit)),
 		)
-		if err != nil || quotaToAdd <= 0 {
+		if quotaErr != nil || calculatedQuota <= 0 {
 			return ErrInvalidTopUpQuota
 		}
+		quotaToAdd = calculatedQuota
 
 		completeTime := common.GetTimestamp()
 		updated, err := updatePendingTopUp(tx, topUp, map[string]interface{}{

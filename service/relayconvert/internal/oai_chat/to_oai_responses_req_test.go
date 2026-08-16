@@ -49,11 +49,11 @@ func TestChatCompletionsRequestToResponsesRequestPreservesPromptCacheKey(t *test
 		})
 		require.NoError(t, err)
 
-		keyRaw, err := kitutil.Marshal(key)
+		keyRaw, err := common.Marshal(key)
 		require.NoError(t, err)
 		assert.Equal(t, keyRaw, []byte(got.PromptCacheKey))
 
-		encoded, err := kitutil.Marshal(got)
+		encoded, err := common.Marshal(got)
 		require.NoError(t, err)
 		assert.Equal(t, key, gjson.GetBytes(encoded, "prompt_cache_key").String())
 	})
@@ -65,7 +65,7 @@ func TestChatCompletionsRequestToResponsesRequestPreservesPromptCacheKey(t *test
 		})
 		require.NoError(t, err)
 
-		encoded, err := kitutil.Marshal(got)
+		encoded, err := common.Marshal(got)
 		require.NoError(t, err)
 		assert.False(t, gjson.GetBytes(encoded, "prompt_cache_key").Exists())
 	})

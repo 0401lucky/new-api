@@ -470,18 +470,18 @@ func postConsumeQuotaWithResult(relayInfo *relaycommon.RelayInfo, quota int, pre
 		} else if quota < 0 {
 			// 退还：优先退永久额度，再退限时额度（过期不恢复），并按额度桶逐桶恢复
 			refundAmount := -quota
-			result, err := model.RefundWallet(relayInfo.UserId, refundAmount, &model.WalletSplit{
+			refundResult, refundErr := model.RefundWallet(relayInfo.UserId, refundAmount, &model.WalletSplit{
 				Temporary:   relayInfo.TemporaryQuotaConsumed,
 				Permanent:   relayInfo.PermanentQuotaConsumed,
 				Allocations: relayAllocationsToModel(relayInfo.TemporaryQuotaAllocations),
 			})
-			if err != nil {
-				return result, err
+			if refundErr != nil {
+				return result, refundErr
 			}
 			// 更新剩余可退拆分
-			relayInfo.TemporaryQuotaConsumed -= result.Temporary
-			relayInfo.PermanentQuotaConsumed -= result.Permanent
-			relayInfo.TemporaryQuotaAllocations = removeRelayAllocations(relayInfo.TemporaryQuotaAllocations, result.Allocations)
+			relayInfo.TemporaryQuotaConsumed -= refundResult.Temporary
+			relayInfo.PermanentQuotaConsumed -= refundResult.Permanent
+			relayInfo.TemporaryQuotaAllocations = removeRelayAllocations(relayInfo.TemporaryQuotaAllocations, refundResult.Allocations)
 			relayInfo.TemporaryQuotaCheckinId = 0
 			relayInfo.TemporaryQuotaExpiresAt = 0
 			if n := len(relayInfo.TemporaryQuotaAllocations); n > 0 {

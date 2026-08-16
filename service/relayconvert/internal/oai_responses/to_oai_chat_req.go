@@ -541,7 +541,7 @@ func responsesRawFloat(raw json.RawMessage) (*float64, error) {
 		return nil, nil
 	}
 	var value float64
-	if err := kitutil.Unmarshal(raw, &value); err != nil {
+	if err := common.Unmarshal(raw, &value); err != nil {
 		return nil, err
 	}
 	return &value, nil
