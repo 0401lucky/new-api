@@ -17,12 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Download } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { CodeCreationActions } from '@/components/code-creation-actions'
 import { DateTimePicker } from '@/components/datetime-picker'
 import {
   SideDrawerSection,
@@ -58,6 +58,10 @@ import {
   getEditableQuotaStep,
   parseQuotaFromDollars,
 } from '@/lib/format'
+import {
+  type GeneratedCodeOutputMode,
+  outputGeneratedCodes,
+} from '@/lib/generated-code-output'
 import { handleServerError } from '@/lib/handle-server-error'
 import { addTimeToDate } from '@/lib/time'
 
@@ -102,18 +106,6 @@ export function RedemptionsMutateDrawer({
   })
 
   const randomQuotaEnabled = form.watch('random_quota_enabled')
-
-  const downloadTextAsFile = (text: string, filename: string) => {
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
 
   // Load existing data when updating
   useEffect(() => {
@@ -171,7 +163,10 @@ export function RedemptionsMutateDrawer({
     (redemptionLoadState === 'ready' && loadedRedemption?.id === redemptionId)
   const isLoadingRedemption = redemptionLoadState === 'loading'
 
-  const onSubmit = async (data: RedemptionFormValues) => {
+  const onSubmit = async (
+    data: RedemptionFormValues,
+    outputMode: GeneratedCodeOutputMode = 'download'
+  ) => {
     if (isUpdate && (!currentRow || !loadedRedemption || !isUpdateReady)) {
       return
     }
@@ -208,7 +203,18 @@ export function RedemptionsMutateDrawer({
               : t(SUCCESS_MESSAGES.REDEMPTION_CREATED)
           )
           if (keys.length > 0) {
-            downloadTextAsFile(keys.join('\n'), `${data.name}.txt`)
+            const delivered = await outputGeneratedCodes(
+              keys,
+              `${data.name}.txt`,
+              outputMode
+            )
+            if (outputMode === 'copy') {
+              if (delivered) {
+                toast.success(t('Copied to clipboard'))
+              } else {
+                toast.error(t('Failed to copy to clipboard'))
+              }
+            }
           }
           onOpenChange(false)
           triggerRefresh()
@@ -228,7 +234,17 @@ export function RedemptionsMutateDrawer({
       }
     }
 
-    void form.handleSubmit(onSubmit)(event)
+    void form.handleSubmit((data) => onSubmit(data, 'download'))(event)
+  }
+
+  const handleCreateAndCopy = () => {
+    const name = form.getValues('name')
+    if (!name?.trim()) {
+      const quota = parseQuotaFromDollars(form.getValues('quota_dollars'))
+      form.setValue('name', formatQuota(quota), { shouldValidate: true })
+    }
+
+    void form.handleSubmit((data) => onSubmit(data, 'copy'))()
   }
 
   const handleSetExpiry = (months: number, days: number, hours: number) => {
@@ -244,13 +260,19 @@ export function RedemptionsMutateDrawer({
   const quotaPlaceholder = tokensOnly
     ? t('Enter quota in tokens')
     : t('Enter quota in {{currency}}', { currency: currencyLabel })
+  let quotaDescription = t('Enter the quota amount in {{currency}}', {
+    currency: currencyLabel,
+  })
+  if (!isUpdate && randomQuotaEnabled) {
+    quotaDescription = t('Fixed quota is ignored when random quota is enabled')
+  } else if (tokensOnly) {
+    quotaDescription = t('Enter the quota amount in tokens')
+  }
   let submitButtonLabel = t('Save changes')
   if (isLoadingRedemption) {
     submitButtonLabel = t('Loading...')
   } else if (isSubmitting) {
     submitButtonLabel = t('Saving...')
-  } else if (!isUpdate) {
-    submitButtonLabel = t('Create and download')
   }
 
   return (
@@ -328,17 +350,7 @@ export function RedemptionsMutateDrawer({
                           }
                         />
                       </FormControl>
-                      <FormDescription>
-                        {!isUpdate && randomQuotaEnabled
-                          ? t(
-                              'Fixed quota is ignored when random quota is enabled'
-                            )
-                          : tokensOnly
-                            ? t('Enter the quota amount in tokens')
-                            : t('Enter the quota amount in {{currency}}', {
-                                currency: currencyLabel,
-                              })}
-                      </FormDescription>
+                      <FormDescription>{quotaDescription}</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -545,16 +557,22 @@ export function RedemptionsMutateDrawer({
           <SheetClose render={<Button variant='outline' />}>
             {t('Close')}
           </SheetClose>
-          <Button
-            form='redemption-form'
-            type='submit'
-            disabled={isSubmitting || !isUpdateReady}
-          >
-            {!isUpdate && !isLoadingRedemption && !isSubmitting && (
-              <Download className='mr-2 h-4 w-4' />
-            )}
-            {submitButtonLabel}
-          </Button>
+          {isUpdate ? (
+            <Button
+              form='redemption-form'
+              type='submit'
+              disabled={isSubmitting || !isUpdateReady}
+            >
+              {submitButtonLabel}
+            </Button>
+          ) : (
+            <CodeCreationActions
+              formId='redemption-form'
+              disabled={!isUpdateReady}
+              isSubmitting={isSubmitting}
+              onCreateAndCopy={handleCreateAndCopy}
+            />
+          )}
         </SheetFooter>
       </SheetContent>
     </Sheet>

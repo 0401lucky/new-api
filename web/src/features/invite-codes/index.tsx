@@ -16,9 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useMemo, useState } from 'react'
-import { z } from 'zod'
-import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
@@ -36,10 +33,8 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { useMediaQuery } from '@/hooks'
 import type { TFunction } from 'i18next'
 import {
-  Download,
   Edit,
   MoreHorizontal as DotsHorizontalIcon,
   Plus,
@@ -47,11 +42,34 @@ import {
   PowerOff,
   Trash2,
 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { formatTimestampToDate } from '@/lib/format'
-import { addTimeToDate } from '@/lib/time'
-import { useTableUrlState } from '@/hooks/use-table-url-state'
+import { z } from 'zod'
+
+import { CodeCreationActions } from '@/components/code-creation-actions'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { CopyButton } from '@/components/copy-button'
+import {
+  DISABLED_ROW_DESKTOP,
+  DISABLED_ROW_MOBILE,
+  DataTableBulkActions as BulkActionsToolbar,
+  DataTableColumnHeader,
+  DataTablePage,
+} from '@/components/data-table'
+import { DateTimePicker } from '@/components/datetime-picker'
+import {
+  SideDrawerSection,
+  sideDrawerContentClassName,
+  sideDrawerFooterClassName,
+  sideDrawerFormClassName,
+  sideDrawerHeaderClassName,
+} from '@/components/drawer-layout'
+import { SectionPageLayout } from '@/components/layout'
+import { MaskedValueDisplay } from '@/components/masked-value-display'
+import { StatusBadge } from '@/components/status-badge'
+import { TableId } from '@/components/table-id'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -96,27 +114,15 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { ConfirmDialog } from '@/components/confirm-dialog'
-import { CopyButton } from '@/components/copy-button'
+import { useMediaQuery } from '@/hooks'
+import { useTableUrlState } from '@/hooks/use-table-url-state'
+import { formatTimestampToDate } from '@/lib/format'
 import {
-  DISABLED_ROW_DESKTOP,
-  DISABLED_ROW_MOBILE,
-  DataTableBulkActions as BulkActionsToolbar,
-  DataTableColumnHeader,
-  DataTablePage,
-} from '@/components/data-table'
-import { DateTimePicker } from '@/components/datetime-picker'
-import {
-  SideDrawerSection,
-  sideDrawerContentClassName,
-  sideDrawerFooterClassName,
-  sideDrawerFormClassName,
-  sideDrawerHeaderClassName,
-} from '@/components/drawer-layout'
-import { SectionPageLayout } from '@/components/layout'
-import { MaskedValueDisplay } from '@/components/masked-value-display'
-import { StatusBadge } from '@/components/status-badge'
-import { TableId } from '@/components/table-id'
+  type GeneratedCodeOutputMode,
+  outputGeneratedCodes,
+} from '@/lib/generated-code-output'
+import { addTimeToDate } from '@/lib/time'
+
 import {
   createInviteCode,
   deleteInvalidInviteCodes,
@@ -237,18 +243,6 @@ function transformInviteCodeToFormDefaults(
     count: 1,
     key_prefix: '',
   }
-}
-
-function downloadTextAsFile(text: string, filename: string) {
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
 }
 
 type InviteCodesColumnsOptions = {
@@ -562,11 +556,7 @@ function InviteCodeRowActions({
   )
 }
 
-function InviteCodesBulkActions<TData>({
-  table,
-}: {
-  table: Table<TData>
-}) {
+function InviteCodesBulkActions<TData>({ table }: { table: Table<TData> }) {
   const { t } = useTranslation()
   const selectedRows = table.getFilteredSelectedRowModel().rows
 
@@ -844,22 +834,20 @@ function InviteCodesTable({
           },
         ],
       }}
-      getRowClassName={(row, { isMobile }) =>
-        row.original.status !== INVITE_CODE_STATUS.ENABLED ||
-        isInviteCodeExpired(row.original.expired_time, row.original.status)
-          ? isMobile
-            ? DISABLED_ROW_MOBILE
-            : DISABLED_ROW_DESKTOP
-          : undefined
-      }
-      bulkActions={
-        <InviteCodesBulkActions table={table} />
-      }
+      getRowClassName={(row, { isMobile }) => {
+        const isDisabled =
+          row.original.status !== INVITE_CODE_STATUS.ENABLED ||
+          isInviteCodeExpired(row.original.expired_time, row.original.status)
+        if (!isDisabled) return undefined
+
+        return isMobile ? DISABLED_ROW_MOBILE : DISABLED_ROW_DESKTOP
+      }}
+      bulkActions={<InviteCodesBulkActions table={table} />}
     />
   )
 }
 
-function InviteCodeMutateDrawer({
+export function InviteCodeMutateDrawer({
   open,
   onOpenChange,
   currentRow,
@@ -881,17 +869,22 @@ function InviteCodeMutateDrawer({
 
   useEffect(() => {
     if (open && isUpdate && currentRow) {
-      getInviteCode(currentRow.id).then((result) => {
-        if (result.success && result.data) {
-          form.reset(transformInviteCodeToFormDefaults(result.data))
-        }
-      })
+      void getInviteCode(currentRow.id)
+        .then((result) => {
+          if (result.success && result.data) {
+            form.reset(transformInviteCodeToFormDefaults(result.data))
+          }
+        })
+        .catch(() => toast.error(t('Failed to load')))
     } else if (open && !isUpdate) {
       form.reset(INVITE_CODE_FORM_DEFAULT_VALUES)
     }
-  }, [open, isUpdate, currentRow, form])
+  }, [open, isUpdate, currentRow, form, t])
 
-  const onSubmit = async (data: InviteCodeFormValues) => {
+  const onSubmit = async (
+    data: InviteCodeFormValues,
+    outputMode: GeneratedCodeOutputMode = 'download'
+  ) => {
     setIsSubmitting(true)
     try {
       const basePayload = transformFormDataToPayload(data)
@@ -916,7 +909,18 @@ function InviteCodeMutateDrawer({
               : t(INVITE_CODE_SUCCESS_MESSAGES.CREATED)
           )
           if (keys.length > 0) {
-            downloadTextAsFile(keys.join('\n'), `${data.name}.txt`)
+            const delivered = await outputGeneratedCodes(
+              keys,
+              `${data.name}.txt`,
+              outputMode
+            )
+            if (outputMode === 'copy') {
+              if (delivered) {
+                toast.success(t('Copied to clipboard'))
+              } else {
+                toast.error(t('Failed to copy to clipboard'))
+              }
+            }
           }
           onOpenChange(false)
           onRefresh()
@@ -929,6 +933,10 @@ function InviteCodeMutateDrawer({
 
   const handleSetExpiry = (months: number, days: number, hours: number) => {
     form.setValue('expired_time', addTimeToDate(months, days, hours))
+  }
+
+  const handleCreateAndCopy = () => {
+    void form.handleSubmit((data) => onSubmit(data, 'copy'))()
   }
 
   return (
@@ -956,7 +964,7 @@ function InviteCodeMutateDrawer({
         <Form {...form}>
           <form
             id='invite-code-form'
-            onSubmit={form.handleSubmit(onSubmit)}
+            onSubmit={form.handleSubmit((data) => onSubmit(data, 'download'))}
             className={sideDrawerFormClassName()}
           >
             <SideDrawerSection>
@@ -1051,7 +1059,7 @@ function InviteCodeMutateDrawer({
                             placeholder={t('Number of codes to create')}
                             onChange={(event) =>
                               field.onChange(
-                                parseInt(event.target.value, 10) || 1
+                                Number.parseInt(event.target.value, 10) || 1
                               )
                             }
                           />
@@ -1094,18 +1102,22 @@ function InviteCodeMutateDrawer({
           <SheetClose render={<Button variant='outline' />}>
             {t('Close')}
           </SheetClose>
-          <Button form='invite-code-form' type='submit' disabled={isSubmitting}>
-            {isSubmitting ? (
-              t('Saving...')
-            ) : !isUpdate ? (
-              <>
-                <Download className='mr-2 h-4 w-4' />
-                {t('Create and download')}
-              </>
-            ) : (
-              t('Save changes')
-            )}
-          </Button>
+          {isUpdate ? (
+            <Button
+              form='invite-code-form'
+              type='submit'
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? t('Saving...') : t('Save changes')}
+            </Button>
+          ) : (
+            <CodeCreationActions
+              formId='invite-code-form'
+              disabled={isSubmitting}
+              isSubmitting={isSubmitting}
+              onCreateAndCopy={handleCreateAndCopy}
+            />
+          )}
         </SheetFooter>
       </SheetContent>
     </Sheet>

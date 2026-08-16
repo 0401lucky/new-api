@@ -23,9 +23,25 @@ import {
   waitFor,
   type RenderResult,
 } from '@testing-library/react'
-import { afterEach, describe, expect, test } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 
 import type { Redemption } from '../../types'
+
+const localStorageValues = new Map<string, string>()
+Object.defineProperty(globalThis, 'localStorage', {
+  configurable: true,
+  value: {
+    get length() {
+      return localStorageValues.size
+    },
+    clear: () => localStorageValues.clear(),
+    getItem: (key: string) => localStorageValues.get(key) ?? null,
+    key: (index: number) => [...localStorageValues.keys()][index] ?? null,
+    removeItem: (key: string) => localStorageValues.delete(key),
+    setItem: (key: string, value: string) => localStorageValues.set(key, value),
+  } satisfies Storage,
+})
 
 const i18n = (await import('i18next')).default
 const { I18nextProvider, initReactI18next } = await import('react-i18next')
@@ -52,6 +68,7 @@ await i18n.use(initReactI18next).init({
 type ApiMethod = (url: string, data?: unknown) => Promise<{ data: unknown }>
 type MockableApi = {
   get: ApiMethod
+  post: ApiMethod
   put: ApiMethod
 }
 type RenderedDrawer = {
@@ -64,8 +81,13 @@ type CurrencyFixture = {
 
 const apiClient = api as unknown as MockableApi
 const originalGet = apiClient.get
+const originalPost = apiClient.post
 const originalPut = apiClient.put
 const originalConsoleLog = Reflect.get(console, 'log')
+const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(
+  navigator,
+  'clipboard'
+)
 let renderedDrawer: RenderedDrawer | null = null
 
 function redemption(id: number, quota = 500001): Redemption {
@@ -93,7 +115,7 @@ function deferred<T>() {
   return { promise, reject, resolve }
 }
 
-function drawerTree(currentRow: Redemption) {
+function drawerTree(currentRow?: Redemption) {
   return (
     <I18nextProvider i18n={i18n}>
       <RedemptionsProvider>
@@ -109,7 +131,7 @@ function drawerTree(currentRow: Redemption) {
 }
 
 async function renderDrawer(
-  currentRow: Redemption,
+  currentRow?: Redemption,
   currency: CurrencyFixture = {
     quotaDisplayType: 'USD',
     usdExchangeRate: 1,
@@ -179,14 +201,66 @@ async function waitForLoadedForm(): Promise<void> {
 
 afterEach(() => {
   apiClient.get = originalGet
+  apiClient.post = originalPost
   apiClient.put = originalPut
   Reflect.set(console, 'log', originalConsoleLog)
+  if (originalClipboardDescriptor) {
+    Object.defineProperty(navigator, 'clipboard', originalClipboardDescriptor)
+  } else {
+    Reflect.deleteProperty(navigator, 'clipboard')
+  }
   toast.dismiss()
   localStorage.clear()
   renderedDrawer = null
 })
 
 describe('redemption drawer', () => {
+  test('creates from the copy menu and writes multiple codes one per line', async () => {
+    const user = userEvent.setup()
+    const writeText = vi.fn(async () => undefined)
+    const creations: Array<Record<string, unknown>> = []
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+    apiClient.post = async (_url, data) => {
+      expect(data && typeof data === 'object').toBeTruthy()
+      creations.push(data as Record<string, unknown>)
+      return {
+        data: {
+          success: true,
+          data: ['redeem-first', 'redeem-second'],
+        },
+      }
+    }
+
+    await renderDrawer()
+    await user.click(
+      screen.getByRole('button', { name: 'More creation options' })
+    )
+    await user.click(screen.getByRole('menuitem', { name: 'Create and copy' }))
+
+    await waitFor(() => expect(creations).toHaveLength(1))
+    expect(creations[0]?.name).toBeTruthy()
+    expect(writeText).toHaveBeenCalledWith('redeem-first\nredeem-second')
+    await waitFor(() =>
+      expect(document.body).toHaveTextContent('Copied to clipboard')
+    )
+  })
+
+  test('shows only the save button when updating', async () => {
+    const original = redemption(1)
+    apiClient.get = async () => ({ data: { success: true, data: original } })
+
+    await renderDrawer(original)
+    await waitForLoadedForm()
+
+    expect(getSaveButton()).toBeEnabled()
+    expect(
+      screen.queryByRole('button', { name: 'More creation options' })
+    ).not.toBeInTheDocument()
+  })
+
   test('shows the reported CNY quota without floating-point noise', async () => {
     const original = redemption(1, 13888889)
     apiClient.get = async () => ({ data: { success: true, data: original } })
