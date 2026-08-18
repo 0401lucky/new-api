@@ -292,8 +292,21 @@ func RecordTopupLog(userId int, content string, callerIp string, paymentMethod s
 	}
 }
 
+// RecordGatewayErrorLog 记录网关策略侧（泄漏防护、提示词检查等）拒绝请求的错误日志。
+// 这类拒绝不是上游模型故障，因此不计入模型健康度统计。
+func RecordGatewayErrorLog(c *gin.Context, userId int, channelId int, modelName string, tokenName string, content string, tokenId int, useTimeSeconds int,
+	isStream bool, group string, other map[string]interface{}) {
+	recordErrorLog(c, userId, channelId, modelName, tokenName, content, tokenId, useTimeSeconds, isStream, group, other, false)
+}
+
+// RecordErrorLog 记录渠道/上游错误日志，并将该次失败计入模型健康度统计。
 func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string, tokenName string, content string, tokenId int, useTimeSeconds int,
 	isStream bool, group string, other map[string]interface{}) {
+	recordErrorLog(c, userId, channelId, modelName, tokenName, content, tokenId, useTimeSeconds, isStream, group, other, true)
+}
+
+func recordErrorLog(c *gin.Context, userId int, channelId int, modelName string, tokenName string, content string, tokenId int, useTimeSeconds int,
+	isStream bool, group string, other map[string]interface{}, countModelHealth bool) {
 	logger.LogInfo(c, fmt.Sprintf("record error log: userId=%d, channelId=%d, modelName=%s, tokenName=%s, content=%s", userId, channelId, modelName, tokenName, common.LocalLogPreview(content)))
 	username := c.GetString("username")
 	requestId := c.GetString(common.RequestIdKey)
@@ -336,7 +349,7 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 	if err != nil {
 		logger.LogError(c, "failed to record log: "+err.Error())
 	}
-	if modelName != "" {
+	if countModelHealth && modelName != "" {
 		RecordModelHealthEventAsync(&ModelHealthEvent{
 			ModelName: modelName,
 			CreatedAt: log.CreatedAt,

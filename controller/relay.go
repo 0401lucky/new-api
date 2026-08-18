@@ -412,7 +412,7 @@ func recordLeakProtectionBlockedLog(c *gin.Context, reason string) {
 		useTimeSeconds = int(time.Since(startTime).Seconds())
 	}
 
-	model.RecordErrorLog(
+	model.RecordGatewayErrorLog(
 		c,
 		userId,
 		common.GetContextKeyInt(c, constant.ContextKeyChannelId),
@@ -481,7 +481,7 @@ func recordPromptCheckLog(c *gin.Context, relayInfo *relaycommon.RelayInfo, verd
 	if reason == "" {
 		reason = "prompt check matched"
 	}
-	model.RecordErrorLog(
+	model.RecordGatewayErrorLog(
 		c,
 		userId,
 		common.GetContextKeyInt(c, constant.ContextKeyChannelId),
