@@ -16,8 +16,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Activity, CheckCircle, RefreshCw, Search, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  Activity,
+  HeartPulse,
+  Percent,
+  Radar,
+  RefreshCw,
+  Search,
+  Sigma,
+  X,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -28,6 +37,7 @@ import { PublicLayout } from '@/components/layout'
 import { cn } from '@/lib/utils'
 import { getPublicModelHealthOverview } from './api'
 import { ModelHealthCard } from './components/model-health-card'
+import { StatCard, StatCardSkeleton } from './components/stat-card'
 import { GLOBAL_STATUS_META } from './status'
 import type { ModelHealthOverviewPayload, ModelHealthPeriod } from './types'
 import { formatRate, formatTokens, timestamp2string } from './utils'
@@ -40,67 +50,10 @@ const PERIOD_LABEL_KEYS: Record<ModelHealthPeriod, string> = {
   '30d': '30 days',
 }
 
-function StatCard(props: {
-  title: string
-  value: ReactNode
-  subtitle?: string
-  bgGradient: string
-}) {
-  return (
-    <div
-      className='relative flex min-h-[116px] flex-col justify-between overflow-hidden rounded-[20px] border border-white/10 p-5 shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl sm:rounded-[24px]'
-      style={{ background: props.bgGradient }}
-    >
-      <div className='relative z-10 flex items-center justify-between'>
-        <div className='text-sm font-medium tracking-wide text-white/90'>
-          {props.title}
-        </div>
-        <div className='flex h-9 w-9 items-center justify-center rounded-full bg-black/15 shadow-inner'>
-          <CheckCircle className='size-5 text-white' strokeWidth={2.5} />
-        </div>
-      </div>
-      <div className='relative z-10 mt-3'>
-        <div className='text-2xl font-bold tracking-tight text-white sm:text-3xl'>
-          {props.value}
-        </div>
-        {props.subtitle && (
-          <div className='mt-1 text-xs font-medium text-white/80 sm:text-sm'>
-            {props.subtitle}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function StatCardSkeleton(props: {
-  title: string
-  bgGradient: string
-  valueWidth?: number
-}) {
-  return (
-    <div
-      className='relative flex min-h-[116px] flex-col justify-between overflow-hidden rounded-[20px] border border-white/10 p-5 shadow-lg sm:rounded-[24px]'
-      style={{ background: props.bgGradient }}
-    >
-      <div className='relative z-10 flex items-center justify-between'>
-        <div className='text-sm font-medium tracking-wide text-white/90'>
-          {props.title}
-        </div>
-        <div className='flex h-9 w-9 items-center justify-center rounded-full bg-black/15 shadow-inner'>
-          <CheckCircle className='size-5 text-white/40' />
-        </div>
-      </div>
-      <div className='relative z-10 mt-3'>
-        <Skeleton
-          className='mb-2 h-[34px] rounded-[10px] bg-white/35'
-          style={{ width: props.valueWidth ?? 110 }}
-        />
-        <Skeleton className='h-3.5 w-20 rounded-lg bg-white/25' />
-      </div>
-    </div>
-  )
-}
+const MODEL_CARD_SKELETON_KEYS = Array.from(
+  { length: 6 },
+  (_, index) => `model-health-card-skeleton-${index + 1}`
+)
 
 function LoadingOverlay() {
   return (
@@ -255,27 +208,27 @@ export function ModelHealthPublicPage() {
 
           {showSpin && <LoadingOverlay />}
 
-          <div className='mb-8 grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4'>
+          <div className='mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4'>
             {isInitialLoading || !stats ? (
               <>
                 <StatCardSkeleton
                   title={t('Monitored models')}
-                  bgGradient='linear-gradient(135deg, #2ec4b6 0%, #0ea5e9 100%)'
+                  icon={<Radar className='size-3.5' />}
                   valueWidth={72}
                 />
                 <StatCardSkeleton
                   title={t('Overall success rate')}
-                  bgGradient='linear-gradient(135deg, #4caf50 0%, #8bc34a 100%)'
+                  icon={<Percent className='size-3.5' />}
                   valueWidth={96}
                 />
                 <StatCardSkeleton
                   title={t('Total tokens')}
-                  bgGradient='linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)'
+                  icon={<Sigma className='size-3.5' />}
                   valueWidth={120}
                 />
                 <StatCardSkeleton
                   title={t('Healthy models')}
-                  bgGradient='linear-gradient(135deg, #14b8a6 0%, #10b981 100%)'
+                  icon={<HeartPulse className='size-3.5' />}
                   valueWidth={72}
                 />
               </>
@@ -283,29 +236,29 @@ export function ModelHealthPublicPage() {
               <>
                 <StatCard
                   title={t('Monitored models')}
+                  icon={<Radar className='size-3.5' />}
                   value={stats.total_models}
                   subtitle={t('{{count}} healthy', {
                     count: stats.healthy_models,
                   })}
-                  bgGradient='linear-gradient(135deg, #2ec4b6 0%, #0ea5e9 100%)'
                 />
                 <StatCard
                   title={t('Overall success rate')}
+                  icon={<Percent className='size-3.5' />}
                   value={formatRate(stats.overall_rate_24h)}
                   subtitle={t('Past 24 hours')}
-                  bgGradient='linear-gradient(135deg, #4caf50 0%, #8bc34a 100%)'
                 />
                 <StatCard
                   title={t('Total tokens')}
+                  icon={<Sigma className='size-3.5' />}
                   value={formatTokens(stats.total_tokens_24h)}
                   subtitle={t('Past 24 hours')}
-                  bgGradient='linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)'
                 />
                 <StatCard
                   title={t('Healthy models')}
+                  icon={<HeartPulse className='size-3.5' />}
                   value={stats.healthy_models}
                   subtitle={t('Status operational')}
-                  bgGradient='linear-gradient(135deg, #14b8a6 0%, #10b981 100%)'
                 />
               </>
             )}
@@ -357,8 +310,8 @@ export function ModelHealthPublicPage() {
 
           {isInitialLoading ? (
             <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3'>
-              {Array.from({ length: 6 }).map((_, idx) => (
-                <Skeleton key={idx} className='h-[280px] rounded-xl' />
+              {MODEL_CARD_SKELETON_KEYS.map((key) => (
+                <Skeleton key={key} className='h-[280px] rounded-xl' />
               ))}
             </div>
           ) : (
