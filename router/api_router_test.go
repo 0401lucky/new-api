@@ -20,6 +20,7 @@ func TestSetApiRouterRegisters(t *testing.T) {
 
 	expectedRoutes := []string{
 		http.MethodGet + " /api/authz/catalog",
+		http.MethodGet + " /api/user/by_linuxdo",
 		http.MethodGet + " /api/channel/ops",
 		http.MethodPost + " /api/channel/:id/status",
 		http.MethodPost + " /api/channel/status/batch",

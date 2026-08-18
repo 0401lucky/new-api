@@ -436,6 +436,38 @@ func GetUser(c *gin.Context) {
 	return
 }
 
+// GetUserByLinuxDOId 按 LinuxDO id 精确反查用户，供福利站等外部服务做账号绑定匹配。
+// 只返回绑定所需的精简字段；不做角色分级校验（root 也可被查到），因为站长本人绑定时需要。
+func GetUserByLinuxDOId(c *gin.Context) {
+	linuxDOId := strings.TrimSpace(c.Query("linux_do_id"))
+	if linuxDOId == "" {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	user := model.User{LinuxDOId: linuxDOId}
+	if err := user.FillUserByLinuxDOId(); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			common.ApiErrorI18n(c, i18n.MsgUserNotExists)
+		} else {
+			common.ApiError(c, err)
+		}
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data": gin.H{
+			"id":           user.Id,
+			"username":     user.Username,
+			"display_name": user.DisplayName,
+			"linux_do_id":  user.LinuxDOId,
+			"quota":        user.Quota,
+			"status":       user.Status,
+			"role":         user.Role,
+		},
+	})
+}
+
 func GenerateAccessToken(c *gin.Context) {
 	id := c.GetInt("id")
 	// get rand int 28-32
