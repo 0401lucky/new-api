@@ -227,6 +227,115 @@ func userCheckinWithoutTransaction(checkin *Checkin, userId int, quotaAwarded in
 	return checkin, nil
 }
 
+// ErrCheckinPermanentConflict 当日已存在永久签到记录，不能再写入限时额度桶。
+var ErrCheckinPermanentConflict = errors.New("用户今日已有永久签到记录")
+
+// GrantTemporaryQuota 由外部服务（福利站）为指定用户发放当日限时额度。
+// 复用签到额度桶语义：当日一行，失效时间为北京时间次日 00:00。
+// 当日已有 temporary 记录时原子累加（保持原失效时间）；已有 permanent 记录时拒绝，不篡改该行。
+// MySQL 和 PostgreSQL 使用事务保证原子性；SQLite 不支持嵌套事务，直接顺序操作。
+func GrantTemporaryQuota(userId int, quota int) (*Checkin, error) {
+	if quota <= 0 {
+		return nil, errors.New("发放额度必须大于 0")
+	}
+	now := common.NowInCheckinTimezone()
+	today := now.Format("2006-01-02")
+	expiresAt := nextDayMidnightUnix(now)
+
+	if common.UsingMainDatabase(common.DatabaseTypeSQLite) {
+		return grantTemporaryQuotaOn(DB, userId, quota, today, expiresAt)
+	}
+
+	var checkin *Checkin
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		result, err := grantTemporaryQuotaOn(tx, userId, quota, today, expiresAt)
+		if err != nil {
+			return err
+		}
+		checkin = result
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return checkin, nil
+}
+
+// grantTemporaryQuotaOn 在给定连接（事务或裸库）上执行限时额度发放。
+// 并发安全依赖两点：累加走 SQL 增量表达式；插入靠 (user_id, checkin_date) 唯一索引兜底，
+// 冲突后回读当日记录，仍是 temporary 则改走累加分支。
+func grantTemporaryQuotaOn(db *gorm.DB, userId int, quota int, today string, expiresAt int64) (*Checkin, error) {
+	added, err := addTemporaryQuotaOn(db, userId, quota, today)
+	if err != nil {
+		return nil, err
+	}
+	if added != nil {
+		return added, nil
+	}
+
+	// 当日无 temporary 记录：先确认用户存在，再尝试新建额度桶
+	var userCount int64
+	if err := db.Model(&User{}).Where("id = ?", userId).Count(&userCount).Error; err != nil {
+		return nil, err
+	}
+	if userCount == 0 {
+		return nil, errors.New("用户不存在")
+	}
+
+	var existing Checkin
+	err = db.Where("user_id = ? AND checkin_date = ?", userId, today).First(&existing).Error
+	if err == nil {
+		// 当日已有 permanent 记录（temporary 已在上面处理），不得篡改
+		return nil, ErrCheckinPermanentConflict
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	checkin := &Checkin{
+		UserId:         userId,
+		CheckinDate:    today,
+		QuotaAwarded:   quota,
+		QuotaType:      CheckinQuotaTypeTemporary,
+		QuotaRemaining: quota,
+		QuotaExpiresAt: expiresAt,
+		CreatedAt:      common.GetTimestamp(),
+	}
+	if err := db.Create(checkin).Error; err != nil {
+		// 唯一索引冲突：并发请求已插入当日记录，回退到累加分支
+		added, addErr := addTemporaryQuotaOn(db, userId, quota, today)
+		if addErr != nil {
+			return nil, addErr
+		}
+		if added != nil {
+			return added, nil
+		}
+		return nil, ErrCheckinPermanentConflict
+	}
+	return checkin, nil
+}
+
+// addTemporaryQuotaOn 原子累加当日 temporary 额度桶，命中则回读并返回该记录，未命中返回 nil。
+func addTemporaryQuotaOn(db *gorm.DB, userId int, quota int, today string) (*Checkin, error) {
+	result := db.Model(&Checkin{}).
+		Where("user_id = ? AND checkin_date = ? AND quota_type = ?", userId, today, CheckinQuotaTypeTemporary).
+		Updates(map[string]interface{}{
+			"quota_awarded":   gorm.Expr("quota_awarded + ?", quota),
+			"quota_remaining": gorm.Expr("quota_remaining + ?", quota),
+		})
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+	var checkin Checkin
+	if err := db.Where("user_id = ? AND checkin_date = ?", userId, today).First(&checkin).Error; err != nil {
+		return nil, err
+	}
+	return &checkin, nil
+}
+
 // GetUserCheckinStats 获取用户签到统计信息
 func GetUserCheckinStats(userId int, month string) (map[string]interface{}, error) {
 	// 获取指定月份的所有签到记录

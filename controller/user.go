@@ -468,6 +468,42 @@ func GetUserByLinuxDOId(c *gin.Context) {
 	})
 }
 
+// GrantTemporaryQuotaRequest 外部服务发放当日限时额度的请求体
+type GrantTemporaryQuotaRequest struct {
+	UserId int `json:"user_id"`
+	Quota  int `json:"quota"`
+}
+
+// GrantUserTemporaryQuota 给指定用户发放当日限时额度，供福利站等外部服务调用。
+// 复用签到额度桶：当日一个桶，次日 00:00（北京时间）失效；重复调用为幂等叠加。
+func GrantUserTemporaryQuota(c *gin.Context) {
+	var req GrantTemporaryQuotaRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	if req.UserId <= 0 || req.Quota <= 0 {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	checkin, err := model.GrantTemporaryQuota(req.UserId, req.Quota)
+	if err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data": gin.H{
+			"user_id":         checkin.UserId,
+			"quota_added":     req.Quota,
+			"quota_remaining": checkin.QuotaRemaining,
+			"expires_at":      checkin.QuotaExpiresAt,
+			"checkin_date":    checkin.CheckinDate,
+		},
+	})
+}
+
 func GenerateAccessToken(c *gin.Context) {
 	id := c.GetInt("id")
 	// get rand int 28-32
