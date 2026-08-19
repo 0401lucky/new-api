@@ -412,14 +412,29 @@ func GetUser(c *gin.Context) {
 
 	// 钱包限时额度：只返回当前仍有效的剩余额度，已过期按零返回；不依赖签到功能是否开启
 	temporaryQuota, _ := model.GetActiveTemporaryQuota(user.Id)
+	// 当日签到状态：供福利站等外部服务判重，避免同一天在两侧各领一份奖励
+	checkedInToday := false
+	todayCheckinQuotaType := ""
+	if todayCheckin, _ := model.GetTodayCheckin(user.Id); todayCheckin != nil {
+		checkedInToday = true
+		todayCheckinQuotaType = todayCheckin.QuotaType
+		if todayCheckinQuotaType == "" {
+			// 旧记录 quota_type 为空，按 permanent 归一化
+			todayCheckinQuotaType = model.CheckinQuotaTypePermanent
+		}
+	}
 	data := struct {
 		*model.User
 		TemporaryQuota                 int    `json:"temporary_quota"`
 		TemporaryQuotaExpiresAt        int64  `json:"temporary_quota_expires_at,omitempty"`
 		TemporaryQuotaExpiresAtDisplay string `json:"temporary_quota_expires_at_display,omitempty"`
+		CheckedInToday                 bool   `json:"checked_in_today"`
+		TodayCheckinQuotaType          string `json:"today_checkin_quota_type"`
 	}{
-		User:           user,
-		TemporaryQuota: temporaryQuota,
+		User:                  user,
+		TemporaryQuota:        temporaryQuota,
+		CheckedInToday:        checkedInToday,
+		TodayCheckinQuotaType: todayCheckinQuotaType,
 	}
 	if temporaryQuota > 0 {
 		if expiresAt := model.GetActiveTemporaryQuotaExpiresAt(user.Id); expiresAt > 0 {
