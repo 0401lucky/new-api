@@ -299,6 +299,43 @@ func RecordGatewayErrorLog(c *gin.Context, userId int, channelId int, modelName 
 	recordErrorLog(c, userId, channelId, modelName, tokenName, content, tokenId, useTimeSeconds, isStream, group, other, false)
 }
 
+// maxLoggedUserAgentLen bounds the client-controlled User-Agent header before it
+// is stored in a log row.
+const maxLoggedUserAgentLen = 256
+
+// otherWithRequestUserAgent returns other carrying the request's User-Agent
+// under admin_info.user_agent. The header identifies the calling client (SDK,
+// CLI, or a downstream gateway that did not rewrite it), which is what admins
+// use to tell direct usage apart from re-distribution. Nesting it under
+// admin_info keeps it admin-only for free, since formatUserLogs strips the whole
+// admin_info object for non-admin viewers. Returns other unchanged when no
+// request or header is available.
+func otherWithRequestUserAgent(c *gin.Context, other map[string]interface{}) map[string]interface{} {
+	if c == nil || c.Request == nil {
+		return other
+	}
+	userAgent := c.Request.UserAgent()
+	if userAgent == "" {
+		return other
+	}
+	if runes := []rune(userAgent); len(runes) > maxLoggedUserAgentLen {
+		userAgent = string(runes[:maxLoggedUserAgentLen])
+	}
+	merged := make(map[string]interface{}, len(other)+1)
+	for k, v := range other {
+		merged[k] = v
+	}
+	adminInfo := make(map[string]interface{}, 1)
+	if existing, ok := merged["admin_info"].(map[string]interface{}); ok {
+		for k, v := range existing {
+			adminInfo[k] = v
+		}
+	}
+	adminInfo["user_agent"] = userAgent
+	merged["admin_info"] = adminInfo
+	return merged
+}
+
 // RecordErrorLog 记录渠道/上游错误日志，并将该次失败计入模型健康度统计。
 func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string, tokenName string, content string, tokenId int, useTimeSeconds int,
 	isStream bool, group string, other map[string]interface{}) {
@@ -311,7 +348,7 @@ func recordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 	username := c.GetString("username")
 	requestId := c.GetString(common.RequestIdKey)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
-	otherStr := common.MapToJsonStr(other)
+	otherStr := common.MapToJsonStr(otherWithRequestUserAgent(c, other))
 	// 判断是否需要记录 IP
 	needRecordIp := false
 	if settingMap, err := GetUserSetting(userId, false); err == nil {
@@ -386,7 +423,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	requestId := c.GetString(common.RequestIdKey)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	createdAt := common.GetTimestamp()
-	otherStr := common.MapToJsonStr(params.Other)
+	otherStr := common.MapToJsonStr(otherWithRequestUserAgent(c, params.Other))
 	// 判断是否需要记录 IP
 	needRecordIp := false
 	if settingMap, err := GetUserSetting(userId, false); err == nil {
