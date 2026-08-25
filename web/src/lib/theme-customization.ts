@@ -30,6 +30,16 @@ export const THEME_PRESETS = [
     swatches: ['oklch(0.72 0.18 250)', 'oklch(0.7 0.12 280)'],
   },
   {
+    // Four-leaf clover: a mint canvas with deep-forest CTAs and a warm gold
+    // secondary accent. Surfaces stay near-white and float on soft green
+    // shadows instead of hard borders, so the data-dense admin screens keep
+    // their contrast while the chrome reads light and airy.
+    // Swatches preview the deep-green → mint gradient that defines it.
+    value: 'lucky-clover',
+    name: 'Lucky Clover',
+    swatches: ['oklch(0.45 0.105 160)', 'oklch(0.78 0.155 162)'],
+  },
+  {
     // Inspired by Anthropic's official brand language: warm cream canvas
     // (#faf9f5) paired with clay/coral (#d97757) as the single accent.
     // Swatches preview the canvas → accent gradient that defines the system.
@@ -116,12 +126,31 @@ export type ThemeCustomization = {
 }
 
 export const DEFAULT_THEME_CUSTOMIZATION: ThemeCustomization = {
-  preset: 'default',
+  preset: 'lucky-clover',
   font: 'default',
   radius: 'default',
   scale: 'default',
   contentLayout: 'full',
 }
+
+/**
+ * The one preset whose palette lives in `:root` / `.dark` (theme.css) rather
+ * than behind a `[data-theme-preset='…']` block in theme-presets.css.
+ *
+ * The provider omits `data-theme-preset` for exactly this value and writes the
+ * attribute for every other preset. Keep this separate from
+ * `DEFAULT_THEME_CUSTOMIZATION.preset`: the two answer different questions
+ * ("which palette needs no attribute?" vs. "which preset ships as default?"),
+ * and they stopped being the same value once a themed preset became the
+ * default. Conflating them would leave the default preset with no attribute on
+ * <body>, so its CSS block would never match and the UI would silently fall
+ * back to the `:root` palette.
+ *
+ * `web/index.html` hardcodes the default preset's attribute on <body> so the
+ * first paint is already themed; update it alongside
+ * `DEFAULT_THEME_CUSTOMIZATION.preset`.
+ */
+export const ROOT_STYLED_PRESET: ThemePreset = 'default'
 
 export const THEME_PRESET_VALUES = new Set(
   THEME_PRESETS.map((p) => p.value)

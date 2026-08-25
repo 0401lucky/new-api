@@ -418,7 +418,7 @@ For commercial licensing, please contact support@quantumnous.com
  * duplicating per-component dark-mode overrides.
  *
  * NOTE: `:not()` contributes its argument's specificity, so this selector
- * resolves to (0,3,0). Presets that define bespoke surfaces below need to
+ * resolves to (0,4,0). Presets that define bespoke surfaces below need to
  * either match that specificity or opt out here — the latter is cleaner.
  *
  * Opt-outs:
@@ -426,10 +426,16 @@ For commercial licensing, please contact support@quantumnous.com
  *   - `anthropic`: warm cream surfaces are a brand choice, NOT a primary-mix
  *     derivation (the Anthropic system deliberately uses warm neutrals for
  *     cards/borders rather than tinting them with the clay accent).
- *   - `simple-large`: keeps intentionally neutral, high-contrast surfaces. */
+ *   - `simple-large`: keeps intentionally neutral, high-contrast surfaces.
+ *   - `lucky-clover`: inverts the bridge's assumption. The bridge tints cards
+ *     with primary and leaves the canvas untinted; the clover system does the
+ *     opposite — a mint-tinted canvas with near-white cards floating on soft
+ *     green shadows — so its surfaces are declared explicitly below. */
 [data-theme-preset]:not([data-theme-preset='default']):not(
   [data-theme-preset='anthropic']
-):not([data-theme-preset='simple-large']) {
+):not([data-theme-preset='simple-large']):not(
+  [data-theme-preset='lucky-clover']
+) {
   --card: color-mix(in oklch, var(--primary) 3%, var(--background));
   --popover: color-mix(in oklch, var(--primary) 5%, var(--background));
   --muted: color-mix(in oklch, var(--primary) 7%, var(--background));
@@ -454,7 +460,9 @@ For commercial licensing, please contact support@quantumnous.com
 .dark
   [data-theme-preset]:not([data-theme-preset='default']):not(
     [data-theme-preset='anthropic']
-  ):not([data-theme-preset='simple-large']) {
+  ):not([data-theme-preset='simple-large']):not(
+    [data-theme-preset='lucky-clover']
+  ) {
   --card: color-mix(in oklch, var(--primary) 8%, var(--background));
   --popover: color-mix(in oklch, var(--primary) 12%, var(--background));
   --muted: color-mix(in oklch, var(--primary) 12%, var(--background));
@@ -610,6 +618,280 @@ For commercial licensing, please contact support@quantumnous.com
 
   --skeleton-base: oklch(0.305 0.004 60);
   --skeleton-highlight: oklch(0.41 0.004 60);
+}
+
+/* ── Lucky Clover ─────────────────────────────────────────────────────── */
+/*
+ * A four-leaf-clover system modeled on the project's public home page: a mint
+ * canvas washed with leaf green and warm cream, deep-forest CTAs, and gold as
+ * the secondary accent.
+ *
+ * Defining counter-positioning: this preset does NOT tint cards with primary
+ * (see the surface-bridge opt-out above). Every other color preset derives
+ * `--card` from `primary`, which on a green theme turns dense log tables into
+ * an undifferentiated green wash. Here the relationship is inverted — the
+ * canvas carries the tint and cards stay near-white, lifting off it on a soft
+ * green shadow rather than a hard hairline. Contrast on data-dense screens
+ * therefore matches the neutral default while the chrome reads light and airy.
+ *
+ * OKLCH hue 158-162 = clover green; hue 95 = warm cream; hue 78-82 = gold.
+ */
+[data-theme-preset='lucky-clover'] {
+  /* Canvas + ink — the defining pair: mint paper under deep forest ink.
+   * Text is green-black rather than neutral black, as on the home page. */
+  --background: oklch(0.985 0.014 158);
+  --foreground: oklch(0.29 0.045 160);
+
+  /* Near-white surfaces — "paper on grass", not green chips. */
+  --card: oklch(0.998 0.003 158);
+  --card-foreground: oklch(0.29 0.045 160);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.29 0.045 160);
+
+  /* Deep forest — the CTA color, used scarcely as on the home page. */
+  --primary: oklch(0.45 0.105 160);
+  --primary-foreground: oklch(0.99 0.01 155);
+
+  --secondary: oklch(0.945 0.028 160);
+  --secondary-foreground: oklch(0.36 0.07 160);
+
+  --muted: oklch(0.958 0.018 158);
+  --muted-foreground: oklch(0.5 0.035 160);
+  --accent: oklch(0.925 0.045 162);
+  --accent-foreground: oklch(0.3 0.06 160);
+
+  --destructive: oklch(0.58 0.2 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  /* Bright leaf mint — reserved for success/health signals. */
+  --success: oklch(0.535 0.145 160);
+  --success-foreground: oklch(0.99 0.01 155);
+  /* Gold — the home page's lucky-score accent. */
+  --warning: oklch(0.76 0.135 78);
+  --warning-foreground: oklch(0.26 0.04 80);
+  --info: oklch(0.55 0.09 220);
+  --info-foreground: oklch(0.99 0 0);
+  --neutral: oklch(0.5 0.035 160);
+  --neutral-foreground: oklch(0.99 0.01 155);
+
+  /* Hairlines — pale leaf green, never gray. */
+  --border: oklch(0.905 0.035 160);
+  --input: oklch(0.9 0.038 160);
+  --ring: oklch(0.68 0.14 162);
+
+  /* Charts walk the clover palette: forest → mint → gold → teal → sage. */
+  --chart-1: oklch(0.52 0.115 160);
+  --chart-2: oklch(0.72 0.145 162);
+  --chart-3: oklch(0.78 0.125 82);
+  --chart-4: oklch(0.62 0.085 205);
+  --chart-5: oklch(0.85 0.075 150);
+
+  --sidebar: oklch(0.972 0.022 158);
+  --sidebar-foreground: oklch(0.3 0.045 160);
+  --sidebar-primary: oklch(0.45 0.105 160);
+  --sidebar-primary-foreground: oklch(0.99 0.01 155);
+  --sidebar-accent: oklch(0.915 0.05 162);
+  --sidebar-accent-foreground: oklch(0.28 0.065 160);
+  --sidebar-border: oklch(0.9 0.032 160);
+  --sidebar-ring: oklch(0.68 0.14 162);
+
+  --skeleton-base: oklch(0.945 0.025 158);
+  --skeleton-highlight: oklch(0.978 0.012 158);
+
+  /* Tables keep paper-white rows under mint headers, so a 100-row log page
+   * reads as columns of data rather than a green field. */
+  --table-row: var(--card);
+  --table-header: oklch(0.955 0.03 158);
+  --table-header-hover: oklch(0.938 0.04 158);
+  --table-disabled: oklch(0.955 0.012 158);
+  --table-disabled-hover: oklch(0.94 0.016 158);
+  --table-disabled-border: oklch(0.88 0.028 160);
+
+  /* Soft green elevation — the shadow that stands in for card borders.
+   * Consumed by the component-shaping rules below. */
+  --clover-shadow:
+    0 1px 2px oklch(0.45 0.105 160 / 0.04),
+    0 4px 16px oklch(0.45 0.105 160 / 0.07);
+  --clover-shadow-hover:
+    0 2px 4px oklch(0.45 0.105 160 / 0.05),
+    0 10px 28px oklch(0.45 0.105 160 / 0.11);
+
+  --radius: 1.125rem;
+}
+.dark [data-theme-preset='lucky-clover'] {
+  /* Deep forest night — a green-tinted charcoal, never pure black, so the
+   * clover identity survives inversion. */
+  --background: oklch(0.215 0.022 162);
+  --foreground: oklch(0.955 0.012 158);
+  --card: oklch(0.258 0.026 162);
+  --card-foreground: oklch(0.955 0.012 158);
+  --popover: oklch(0.278 0.028 162);
+  --popover-foreground: oklch(0.955 0.012 158);
+
+  /* Mint leads in the dark: deep forest would disappear against this canvas. */
+  --primary: oklch(0.76 0.155 162);
+  --primary-foreground: oklch(0.19 0.04 162);
+
+  --secondary: oklch(0.315 0.03 162);
+  --secondary-foreground: oklch(0.945 0.015 158);
+
+  --muted: oklch(0.29 0.026 162);
+  --muted-foreground: oklch(0.78 0.022 158);
+  --accent: oklch(0.345 0.045 162);
+  --accent-foreground: oklch(0.97 0.015 158);
+
+  --destructive: oklch(0.7 0.19 22);
+  --destructive-foreground: oklch(0.2 0.04 25);
+  --success: oklch(0.78 0.15 162);
+  --success-foreground: oklch(0.19 0.04 162);
+  --warning: oklch(0.82 0.13 80);
+  --warning-foreground: oklch(0.2 0.03 80);
+  --info: oklch(0.72 0.09 220);
+  --info-foreground: oklch(0.19 0.03 220);
+  --neutral: oklch(0.78 0.022 158);
+  --neutral-foreground: oklch(0.19 0.04 162);
+
+  --border: oklch(0.85 0.06 162 / 14%);
+  --input: oklch(0.85 0.06 162 / 20%);
+  --ring: oklch(0.76 0.155 162);
+
+  --chart-1: oklch(0.76 0.155 162);
+  --chart-2: oklch(0.68 0.12 178);
+  --chart-3: oklch(0.82 0.13 82);
+  --chart-4: oklch(0.7 0.1 205);
+  --chart-5: oklch(0.86 0.08 150);
+
+  --sidebar: oklch(0.195 0.02 162);
+  --sidebar-foreground: oklch(0.95 0.012 158);
+  --sidebar-primary: oklch(0.76 0.155 162);
+  --sidebar-primary-foreground: oklch(0.19 0.04 162);
+  --sidebar-accent: oklch(0.335 0.045 162);
+  --sidebar-accent-foreground: oklch(0.97 0.015 158);
+  --sidebar-border: oklch(0.85 0.06 162 / 13%);
+  --sidebar-ring: oklch(0.76 0.155 162);
+
+  --skeleton-base: oklch(0.305 0.028 162);
+  --skeleton-highlight: oklch(0.4 0.032 162);
+
+  --table-row: var(--card);
+  --table-header: oklch(0.3 0.032 162);
+  --table-header-hover: oklch(0.335 0.036 162);
+  --table-disabled: oklch(0.285 0.02 162);
+  --table-disabled-hover: oklch(0.31 0.024 162);
+  --table-disabled-border: oklch(0.42 0.04 162);
+
+  /* Dark elevation reads as depth, not glow: near-black green shadow. */
+  --clover-shadow:
+    0 1px 2px oklch(0.12 0.02 162 / 0.4), 0 4px 16px oklch(0.12 0.02 162 / 0.3);
+  --clover-shadow-hover:
+    0 2px 4px oklch(0.12 0.02 162 / 0.45),
+    0 10px 28px oklch(0.12 0.02 162 / 0.42);
+}
+
+/* ── Lucky Clover — component shaping ─────────────────────────────────────
+ * The clover identity is as much shape and elevation as it is color, so the
+ * preset also restyles a few primitives. Everything below is scoped to
+ * `[data-theme-preset='lucky-clover']`, so switching presets reverts it
+ * completely — no other theme is affected. */
+
+/* Canvas wash: two soft corner glows — leaf green top-left, warm cream
+ * top-right — layered over the flat `--background`, mirroring the home page.
+ * Deliberately `background-attachment: scroll` (the default): the app scrolls
+ * inside the sidebar inset rather than on <body>, so the wash stays put
+ * without paying the mobile-Safari cost of a fixed attachment. */
+[data-theme-preset='lucky-clover'] {
+  background-image:
+    radial-gradient(
+      68rem 34rem at 8% -6%,
+      oklch(0.9 0.075 158 / 0.5),
+      transparent 62%
+    ),
+    radial-gradient(
+      58rem 30rem at 92% -4%,
+      oklch(0.94 0.06 95 / 0.45),
+      transparent 60%
+    );
+  background-repeat: no-repeat;
+}
+.dark [data-theme-preset='lucky-clover'] {
+  background-image:
+    radial-gradient(
+      68rem 34rem at 8% -6%,
+      oklch(0.62 0.09 160 / 0.22),
+      transparent 62%
+    ),
+    radial-gradient(
+      58rem 30rem at 92% -4%,
+      oklch(0.7 0.06 95 / 0.1),
+      transparent 60%
+    );
+  background-repeat: no-repeat;
+}
+
+/* Cards float on soft green shadow instead of a hairline border. */
+[data-theme-preset='lucky-clover'] [data-slot='card'] {
+  border-color: transparent;
+  box-shadow: var(--clover-shadow);
+}
+
+/* The global card-hover rule in index.css lands at specificity (0,3,0) with a
+ * neutral black shadow; this selector reaches (0,4,0) so the lift stays green.
+ * Mirrors that rule's own `min-width: 641px` guard. */
+@media (prefers-reduced-motion: no-preference) {
+  @media (min-width: 641px) {
+    [data-theme-preset='lucky-clover']
+      [data-slot='card']:not([data-card-hover='false']):hover {
+      box-shadow: var(--clover-shadow-hover);
+    }
+  }
+}
+
+/* Capsule chrome — the home page's pill buttons and pill nav. Button groups
+ * are excluded so their joined segments still read as one control. */
+[data-theme-preset='lucky-clover']
+  [data-slot='button']:not([data-slot='button-group'] *),
+[data-theme-preset='lucky-clover'] [data-slot='sidebar-menu-button'] {
+  border-radius: calc(infinity * 1px);
+}
+
+/* Empty-state icons become mint medallions with a soft outer halo. */
+[data-theme-preset='lucky-clover']
+  [data-slot='empty-icon'][data-variant='icon'] {
+  border-radius: calc(infinity * 1px);
+  background-color: var(--sidebar-accent);
+  color: var(--primary);
+  box-shadow: 0 0 0 0.375rem color-mix(in oklch, var(--primary) 8%, transparent);
+}
+
+/* Four-leaf watermarks. Drawn as a mask filled with `--primary` (rather than a
+ * hard-coded fill) so the sprig re-tints itself for light and dark, and held in
+ * ::after so the low opacity never washes out sibling content. */
+[data-theme-preset='lucky-clover'] [data-slot='sidebar-footer'],
+[data-theme-preset='lucky-clover'] [data-slot='empty'] {
+  position: relative;
+}
+[data-theme-preset='lucky-clover'] [data-slot='sidebar-footer']::after,
+[data-theme-preset='lucky-clover'] [data-slot='empty']::after {
+  content: '';
+  position: absolute;
+  background-color: var(--primary);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23000'%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z'/%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z' transform='rotate(90 16 16)'/%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z' transform='rotate(180 16 16)'/%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z' transform='rotate(270 16 16)'/%3E%3C/g%3E%3C/svg%3E");
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  pointer-events: none;
+}
+[data-theme-preset='lucky-clover'] [data-slot='sidebar-footer']::after {
+  right: 0.25rem;
+  bottom: 0.25rem;
+  width: 3.5rem;
+  height: 3.5rem;
+  opacity: 0.07;
+}
+[data-theme-preset='lucky-clover'] [data-slot='empty']::after {
+  top: 1rem;
+  right: 1.25rem;
+  width: 5rem;
+  height: 5rem;
+  opacity: 0.06;
 }
 
 /* ── Font axis ────────────────────────────────────────────────────────────

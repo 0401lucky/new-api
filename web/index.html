@@ -14,12 +14,17 @@
       content="Unified AI API gateway and admin dashboard."
     />
 
-    <meta name="theme-color" content="#fff" />
+    <meta name="theme-color" content="#f4fbf7" />
     <!--umami-->
     <!--Google Analytics-->
   </head>
 
-  <body>
+  <!-- `data-theme-preset` mirrors DEFAULT_THEME_CUSTOMIZATION.preset
+       (src/lib/theme-customization.ts) so the first paint is already themed;
+       ThemeCustomizationProvider takes over once React mounts and rewrites or
+       removes this attribute per the user's saved preference. Keep both in
+       sync. -->
+  <body data-theme-preset="lucky-clover">
     <div id="root" class="notranslate" translate="no"></div>
   </body>
 </html>

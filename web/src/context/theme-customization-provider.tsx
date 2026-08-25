@@ -31,6 +31,7 @@ import {
   type ContentLayout,
   DEFAULT_THEME_CUSTOMIZATION,
   resolveThemeFont,
+  ROOT_STYLED_PRESET,
   THEME_COOKIE_KEYS,
   THEME_FONT_VALUES,
   THEME_PRESET_VALUES,
@@ -135,10 +136,13 @@ export function ThemeCustomizationProvider(props: {
 
   // Mirror state to the <body> via data-* attributes so theme-presets.css can
   // override CSS variables at the right cascade layer.
+  // Only the `default` preset's palette lives in `:root`, so it alone needs no
+  // attribute. Every other preset — the shipped default included — must carry
+  // `data-theme-preset` for its block in theme-presets.css to match.
   useEffect(() => {
     applyAttribute(
       'data-theme-preset',
-      preset === DEFAULT_THEME_CUSTOMIZATION.preset ? null : preset
+      preset === ROOT_STYLED_PRESET ? null : preset
     )
   }, [preset])
 
