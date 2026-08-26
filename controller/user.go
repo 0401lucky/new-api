@@ -415,9 +415,11 @@ func GetUser(c *gin.Context) {
 	// 当日签到状态：供福利站等外部服务判重，避免同一天在两侧各领一份奖励
 	checkedInToday := false
 	todayCheckinQuotaType := ""
+	todayCheckinQuotaAwarded := 0
 	if todayCheckin, _ := model.GetTodayCheckin(user.Id); todayCheckin != nil {
 		checkedInToday = true
 		todayCheckinQuotaType = todayCheckin.QuotaType
+		todayCheckinQuotaAwarded = todayCheckin.QuotaAwarded
 		if todayCheckinQuotaType == "" {
 			// 旧记录 quota_type 为空，按 permanent 归一化
 			todayCheckinQuotaType = model.CheckinQuotaTypePermanent
@@ -430,11 +432,13 @@ func GetUser(c *gin.Context) {
 		TemporaryQuotaExpiresAtDisplay string `json:"temporary_quota_expires_at_display,omitempty"`
 		CheckedInToday                 bool   `json:"checked_in_today"`
 		TodayCheckinQuotaType          string `json:"today_checkin_quota_type"`
+		TodayCheckinQuotaAwarded       int    `json:"today_checkin_quota_awarded"`
 	}{
-		User:                  user,
-		TemporaryQuota:        temporaryQuota,
-		CheckedInToday:        checkedInToday,
-		TodayCheckinQuotaType: todayCheckinQuotaType,
+		User:                     user,
+		TemporaryQuota:           temporaryQuota,
+		CheckedInToday:           checkedInToday,
+		TodayCheckinQuotaType:    todayCheckinQuotaType,
+		TodayCheckinQuotaAwarded: todayCheckinQuotaAwarded,
 	}
 	if temporaryQuota > 0 {
 		if expiresAt := model.GetActiveTemporaryQuotaExpiresAt(user.Id); expiresAt > 0 {

@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -64,7 +63,7 @@ func TestGetUserExposesTodayCheckinStatus(t *testing.T) {
 		GetUser(ctx)
 
 		var payload map[string]any
-		require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &payload))
+		require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &payload))
 		require.Equal(t, true, payload["success"])
 		return payload["data"].(map[string]any)
 	}
@@ -74,6 +73,7 @@ func TestGetUserExposesTodayCheckinStatus(t *testing.T) {
 		data := fetch(t)
 		assert.Equal(t, false, data["checked_in_today"])
 		assert.Equal(t, "", data["today_checkin_quota_type"])
+		assert.Equal(t, float64(0), data["today_checkin_quota_awarded"])
 	})
 
 	t.Run("temporary checkin today", func(t *testing.T) {
@@ -82,6 +82,7 @@ func TestGetUserExposesTodayCheckinStatus(t *testing.T) {
 		data := fetch(t)
 		assert.Equal(t, true, data["checked_in_today"])
 		assert.Equal(t, "temporary", data["today_checkin_quota_type"])
+		assert.Equal(t, float64(1000), data["today_checkin_quota_awarded"])
 	})
 
 	t.Run("permanent checkin today", func(t *testing.T) {
@@ -90,6 +91,7 @@ func TestGetUserExposesTodayCheckinStatus(t *testing.T) {
 		data := fetch(t)
 		assert.Equal(t, true, data["checked_in_today"])
 		assert.Equal(t, "permanent", data["today_checkin_quota_type"])
+		assert.Equal(t, float64(1000), data["today_checkin_quota_awarded"])
 	})
 
 	t.Run("legacy empty quota type normalized to permanent", func(t *testing.T) {
@@ -102,6 +104,7 @@ func TestGetUserExposesTodayCheckinStatus(t *testing.T) {
 		data := fetch(t)
 		assert.Equal(t, true, data["checked_in_today"])
 		assert.Equal(t, "permanent", data["today_checkin_quota_type"])
+		assert.Equal(t, float64(1000), data["today_checkin_quota_awarded"])
 	})
 
 	// 保证既有字段未被破坏
