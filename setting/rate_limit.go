@@ -11,6 +11,16 @@ import (
 	"github.com/QuantumNous/new-api/common"
 )
 
+// maxRateLimitDurationSeconds is the largest window the count cap is computed
+// against (24h). Token-bucket capacity is count*duration; this keeps that
+// product inside int64 when the window is at most a day.
+const maxRateLimitDurationSeconds = 24 * 60 * 60
+
+// maxModelRequestRateLimitCount is math.MaxInt64 / maxRateLimitDurationSeconds.
+// It is the largest count that cannot overflow int64(count)*duration for a
+// window of at most 24 hours.
+const maxModelRequestRateLimitCount int64 = math.MaxInt64 / maxRateLimitDurationSeconds
+
 var ModelRequestRateLimitEnabled = false
 var ModelRequestRateLimitDurationMinutes = 1
 var ModelRequestRateLimitCount = 0
@@ -130,8 +140,8 @@ func ParseModelRequestRateLimitGroup(jsonStr string) (map[string][3]int, error) 
 		if normalized[0] < 0 || normalized[1] < 1 || normalized[2] < 0 {
 			return nil, fmt.Errorf("group %s has invalid rate limit values: [%d, %d, %d]", group, normalized[0], normalized[1], normalized[2])
 		}
-		if normalized[0] > math.MaxInt32 || normalized[1] > math.MaxInt32 || normalized[2] > math.MaxInt32 {
-			return nil, fmt.Errorf("group %s [%d, %d, %d] has max rate limits value 2147483647", group, normalized[0], normalized[1], normalized[2])
+		if int64(normalized[0]) > maxModelRequestRateLimitCount || int64(normalized[1]) > maxModelRequestRateLimitCount || int64(normalized[2]) > maxModelRequestRateLimitCount {
+			return nil, fmt.Errorf("group %s [%d, %d, %d] exceeds max rate limit %d", group, normalized[0], normalized[1], normalized[2], maxModelRequestRateLimitCount)
 		}
 		result[group] = normalized
 	}

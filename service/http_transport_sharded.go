@@ -10,7 +10,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
-	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/relaykit/dto"
 )
 
 // shardedRoundTripper fans requests for each origin across N independent

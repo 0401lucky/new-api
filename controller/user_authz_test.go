@@ -9,6 +9,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/service/authz"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -103,16 +104,18 @@ func TestNonRootUpdateIgnoresReturnedAdminPermissions(t *testing.T) {
 }
 
 func TestDeleteSelfClearsCasbinPermissions(t *testing.T) {
-	db := setupUserAuthzControllerTest(t)
-	user := createUserWithAdminPermissions(t, db, "delete-self", common.RoleCommonUser)
+	user, identity := setupSecurityEnrollmentTest(t)
+	db := model.DB
+	require.NoError(t, authz.SetUserPermissions(user.Id, authz.PermissionsMap{
+		authz.ResourceChannel: {authz.ActionSensitiveWrite: true},
+	}))
 	require.Positive(t, countUserAuthorizationRules(t, db, user.Id))
 
-	recorder := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Set("id", user.Id)
-	DeleteSelf(ctx)
+	proof := issueSecurityEnrollmentProof(t, identity, service.VerificationOperation{Scope: service.VerificationScopeAccountDelete}, "password")
+	recorder := securityEnrollmentRequest("DELETE", "/api/user/self", "", proof, identity, DeleteSelf)
 
 	assert.Equal(t, http.StatusOK, recorder.Code)
+	require.Contains(t, recorder.Body.String(), `"success":true`)
 	var deleted model.User
 	require.NoError(t, db.Unscoped().First(&deleted, user.Id).Error)
 	assert.True(t, deleted.DeletedAt.Valid)

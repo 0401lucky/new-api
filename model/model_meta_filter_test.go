@@ -8,6 +8,7 @@ import (
 
 func TestSearchModelsCombinesStatusSyncAndPagination(t *testing.T) {
 	truncateTables(t)
+	require.NoError(t, DB.AutoMigrate(&Option{}))
 	models := []Model{
 		{ModelName: "filter-enabled-sync-a", Status: 1, SyncOfficial: 1},
 		{ModelName: "filter-enabled-sync-b", Status: 1, SyncOfficial: 1},
@@ -33,6 +34,7 @@ func TestSearchModelsCombinesStatusSyncAndPagination(t *testing.T) {
 
 func TestSearchModelsDisabledAndNoSyncIncludeZeroValues(t *testing.T) {
 	truncateTables(t)
+	require.NoError(t, DB.AutoMigrate(&Option{}))
 	models := []Model{
 		{ModelName: "zero-disabled-manual", Status: 0, SyncOfficial: 0},
 		{ModelName: "zero-disabled-sync", Status: 0, SyncOfficial: 1},

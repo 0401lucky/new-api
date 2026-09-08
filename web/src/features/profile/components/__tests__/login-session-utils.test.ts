@@ -19,7 +19,10 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { describe, expect, test } from 'vitest'
 
-import { loginMethodLabel, sessionDevice } from '../login-session-utils'
+import {
+  loginMethodLabel,
+  sessionDevice,
+} from '@/features/security/components/login-session-utils'
 
 const translate = ((key: string) => key) as TFunction
 

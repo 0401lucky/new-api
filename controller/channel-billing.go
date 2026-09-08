@@ -13,14 +13,14 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
-	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relay/channel/advancedcustom"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
+	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
-	"github.com/QuantumNous/new-api/types"
 
 	"github.com/shopspring/decimal"
 
@@ -463,7 +463,7 @@ func updateChannelBalance(channel *model.Channel) (channelBalanceResult, error) 
 }
 
 func updateStandardChannelBalance(channel *model.Channel) (float64, error) {
-	baseURL := constant.ChannelBaseURLs[channel.Type]
+	baseURL := constant.GetChannelBaseURL(channel.Type)
 	if channel.GetBaseURL() == "" {
 		channel.BaseURL = &baseURL
 	}
@@ -536,6 +536,10 @@ func UpdateChannelBalance(c *gin.Context) {
 	channel, err := model.CacheGetChannel(id)
 	if err != nil {
 		common.ApiError(c, err)
+		return
+	}
+	if channel.Type == constant.ChannelTypeTaskPlugin {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "Task Plugin channels do not support balance queries"})
 		return
 	}
 	if channel.ChannelInfo.IsMultiKey {

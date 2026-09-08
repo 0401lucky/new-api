@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	relaytypes "github.com/QuantumNous/new-api/types"
+	"github.com/QuantumNous/new-api/relaykit/dto"
+	relaytypes "github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream"
 	"github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream/eventstreamapi"
@@ -444,7 +444,8 @@ func TestAwsStreamHandlerStopsAtClientCancellationAndKeepsPartialBillingUsage(t 
 	assert.Equal(t, dto.BillingUsageSourceClaudeMessages, result.usage.BillingUsage.Source)
 	assert.Equal(t, dto.BillingUsageSemanticAnthropic, result.usage.BillingUsage.Semantic)
 	assert.Equal(t, 100, result.usage.BillingUsage.ClaudeUsage.InputTokens)
-	assert.Equal(t, 1, result.usage.BillingUsage.ClaudeUsage.OutputTokens)
+	// message_start usage is provisional; retain the estimate for delivered text.
+	assert.Equal(t, 2, result.usage.BillingUsage.ClaudeUsage.OutputTokens)
 	assert.Equal(t, bodyLengthBeforeCancel, responseWriter.Body.Len())
 	assert.NotContains(t, responseWriter.Body.String(), "[DONE]")
 

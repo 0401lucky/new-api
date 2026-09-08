@@ -10,6 +10,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestWalletRefundAfterPartialSettlementRestoresOriginalBuckets(t *testing.T) {
+	truncate(t)
+	seedUser(t, 1, 1000)
+	now := common.NowInCheckinTimezone().Unix()
+	first := seedTemporaryCheckinOn(t, 1, 600, now+3600, "2026-08-08")
+	second := seedTemporaryCheckinOn(t, 1, 400, now+7200, "2026-08-09")
+	funding := &WalletFunding{userId: 1}
+	require.NoError(t, funding.PreConsume(1200))
+	require.NoError(t, funding.Settle(-550))
+	require.NoError(t, funding.Refund())
+
+	var firstStored, secondStored model.Checkin
+	require.NoError(t, model.DB.First(&firstStored, first.Id).Error)
+	require.NoError(t, model.DB.First(&secondStored, second.Id).Error)
+	assert.Equal(t, 600, firstStored.QuotaRemaining)
+	assert.Equal(t, 400, secondStored.QuotaRemaining)
+	assert.Equal(t, 1000, getUserQuota(t, 1))
+}
+
 // TestBillingSessionReserveRollbackSyncsSplit 验证 Reserve 预扣令牌失败回滚后，
 // WalletFunding 的累计拆分与额度桶列表同步更新，避免后续退款按过期累计重复退永久额度。
 func TestBillingSessionReserveRollbackSyncsSplit(t *testing.T) {

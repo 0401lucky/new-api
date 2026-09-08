@@ -3,7 +3,7 @@ package service
 import (
 	"testing"
 
-	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +25,9 @@ func TestUsageFromGeminiBillingUsageClampsInvalidNegativeCounts(t *testing.T) {
 	})
 	require.NotNil(t, billingUsage)
 
-	usage := usageFromGeminiBillingUsage(billingUsage)
+	usage, ok := billingUsage.CanonicalUsage()
+	require.True(t, ok)
+	require.NotNil(t, usage)
 	assert.Equal(t, 10, usage.PromptTokens)
 	assert.Zero(t, usage.CompletionTokens)
 	assert.Equal(t, 5, usage.TotalTokens)

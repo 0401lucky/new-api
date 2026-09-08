@@ -7,14 +7,14 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
+	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/model_setting"
-	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
 )
@@ -55,6 +55,9 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 	if err != nil {
 		return types.NewError(err, types.ErrorCodeChannelModelMappedError, types.ErrOptionWithSkipRetry())
 	}
+	if err := helper.ApplyReasoningModelSuffix(c, info, request); err != nil {
+		return newConvertRequestFailedError(c, info, err)
+	}
 
 	adaptor := GetAdaptor(info.ApiType)
 	if adaptor == nil {
@@ -71,7 +74,7 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 	} else {
 		convertedRequest, err := adaptor.ConvertOpenAIResponsesRequest(c, info, *request)
 		if err != nil {
-			return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
+			return newConvertRequestFailedError(c, info, err)
 		}
 		relaycommon.AppendRequestConversionFromRequest(info, convertedRequest)
 		jsonData, err := common.Marshal(convertedRequest)

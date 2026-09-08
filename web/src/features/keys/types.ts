@@ -109,6 +109,11 @@ export interface TokenAutoGroupsConfig {
   max_count: number
 }
 
+export interface TokenAutoGroupsConfig {
+  groups: string[]
+  max_count: number
+}
+
 // ============================================================================
 // Dialog Types
 // ============================================================================

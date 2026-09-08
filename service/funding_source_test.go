@@ -137,13 +137,12 @@ func TestWalletFunding_MultiBucketRefundSyncsAllocations(t *testing.T) {
 	// 完整退款：今天桶 2000 恢复（逆序先退），昨天桶 2000 过期丢弃
 	require.NoError(t, funding.Refund())
 
-	// 拆分状态同步：已恢复的今天桶从列表中移除；昨天桶因过期无法退还，
-	// 保留在累计中表示“已消费但无法恢复”的部分，不会重复退款
-	assert.Equal(t, 2000, funding.tempConsumed)
-	assert.Equal(t, 0, funding.permConsumed)
-	assert.Equal(t, 2000, funding.consumed)
-	require.Len(t, funding.allocations, 1)
-	assert.Equal(t, c1.Id, funding.allocations[0].CheckinId)
+	// 再次退款不能复活过期桶，也不能重复恢复仍有效的桶。
+	require.NoError(t, funding.Refund())
+	require.NoError(t, model.DB.First(c1, c1.Id).Error)
+	require.NoError(t, model.DB.First(c2, c2.Id).Error)
+	assert.Zero(t, c1.QuotaRemaining)
+	assert.Equal(t, 3000, c2.QuotaRemaining)
 
 	var u model.User
 	require.NoError(t, model.DB.First(&u, 1).Error)

@@ -37,20 +37,3 @@ func relayAllocationsToModel(allocs []relaycommon.TemporaryQuotaAllocation) []mo
 	}
 	return out
 }
-
-// removeRelayAllocations 从 relay 侧累计额度桶列表中移除本次退款已恢复的桶（逆序匹配）。
-func removeRelayAllocations(all []relaycommon.TemporaryQuotaAllocation, removed []model.TemporaryAllocation) []relaycommon.TemporaryQuotaAllocation {
-	if len(removed) == 0 || len(all) == 0 {
-		return all
-	}
-	result := all
-	for _, rm := range removed {
-		for i := len(result) - 1; i >= 0; i-- {
-			if result[i].CheckinId == rm.CheckinId && result[i].Amount == rm.Amount {
-				result = append(result[:i], result[i+1:]...)
-				break
-			}
-		}
-	}
-	return result
-}

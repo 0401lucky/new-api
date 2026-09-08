@@ -406,6 +406,7 @@ func runGoAwayAfterFirstRequestServer(ln net.Listener) <-chan h2ServerResult {
 				res.err = err
 				return
 			}
+			defer conn.Close()
 			streamID, body, err := readH2TestRequest(framer)
 			if err != nil {
 				conn.Close()
@@ -417,7 +418,9 @@ func runGoAwayAfterFirstRequestServer(ln net.Listener) <-chan h2ServerResult {
 
 			if attempt == 0 {
 				err = framer.WriteGoAway(0, http2.ErrCodeNo, nil)
-				conn.Close()
+				// Keep the draining connection alive until the client has processed
+				// GOAWAY and opened its retry connection. An immediate close can
+				// become a TCP reset on Windows while SETTINGS acknowledgements arrive.
 				if err != nil {
 					res.err = err
 					return

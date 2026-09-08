@@ -40,6 +40,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
+import { Combobox } from '@/components/ui/combobox'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -102,6 +103,22 @@ import {
 import { cn } from '@/lib/utils'
 
 const PRICE_SUFFIX = '$/1M tokens'
+const editorItemKeys = new WeakMap<object, string>()
+let editorItemSequence = 0
+
+function editorItemKey(item: object): string {
+  const key = (item as { _editorKey?: unknown })._editorKey
+  if (typeof key === 'string') return key
+  const existing = editorItemKeys.get(item)
+  if (existing) return existing
+  const next = `billing-editor-${++editorItemSequence}`
+  editorItemKeys.set(item, next)
+  return next
+}
+
+function withEditorKey<T extends object>(item: T, previous: object = item): T {
+  return { ...item, _editorKey: editorItemKey(previous) }
+}
 const CACHE_PRICE_VARS = BILLING_EXTRA_VARS.filter(
   (variable) => variable.group === 'cache'
 )
@@ -332,8 +349,9 @@ function formatTokenHint(n: number | string | null | undefined): string {
 
 function formatNumberDraft(value: number | string): string {
   if (value === '') return ''
-  if (typeof value === 'number')
+  if (typeof value === 'number') {
     return Number.isFinite(value) ? String(value) : '0'
+  }
   return value
 }
 
@@ -436,12 +454,10 @@ function ConditionRow({ condition, onChange, onRemove }: ConditionRowProps) {
   return (
     <div className='flex items-center gap-2'>
       <Select
-        items={[
-          ...CONDITION_INPUT_OPTIONS.map((option) => ({
-            value: option.value,
-            label: t(option.labelKey),
-          })),
-        ]}
+        items={CONDITION_INPUT_OPTIONS.map((option) => ({
+          value: option.value,
+          label: t(option.labelKey),
+        }))}
         value={condition.var}
         onValueChange={(value) =>
           onChange({ ...condition, var: value as TierConditionInput['var'] })
@@ -667,9 +683,14 @@ function VisualTierCard({
         ) : (
           tier.conditions.map((condition, conditionIndex) => (
             <ConditionRow
-              key={conditionIndex}
+              key={editorItemKey(condition)}
               condition={condition}
-              onChange={(next) => handleConditionChange(conditionIndex, next)}
+              onChange={(next) =>
+                handleConditionChange(
+                  conditionIndex,
+                  withEditorKey(next, condition)
+                )
+              }
               onRemove={() => handleConditionRemove(conditionIndex)}
             />
           ))
@@ -776,14 +797,27 @@ type VisualEditorProps = {
 
 function VisualEditor({ visualConfig, onChange }: VisualEditorProps) {
   const { t } = useTranslation()
-  const config = useMemo(
-    () => normalizeVisualConfig(visualConfig),
-    [visualConfig]
-  )
+  const config = useMemo(() => {
+    const normalized = normalizeVisualConfig(visualConfig)
+    return {
+      ...normalized,
+      tiers: normalized.tiers.map((tier) =>
+        withEditorKey(
+          {
+            ...tier,
+            conditions: tier.conditions.map((condition) =>
+              withEditorKey(condition)
+            ),
+          },
+          tier
+        )
+      ),
+    }
+  }, [visualConfig])
 
   const handleTierChange = (index: number, next: VisualTier) => {
     const tiers = [...config.tiers]
-    tiers[index] = normalizeVisualTier(next)
+    tiers[index] = withEditorKey(normalizeVisualTier(next), config.tiers[index])
     onChange({ ...config, tiers })
   }
 
@@ -849,7 +883,7 @@ function VisualEditor({ visualConfig, onChange }: VisualEditorProps) {
       </p>
       {config.tiers.map((tier, index) => (
         <VisualTierCard
-          key={index}
+          key={editorItemKey(tier)}
           tier={tier}
           index={index}
           total={config.tiers.length}
@@ -946,7 +980,7 @@ function RuleConditionRow({
       case MATCH_LTE:
         return t('Less than or equal')
       case MATCH_RANGE:
-        return t('Overnight range')
+        return t('Time range')
       default:
         return mode
     }
@@ -967,12 +1001,9 @@ function RuleConditionRow({
         return timeFunc
     }
   }
-  const sourceLabel =
-    condition.source === SOURCE_PARAM
-      ? t('Body param')
-      : condition.source === SOURCE_HEADER
-        ? t('Header')
-        : t('Time')
+  let sourceLabel = t('Time')
+  if (condition.source === SOURCE_PARAM) sourceLabel = t('Body param')
+  if (condition.source === SOURCE_HEADER) sourceLabel = t('Header')
 
   const handleSourceChange = (source: string) => {
     if (source === SOURCE_TIME) {
@@ -992,12 +1023,10 @@ function RuleConditionRow({
   const renderTimeCondition = (timeCond: TimeCondition) => (
     <>
       <Select
-        items={[
-          ...TIME_FUNCS.map((fn) => ({
-            value: fn,
-            label: getTimeFuncLabel(fn),
-          })),
-        ]}
+        items={TIME_FUNCS.map((fn) => ({
+          value: fn,
+          label: getTimeFuncLabel(fn),
+        }))}
         value={timeCond.timeFunc}
         onValueChange={(value) =>
           onChange({ ...timeCond, timeFunc: value as TimeFunc })
@@ -1016,41 +1045,22 @@ function RuleConditionRow({
           </SelectGroup>
         </SelectContent>
       </Select>
-      <Select
-        items={[
-          ...COMMON_TIMEZONES.map((tz) => ({
-            value: tz.value,
-            label: tz.label,
-          })),
-        ]}
+      <Combobox
+        options={COMMON_TIMEZONES.map((tz) => ({
+          value: tz.value,
+          label: tz.label,
+        }))}
         value={timeCond.timezone}
         onValueChange={(value) =>
           value !== null && onChange({ ...timeCond, timezone: value })
         }
-      >
-        <SelectTrigger className='w-56' size='sm'>
-          <SelectValue>
-            {COMMON_TIMEZONES.find((tz) => tz.value === timeCond.timezone)
-              ?.label ?? timeCond.timezone}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent alignItemWithTrigger={false}>
-          <SelectGroup>
-            {COMMON_TIMEZONES.map((tz) => (
-              <SelectItem key={tz.value} value={tz.value}>
-                {tz.label}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+        className='w-56'
+      />
       <Select
-        items={[
-          ...matchOptions.map((option) => ({
-            value: option.value,
-            label: getMatchLabel(option.value),
-          })),
-        ]}
+        items={matchOptions.map((option) => ({
+          value: option.value,
+          label: getMatchLabel(option.value),
+        }))}
         value={timeCond.mode}
         onValueChange={(v) => v !== null && handleModeChange(v)}
       >
@@ -1111,12 +1121,10 @@ function RuleConditionRow({
         className='w-44'
       />
       <Select
-        items={[
-          ...matchOptions.map((option) => ({
-            value: option.value,
-            label: getMatchLabel(option.value),
-          })),
-        ]}
+        items={matchOptions.map((option) => ({
+          value: option.value,
+          label: getMatchLabel(option.value),
+        }))}
         value={phCond.mode}
         onValueChange={(v) => v !== null && handleModeChange(v)}
       >
@@ -1180,6 +1188,11 @@ function RuleConditionRow({
       >
         <Trash2 className='text-destructive h-4 w-4' />
       </Button>
+      {condition.source === SOURCE_TIME && condition.mode === MATCH_RANGE && (
+        <p className='text-muted-foreground w-full text-xs'>
+          {t('Start ≤ end: within the day; start > end: across midnight')}
+        </p>
+      )}
     </div>
   )
 }
@@ -1241,9 +1254,14 @@ function RuleGroupCard({
       <div className='space-y-2'>
         {group.conditions.map((condition, conditionIndex) => (
           <RuleConditionRow
-            key={conditionIndex}
+            key={editorItemKey(condition)}
             condition={condition}
-            onChange={(next) => handleConditionChange(conditionIndex, next)}
+            onChange={(next) =>
+              handleConditionChange(
+                conditionIndex,
+                withEditorKey(next, condition)
+              )
+            }
             onRemove={() =>
               onChange({
                 ...group,
@@ -1562,7 +1580,7 @@ function LlmPromptHelper({ modelName }: LlmPromptHelperProps) {
 
   const prompt = useMemo(() => {
     if (modelName) {
-      return LLM_PROMPT_TEMPLATE + `\n\nCurrent model: ${modelName}`
+      return `${LLM_PROMPT_TEMPLATE}\n\nCurrent model: ${modelName}`
     }
     return LLM_PROMPT_TEMPLATE
   }, [modelName])
@@ -1649,6 +1667,21 @@ export const TieredPricingEditor = memo(function TieredPricingEditor({
   const [requestRuleGroups, setRequestRuleGroups] = useState<
     RequestRuleGroup[]
   >(() => tryParseRequestRuleExpr(currentRequestRuleExpr) || [])
+  const editorRuleGroups = useMemo(
+    () =>
+      requestRuleGroups.map((group) =>
+        withEditorKey(
+          {
+            ...group,
+            conditions: group.conditions.map((condition) =>
+              withEditorKey(condition)
+            ),
+          },
+          group
+        )
+      ),
+    [requestRuleGroups]
+  )
   const initRef = useRef(false)
 
   useEffect(() => {
@@ -1835,14 +1868,14 @@ export const TieredPricingEditor = memo(function TieredPricingEditor({
               </Alert>
             ) : (
               <>
-                {requestRuleGroups.map((group, groupIndex) => (
+                {editorRuleGroups.map((group, groupIndex) => (
                   <RuleGroupCard
-                    key={groupIndex}
+                    key={editorItemKey(group)}
                     group={group}
                     index={groupIndex}
                     onChange={(next) => {
                       const updated = [...requestRuleGroups]
-                      updated[groupIndex] = next
+                      updated[groupIndex] = withEditorKey(next, group)
                       handleRuleGroupsChange(updated)
                     }}
                     onRemove={() =>

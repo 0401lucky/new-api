@@ -16,12 +16,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useMemo, useState } from 'react'
-import * as z from 'zod'
-import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
+import { useEffect, useMemo, useState } from 'react'
+import { useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
+import * as z from 'zod'
+
+import { MultiSelect, type Option } from '@/components/multi-select'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -53,12 +55,14 @@ import {
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { MultiSelect, type Option } from '@/components/multi-select'
 import { getAllLogs } from '@/features/usage-logs/api'
 import { DetailsDialog } from '@/features/usage-logs/components/dialogs/details-dialog'
 import type { UsageLog } from '@/features/usage-logs/data/schema'
 import { parseLogOther } from '@/features/usage-logs/lib/format'
 import { getGroups } from '@/features/users/api'
+import { ROLE } from '@/lib/roles'
+import { useAuthStore } from '@/stores/auth-store'
+
 import { getPromptCheckRules, getUpstreamChannels } from '../api'
 import {
   SettingsForm,
@@ -143,7 +147,7 @@ function mergeSelectedOptions(
     }
   }
 
-  return Array.from(optionMap.values())
+  return [...optionMap.values()]
 }
 
 function formatLogTime(timestamp?: number): string {
@@ -162,6 +166,9 @@ function getKeywordCount(value?: string | null): number {
 }
 
 function PromptCheckTriggerLogsPanel() {
+  const isRoot = useAuthStore(
+    (state) => state.auth.user?.role === ROLE.SUPER_ADMIN
+  )
   const { t } = useTranslation()
   const [selectedLog, setSelectedLog] = useState<UsageLog | null>(null)
   const logsQuery = useQuery({
@@ -212,68 +219,72 @@ function PromptCheckTriggerLogsPanel() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {logsQuery.isLoading ? (
-              <TableRow>
-                <TableCell colSpan={8} className='h-24 text-center'>
-                  {t('Loading')}
-                </TableCell>
-              </TableRow>
-            ) : logs.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className='h-24 text-center'>
-                  {t('No prompt check trigger logs')}
-                </TableCell>
-              </TableRow>
-            ) : (
-              logs.map((log) => {
-                const other = parseLogOther(log.other)
-                const promptCheck = other?.prompt_check
-                const match = promptCheck?.matches?.[0]
-                const action =
-                  promptCheck?.action ||
-                  (other?.reject_reason === 'prompt_check' ? 'block' : '-')
+            <>
+              {!!logsQuery.isLoading && (
+                <TableRow>
+                  <TableCell colSpan={8} className='h-24 text-center'>
+                    {t('Loading')}
+                  </TableCell>
+                </TableRow>
+              )}
+              {!logsQuery.isLoading && !!(logs.length === 0) && (
+                <TableRow>
+                  <TableCell colSpan={8} className='h-24 text-center'>
+                    {t('No prompt check trigger logs')}
+                  </TableCell>
+                </TableRow>
+              )}
+              {!logsQuery.isLoading &&
+                !(logs.length === 0) &&
+                logs.map((log) => {
+                  const other = parseLogOther(log.other)
+                  const promptCheck = other?.prompt_check
+                  const match = promptCheck?.matches?.[0]
+                  const action =
+                    promptCheck?.action ||
+                    (other?.reject_reason === 'prompt_check' ? 'block' : '-')
 
-                return (
-                  <TableRow key={log.id}>
-                    <TableCell>{formatLogTime(log.created_at)}</TableCell>
-                    <TableCell>{log.username || `#${log.user_id}`}</TableCell>
-                    <TableCell className='max-w-48 truncate'>
-                      {log.model_name || '-'}
-                    </TableCell>
-                    <TableCell>
-                      {log.channel
-                        ? `#${log.channel}${log.channel_name ? ` ${log.channel_name}` : ''}`
-                        : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getActionBadgeVariant(action)}>
-                        {action}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {promptCheck
-                        ? `${promptCheck.score ?? 0}/${promptCheck.threshold ?? '-'}`
-                        : '-'}
-                    </TableCell>
-                    <TableCell className='max-w-72 truncate'>
-                      {match
-                        ? `${match.name || '-'}${match.matched ? `: ${match.matched}` : ''}`
-                        : '-'}
-                    </TableCell>
-                    <TableCell className='text-right'>
-                      <Button
-                        type='button'
-                        variant='ghost'
-                        size='sm'
-                        onClick={() => setSelectedLog(log)}
-                      >
-                        {t('View')}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            )}
+                  return (
+                    <TableRow key={log.id}>
+                      <TableCell>{formatLogTime(log.created_at)}</TableCell>
+                      <TableCell>{log.username || `#${log.user_id}`}</TableCell>
+                      <TableCell className='max-w-48 truncate'>
+                        {log.model_name || '-'}
+                      </TableCell>
+                      <TableCell>
+                        {log.channel
+                          ? `#${log.channel}${log.channel_name ? ` ${log.channel_name}` : ''}`
+                          : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getActionBadgeVariant(action)}>
+                          {action}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {promptCheck
+                          ? `${promptCheck.score ?? 0}/${promptCheck.threshold ?? '-'}`
+                          : '-'}
+                      </TableCell>
+                      <TableCell className='max-w-72 truncate'>
+                        {match
+                          ? `${match.name || '-'}${match.matched ? `: ${match.matched}` : ''}`
+                          : '-'}
+                      </TableCell>
+                      <TableCell className='text-right'>
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='sm'
+                          onClick={() => setSelectedLog(log)}
+                        >
+                          {t('View')}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+            </>
           </TableBody>
         </Table>
       </div>
@@ -282,6 +293,7 @@ function PromptCheckTriggerLogsPanel() {
         <DetailsDialog
           log={selectedLog}
           isAdmin
+          isRoot={isRoot}
           open={Boolean(selectedLog)}
           onOpenChange={(open) => {
             if (!open) setSelectedLog(null)
@@ -362,56 +374,60 @@ function PromptCheckRuleManagementPanel(props: {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rulesQuery.isLoading ? (
-              <TableRow>
-                <TableCell colSpan={6} className='h-24 text-center'>
-                  {t('Loading')}
-                </TableCell>
-              </TableRow>
-            ) : rules.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className='h-24 text-center'>
-                  {t('No rules found')}
-                </TableCell>
-              </TableRow>
-            ) : (
-              rules.map((rule) => {
-                const enabled = !disabledRuleSet.has(rule.name.toLowerCase())
+            <>
+              {!!rulesQuery.isLoading && (
+                <TableRow>
+                  <TableCell colSpan={6} className='h-24 text-center'>
+                    {t('Loading')}
+                  </TableCell>
+                </TableRow>
+              )}
+              {!rulesQuery.isLoading && !!(rules.length === 0) && (
+                <TableRow>
+                  <TableCell colSpan={6} className='h-24 text-center'>
+                    {t('No rules found')}
+                  </TableCell>
+                </TableRow>
+              )}
+              {!rulesQuery.isLoading &&
+                !(rules.length === 0) &&
+                rules.map((rule) => {
+                  const enabled = !disabledRuleSet.has(rule.name.toLowerCase())
 
-                return (
-                  <TableRow key={rule.name}>
-                    <TableCell className='max-w-80 whitespace-normal'>
-                      <div className='flex min-w-0 flex-col gap-1'>
-                        <span className='font-medium'>{rule.name}</span>
-                        {rule.pattern && (
-                          <span className='text-muted-foreground line-clamp-2 font-mono text-xs break-all'>
-                            {rule.pattern}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{rule.category || '-'}</TableCell>
-                    <TableCell>{rule.weight}</TableCell>
-                    <TableCell>{rule.strict ? t('Yes') : t('No')}</TableCell>
-                    <TableCell>
-                      <Badge variant={enabled ? 'secondary' : 'outline'}>
-                        {enabled ? t('Enabled') : t('Disabled')}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className='text-right'>
-                      <Switch
-                        checked={enabled}
-                        disabled={updateOption.isPending}
-                        aria-label={t('Toggle rule')}
-                        onCheckedChange={(checked) =>
-                          void handleRuleEnabledChange(rule, checked)
-                        }
-                      />
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            )}
+                  return (
+                    <TableRow key={rule.name}>
+                      <TableCell className='max-w-80 whitespace-normal'>
+                        <div className='flex min-w-0 flex-col gap-1'>
+                          <span className='font-medium'>{rule.name}</span>
+                          {rule.pattern && (
+                            <span className='text-muted-foreground line-clamp-2 font-mono text-xs break-all'>
+                              {rule.pattern}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{rule.category || '-'}</TableCell>
+                      <TableCell>{rule.weight}</TableCell>
+                      <TableCell>{rule.strict ? t('Yes') : t('No')}</TableCell>
+                      <TableCell>
+                        <Badge variant={enabled ? 'secondary' : 'outline'}>
+                          {enabled ? t('Enabled') : t('Disabled')}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className='text-right'>
+                        <Switch
+                          checked={enabled}
+                          disabled={updateOption.isPending}
+                          aria-label={t('Toggle rule')}
+                          onCheckedChange={(checked) =>
+                            void handleRuleEnabledChange(rule, checked)
+                          }
+                        />
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+            </>
           </TableBody>
         </Table>
       </div>

@@ -11,7 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	"github.com/QuantumNous/new-api/types"
+	"github.com/QuantumNous/new-api/relaykit/types"
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-gonic/gin"
@@ -151,13 +151,13 @@ func (s *BillingSession) GetPreConsumedQuota() int {
 	return s.preConsumedQuota
 }
 
-// WalletFundingSnapshot 返回钱包资金来源的限时额度桶分配快照（用于异步任务持久化）。
-// 非钱包计费时返回 false。调用方应在请求完成、Settle/Refund 提交后调用。
-func (s *BillingSession) WalletFundingSnapshot() ([]model.TemporaryAllocation, bool) {
+// WalletFundingSnapshot freezes the source split for a task's actual charge
+// before it is inserted. Reserve must cover the charge before this is called.
+func (s *BillingSession) WalletFundingSnapshot(actualQuota int) (*model.WalletSplit, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if wf, ok := s.funding.(*WalletFunding); ok {
-		return wf.allocations, true
+		return wf.split().AfterRefund(max(wf.consumed-actualQuota, 0)), true
 	}
 	return nil, false
 }
@@ -296,14 +296,8 @@ func (s *BillingSession) rollbackFundingReserve(delta int) {
 		// 回滚本次 reserve 的扣费：优先退永久额度，再退限时额度（过期不恢复）。
 		// 退款成功后必须同步累计拆分与额度桶列表，否则后续完整退款会按过期的
 		// 累计拆分重复退永久额度，造成资金来源转换。
-		result, err := model.RefundWallet(funding.userId, delta, funding.split())
-		if err != nil {
+		if err := funding.refund(delta); err != nil {
 			common.SysLog("error rolling back wallet funding reserve: " + err.Error())
-		} else {
-			funding.consumed -= delta
-			funding.tempConsumed -= result.Temporary
-			funding.permConsumed -= result.Permanent
-			funding.allocations = removeRefundedAllocations(funding.allocations, result.Allocations)
 		}
 	case *SubscriptionFunding:
 		if err := model.PostConsumeUserSubscriptionDelta(funding.subscriptionId, -int64(delta)); err != nil {
@@ -458,7 +452,7 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 			funding: &SubscriptionFunding{
 				requestId: relayInfo.RequestId,
 				userId:    relayInfo.UserId,
-				modelName: relayInfo.OriginModelName,
+				modelName: relayInfo.GetBillingModelName(),
 				amount:    subConsume,
 			},
 		}

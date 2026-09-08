@@ -2,6 +2,7 @@ package controller
 
 import (
 	"crypto/rand"
+	"errors"
 	"math/big"
 	"net/http"
 	"strconv"
@@ -125,6 +126,12 @@ func AddRedemption(c *gin.Context) {
 		common.ApiErrorMsg(c, "额度必须大于 0")
 		return
 	}
+	if !req.randomQuotaMode() {
+		if err := common.ValidateWalletQuota(req.Quota); err != nil {
+			common.ApiError(c, err)
+			return
+		}
+	}
 
 	randomQuotaMode := req.randomQuotaMode()
 	if randomQuotaMode {
@@ -138,6 +145,10 @@ func AddRedemption(c *gin.Context) {
 		}
 		if *req.QuotaMin > *req.QuotaMax {
 			common.ApiErrorMsg(c, "随机额度最小值不能大于最大值")
+			return
+		}
+		if err := common.ValidateWalletQuota(*req.QuotaMax); err != nil {
+			common.ApiError(c, err)
 			return
 		}
 	}
@@ -244,6 +255,14 @@ func UpdateRedemption(c *gin.Context) {
 		return
 	}
 	if statusOnly == "" {
+		if redemption.Quota <= 0 {
+			common.ApiError(c, errors.New("redemption quota must be positive"))
+			return
+		}
+		if err := common.ValidateWalletQuota(redemption.Quota); err != nil {
+			common.ApiError(c, err)
+			return
+		}
 		if valid, msg := validateExpiredTime(c, redemption.ExpiredTime); !valid {
 			c.JSON(http.StatusOK, gin.H{"success": false, "message": msg})
 			return

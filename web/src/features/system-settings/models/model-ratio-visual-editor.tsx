@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useQuery } from '@tanstack/react-query'
 import type {
   ColumnFiltersState,
   OnChangeFn,
@@ -24,7 +25,6 @@ import type {
   VisibilityState,
   SortingState,
 } from '@tanstack/react-table'
-import { useQuery } from '@tanstack/react-query'
 import { Copy, Plus } from 'lucide-react'
 import {
   useState,
@@ -49,7 +49,12 @@ import {
 } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
 import { getAllChannelModels } from '@/features/channels/api'
-import { combineBillingExpr } from '@/features/pricing/lib/billing-expr'
+import { useModelPricing } from '@/features/model-pricing/api'
+import {
+  applyPricingDraft,
+  pricingOptions,
+} from '@/features/model-pricing/pricing'
+import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 import { useMediaQuery } from '@/hooks'
 import { cn } from '@/lib/utils'
 
@@ -68,7 +73,10 @@ import {
   type ChannelModelStatus,
   type ModelRow,
 } from './model-pricing-snapshots'
-import { buildModelRatioColumns } from './model-ratio-table-columns'
+import {
+  buildModelRatioColumns,
+  TASK_PRICING_MODE_FILTER,
+} from './model-ratio-table-columns'
 
 type ModelRatioVisualEditorProps = {
   savedModelPrice: string
@@ -142,9 +150,14 @@ const ModelRatioVisualEditorComponent = forwardRef<
   const { t } = useTranslation()
   // 1280px 以下（含垂直标签页等窄视口）表格占满整行，编辑面板走抽屉
   const isCompact = useMediaQuery('(max-width: 1279px)')
+  const { models: pricingModels } = usePricingData()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editorOpen, setEditorOpen] = useState(false)
   const [editData, setEditData] = useState<ModelRatioData | null>(null)
+  const pricingConfig = useModelPricing(
+    editData?.name ? [editData.name] : [],
+    Boolean(editData?.name)
+  )
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -203,6 +216,20 @@ const ModelRatioVisualEditorComponent = forwardRef<
     return new Set(channelModelsData.data)
   }, [channelModelsData])
   const channelModelsReady = channelModelSet !== null
+
+  const taskModelNames = useMemo(
+    () =>
+      new Set(
+        pricingModels
+          .filter(
+            (model) =>
+              model.billing_usage_schema &&
+              Object.keys(model.billing_usage_schema).length > 0
+          )
+          .map((model) => model.model_name)
+      ),
+    [pricingModels]
+  )
 
   const models = useMemo(() => {
     const savedRows = buildModelSnapshots({
@@ -273,21 +300,21 @@ const ModelRatioVisualEditorComponent = forwardRef<
 
     const unpricedRows: ModelRow[] =
       filterMode === 'all' && channelModelSet
-      ? [...channelModelSet]
-          .filter((name) => !modelNames.has(name))
-          .map((name) => ({
-            name,
-            billingMode: undefined,
-            hasConflict: false,
-            saved: undefined,
-            draft: undefined,
-            isDraftChanged: false,
-            isDraftDeleted: false,
-            isDraftNew: false,
-            channelStatus: 'unpriced' as const,
-            isUnpriced: true,
-          }))
-      : []
+        ? [...channelModelSet]
+            .filter((name) => !modelNames.has(name))
+            .map((name) => ({
+              name,
+              billingMode: undefined,
+              hasConflict: false,
+              saved: undefined,
+              draft: undefined,
+              isDraftChanged: false,
+              isDraftDeleted: false,
+              isDraftNew: false,
+              channelStatus: 'unpriced' as const,
+              isUnpriced: true,
+            }))
+        : []
 
     return [...pricedRows, ...unpricedRows].sort((a, b) =>
       a.name.localeCompare(b.name)
@@ -318,27 +345,31 @@ const ModelRatioVisualEditorComponent = forwardRef<
     channelModelSet,
   ])
 
-  const modeCounts = useMemo(
-    () =>
-      models.reduce(
-        (acc, model) => {
-          if (model.isUnpriced) return acc
-          const mode =
-            model.billingMode === 'per-request' ||
-            model.billingMode === 'tiered_expr'
-              ? model.billingMode
-              : 'per-token'
-          acc[mode] += 1
-          return acc
-        },
-        {
-          'per-token': 0,
-          'per-request': 0,
-          tiered_expr: 0,
-        } as Record<'per-token' | 'per-request' | 'tiered_expr', number>
-      ),
-    [models]
-  )
+  const modeCounts = useMemo(() => {
+    const counts = {
+      'per-token': 0,
+      'per-request': 0,
+      tiered_expr: 0,
+      [TASK_PRICING_MODE_FILTER]: 0,
+    }
+    for (const model of models) {
+      if (model.isUnpriced) continue
+      const mode =
+        model.billingMode === 'per-request' ||
+        model.billingMode === 'tiered_expr'
+          ? model.billingMode
+          : 'per-token'
+      counts[mode] += 1
+      if (
+        taskModelNames.has(model.name) &&
+        model.billingMode === 'tiered_expr' &&
+        Boolean(model.billingExpr)
+      ) {
+        counts[TASK_PRICING_MODE_FILTER] += 1
+      }
+    }
+    return counts
+  }, [models, taskModelNames])
 
   const channelStatusCounts = useMemo(
     () =>
@@ -514,9 +545,17 @@ const ModelRatioVisualEditorComponent = forwardRef<
         onEdit: handleEdit,
         showChannelStatus: channelModelsReady,
         deleteDisabled: filterMode === 'unset',
+        taskModelNames,
         t,
       }),
-    [handleEdit, handleDelete, channelModelsReady, filterMode, t]
+    [
+      handleEdit,
+      handleDelete,
+      channelModelsReady,
+      filterMode,
+      t,
+      taskModelNames,
+    ]
   )
 
   const ensurePageInRange = useCallback((pageCount: number) => {
@@ -554,129 +593,27 @@ const ModelRatioVisualEditorComponent = forwardRef<
 
   const persistPricingData = useCallback(
     (data: ModelRatioData, targetNames: string[] = [data.name]) => {
-      const priceMap = safeJsonParse<Record<string, number>>(modelPrice, {
-        fallback: {},
-        silent: true,
+      const options = pricingOptions({
+        ModelPrice: modelPrice,
+        ModelRatio: modelRatio,
+        CompletionRatio: completionRatio,
+        CacheRatio: cacheRatio,
+        CreateCacheRatio: createCacheRatio,
+        ImageRatio: imageRatio,
+        AudioRatio: audioRatio,
+        AudioCompletionRatio: audioCompletionRatio,
+        BillingMode: billingMode,
+        BillingExpr: billingExpr,
       })
-      const ratioMap = safeJsonParse<Record<string, number>>(modelRatio, {
-        fallback: {},
-        silent: true,
-      })
-      const cacheMap = safeJsonParse<Record<string, number>>(cacheRatio, {
-        fallback: {},
-        silent: true,
-      })
-      const createCacheMap = safeJsonParse<Record<string, number>>(
-        createCacheRatio,
-        { fallback: {}, silent: true }
-      )
-      const completionMap = safeJsonParse<Record<string, number>>(
-        completionRatio,
-        { fallback: {}, silent: true }
-      )
-      const imageMap = safeJsonParse<Record<string, number>>(imageRatio, {
-        fallback: {},
-        silent: true,
-      })
-      const audioMap = safeJsonParse<Record<string, number>>(audioRatio, {
-        fallback: {},
-        silent: true,
-      })
-      const audioCompletionMap = safeJsonParse<Record<string, number>>(
-        audioCompletionRatio,
-        { fallback: {}, silent: true }
-      )
-      const billingModeMap = safeJsonParse<Record<string, string>>(
-        billingMode,
-        { fallback: {}, silent: true }
-      )
-      const billingExprMap = safeJsonParse<Record<string, string>>(
-        billingExpr,
-        { fallback: {}, silent: true }
-      )
-
-      const setIfPresent = (
-        target: Record<string, number>,
-        name: string,
-        value: string | undefined
-      ) => {
-        if (!value || value === '') return
-        const parsed = Number.parseFloat(value)
-        if (Number.isFinite(parsed)) target[name] = parsed
-      }
-
-      targetNames.forEach((name) => {
-        delete priceMap[name]
-        delete ratioMap[name]
-        delete cacheMap[name]
-        delete createCacheMap[name]
-        delete completionMap[name]
-        delete imageMap[name]
-        delete audioMap[name]
-        delete audioCompletionMap[name]
-        delete billingModeMap[name]
-        delete billingExprMap[name]
-
-        if (data.billingMode === 'tiered_expr') {
-          const combined = combineBillingExpr(
-            data.billingExpr || '',
-            data.requestRuleExpr || ''
-          )
-          if (combined) {
-            billingModeMap[name] = 'tiered_expr'
-            billingExprMap[name] = combined
-          }
-          // Always serialize ratio/price values for tiered_expr models so they
-          // serve as fallback during multi-instance sync delays. The backend's
-          // ModelPriceHelper checks billing_mode first, so these values are
-          // only consulted when billing_setting hasn't propagated yet.
-          setIfPresent(priceMap, name, data.price)
-          setIfPresent(ratioMap, name, data.ratio)
-          setIfPresent(cacheMap, name, data.cacheRatio)
-          setIfPresent(createCacheMap, name, data.createCacheRatio)
-          setIfPresent(completionMap, name, data.completionRatio)
-          setIfPresent(imageMap, name, data.imageRatio)
-          setIfPresent(audioMap, name, data.audioRatio)
-          setIfPresent(audioCompletionMap, name, data.audioCompletionRatio)
-        } else if (data.price && data.price !== '') {
-          setIfPresent(priceMap, name, data.price)
-        } else {
-          setIfPresent(ratioMap, name, data.ratio)
-          setIfPresent(cacheMap, name, data.cacheRatio)
-          setIfPresent(createCacheMap, name, data.createCacheRatio)
-          setIfPresent(completionMap, name, data.completionRatio)
-          setIfPresent(imageMap, name, data.imageRatio)
-          setIfPresent(audioMap, name, data.audioRatio)
-          setIfPresent(audioCompletionMap, name, data.audioCompletionRatio)
-        }
-      })
-
-      onChange('ModelPrice', JSON.stringify(priceMap, null, 2))
-      onChange('ModelRatio', JSON.stringify(ratioMap, null, 2))
-      onChange('CacheRatio', JSON.stringify(cacheMap, null, 2))
-      onChange('CreateCacheRatio', JSON.stringify(createCacheMap, null, 2))
-      onChange('CompletionRatio', JSON.stringify(completionMap, null, 2))
-      onChange('ImageRatio', JSON.stringify(imageMap, null, 2))
-      onChange('AudioRatio', JSON.stringify(audioMap, null, 2))
-      onChange(
-        'AudioCompletionRatio',
-        JSON.stringify(audioCompletionMap, null, 2)
-      )
-      onChange(
-        'billing_setting.billing_mode',
-        JSON.stringify(billingModeMap, null, 2)
-      )
-      onChange(
-        'billing_setting.billing_expr',
-        JSON.stringify(billingExprMap, null, 2)
-      )
+      const updated = applyPricingDraft(options, data, targetNames)
+      for (const [key, value] of Object.entries(updated)) onChange(key, value)
     },
     [
       modelPrice,
       modelRatio,
+      completionRatio,
       cacheRatio,
       createCacheRatio,
-      completionRatio,
       imageRatio,
       audioRatio,
       audioCompletionRatio,
@@ -783,6 +720,11 @@ const ModelRatioVisualEditorComponent = forwardRef<
                     value: 'tiered_expr',
                     count: modeCounts.tiered_expr,
                   },
+                  {
+                    label: 'Expression - Task pricing',
+                    value: TASK_PRICING_MODE_FILTER,
+                    count: modeCounts[TASK_PRICING_MODE_FILTER],
+                  },
                 ],
               },
               ...(channelModelsReady
@@ -884,6 +826,11 @@ const ModelRatioVisualEditorComponent = forwardRef<
             <ModelPricingEditorPanel
               ref={editorPanelRef}
               editData={editData}
+              usageSchema={
+                pricingConfig.data?.entries.find(
+                  (entry) => entry.model_name === editData?.name
+                )?.usage_schema
+              }
               onSave={onSave}
               isSaving={isSaving}
               onClose={handleCloseEditor}
@@ -908,6 +855,11 @@ const ModelRatioVisualEditorComponent = forwardRef<
           open={sheetOpen}
           onOpenChange={setSheetOpen}
           editData={editData}
+          usageSchema={
+            pricingConfig.data?.entries.find(
+              (entry) => entry.model_name === editData?.name
+            )?.usage_schema
+          }
           onSave={onSave}
           isSaving={isSaving}
         />

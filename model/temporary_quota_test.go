@@ -44,6 +44,26 @@ func getPermanentQuota(t *testing.T, userId int) int {
 	return u.Quota
 }
 
+func TestRefundWalletRejectsWalletOverflowAtomically(t *testing.T) {
+	truncateTables(t)
+	user := seedWalletUser(t, common.MaxWalletQuota-100)
+	expiresAt := common.NowInCheckinTimezone().Unix() + 3600
+	checkin := &Checkin{
+		UserId: user.Id, CheckinDate: "2026-08-08", QuotaType: CheckinQuotaTypeTemporary,
+		QuotaAwarded: 50, QuotaRemaining: 0, QuotaExpiresAt: expiresAt,
+	}
+	require.NoError(t, DB.Create(checkin).Error)
+
+	_, err := RefundWallet(user.Id, 250, &WalletSplit{
+		Temporary: 50, Permanent: 200,
+		Allocations: []TemporaryAllocation{{CheckinId: checkin.Id, Amount: 50, ExpiresAt: expiresAt}},
+	})
+	require.ErrorIs(t, err, ErrWalletQuotaLimitExceeded)
+	assert.Equal(t, common.MaxWalletQuota-100, getPermanentQuota(t, user.Id))
+	require.NoError(t, DB.First(checkin, checkin.Id).Error)
+	assert.Zero(t, checkin.QuotaRemaining)
+}
+
 func TestGetActiveTemporaryQuota_ExpiredExcluded(t *testing.T) {
 	truncateTables(t)
 	user := seedWalletUser(t, 1000)

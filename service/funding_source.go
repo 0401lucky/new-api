@@ -120,33 +120,16 @@ func (w *WalletFunding) Refund() error {
 // 退款本身在数据库事务内完成，可安全重试；过期限时部分直接丢弃。
 // 退款后同步累计拆分与额度桶列表，保证后续退款不会重复退已退部分。
 func (w *WalletFunding) refund(amount int) error {
-	result, err := model.RefundWallet(w.userId, amount, w.split())
+	_, err := model.RefundWallet(w.userId, amount, w.split())
 	if err != nil {
 		return err
 	}
-	w.tempConsumed -= result.Temporary
-	w.permConsumed -= result.Permanent
-	w.consumed -= result.Temporary + result.Permanent
-	w.allocations = removeRefundedAllocations(w.allocations, result.Allocations)
+	remaining := w.split().AfterRefund(amount)
+	w.tempConsumed = remaining.Temporary
+	w.permConsumed = remaining.Permanent
+	w.consumed = remaining.Total()
+	w.allocations = remaining.Allocations
 	return nil
-}
-
-// removeRefundedAllocations 从累计额度桶列表中移除本次退款已恢复的桶。
-// RefundWallet 逆序退还（后扣的先退），此处也从尾部匹配移除。
-func removeRefundedAllocations(all, removed []model.TemporaryAllocation) []model.TemporaryAllocation {
-	if len(removed) == 0 || len(all) == 0 {
-		return all
-	}
-	result := all
-	for _, rm := range removed {
-		for i := len(result) - 1; i >= 0; i-- {
-			if result[i].CheckinId == rm.CheckinId && result[i].Amount == rm.Amount {
-				result = append(result[:i], result[i+1:]...)
-				break
-			}
-		}
-	}
-	return result
 }
 
 // ---------------------------------------------------------------------------

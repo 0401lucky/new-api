@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"sync"
@@ -268,7 +269,7 @@ func redisRateLimitHandler(duration int64, layers []rateLimitLayer) gin.HandlerF
 				allowed, err = tb.Allow(
 					ctx,
 					totalKey,
-					limiter.WithCapacity(int64(layer.totalMaxCount)*duration),
+					limiter.WithCapacity(rateLimitCapacity(layer.totalMaxCount, duration)),
 					limiter.WithRate(int64(layer.totalMaxCount)),
 					limiter.WithRequested(duration),
 				)
@@ -384,7 +385,7 @@ func ModelRequestRateLimit() func(c *gin.Context) {
 		if durationMinutes <= 0 {
 			durationMinutes = 1
 		}
-		duration := int64(durationMinutes * 60)
+		duration := rateLimitDurationSeconds(durationMinutes)
 
 		// 用户/分组默认参数
 		totalMaxCount := setting.ModelRequestRateLimitCount
@@ -452,4 +453,26 @@ func ModelRequestRateLimit() func(c *gin.Context) {
 // Token 启用自定义限流时，调用方不会使用本函数的绕过结果。
 func shouldBypassModelRequestRateLimit(userID int) bool {
 	return setting.IsModelRequestRateLimitExemptUser(userID)
+}
+
+func rateLimitDurationSeconds(durationMinutes int) int64 {
+	if durationMinutes <= 0 {
+		return 0
+	}
+	minutes := int64(durationMinutes)
+	if minutes > math.MaxInt64/60 {
+		return math.MaxInt64
+	}
+	return minutes * 60
+}
+
+func rateLimitCapacity(count int, durationSeconds int64) int64 {
+	if count <= 0 || durationSeconds <= 0 {
+		return 0
+	}
+	c := int64(count)
+	if c > math.MaxInt64/durationSeconds {
+		return math.MaxInt64
+	}
+	return c * durationSeconds
 }

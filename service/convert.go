@@ -1,24 +1,13 @@
 package service
 
 import (
-	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	"github.com/QuantumNous/new-api/service/relayconvert"
+	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/QuantumNous/new-api/relaykit/relayconvert"
 )
 
 func NormalizeCacheCreationSplit(totalTokens int, tokens5m int, tokens1h int) (int, int) {
 	return relayconvert.NormalizeCacheCreationSplit(totalTokens, tokens5m, tokens1h)
-}
-
-func buildClaudeUsageFromOpenAIUsage(usage *dto.Usage) *dto.ClaudeUsage {
-	if usage == nil {
-		return nil
-	}
-	response := relayconvert.ResponseOpenAI2Claude(&dto.OpenAITextResponse{Usage: *usage}, nil)
-	if response == nil {
-		return nil
-	}
-	return response.Usage
 }
 
 func StreamResponseOpenAI2Claude(openAIResponse *dto.ChatCompletionsStreamResponse, info *relaycommon.RelayInfo) []*dto.ClaudeResponse {

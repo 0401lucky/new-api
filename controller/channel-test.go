@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -17,7 +16,6 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
-	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
@@ -25,9 +23,11 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
+	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
-	"github.com/QuantumNous/new-api/types"
+	hosttypes "github.com/QuantumNous/new-api/types"
 
 	"github.com/samber/lo"
 	"github.com/tidwall/gjson"
@@ -82,6 +82,7 @@ func testChannel(ctx context.Context, channel *model.Channel, testUserID int, te
 		constant.ChannelTypeJimeng,
 		constant.ChannelTypeDoubaoVideo,
 		constant.ChannelTypeVidu,
+		constant.ChannelTypeTaskPlugin,
 	}
 	if lo.Contains(unsupportedTestChannelTypes, channel.Type) {
 		channelTypeName := constant.GetChannelTypeName(channel.Type)
@@ -256,6 +257,13 @@ func testChannel(ctx context.Context, channel *model.Channel, testUserID int, te
 			context:     c,
 			localErr:    err,
 			newAPIError: types.NewError(err, types.ErrorCodeChannelModelMappedError),
+		}
+	}
+	if err := helper.ApplyReasoningModelSuffix(c, info, request); err != nil {
+		return testResult{
+			context:     c,
+			localErr:    err,
+			newAPIError: types.NewErrorWithStatusCode(err, types.ErrorCodeConvertRequestFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry()),
 		}
 	}
 
@@ -528,7 +536,7 @@ func attachTestBillingRequestInput(info *relaycommon.RelayInfo, request dto.Requ
 	return nil
 }
 
-func settleTestQuota(info *relaycommon.RelayInfo, priceData types.PriceData, usage *dto.Usage) (int, *billingexpr.TieredResult) {
+func settleTestQuota(info *relaycommon.RelayInfo, priceData hosttypes.PriceData, usage *dto.Usage) (int, *billingexpr.TieredResult) {
 	if usage != nil && info != nil && info.TieredBillingSnapshot != nil {
 		isClaudeUsageSemantic := usage.UsageSemantic == "anthropic" || info.GetFinalRequestRelayFormat() == types.RelayFormatClaude
 		usedVars := billingexpr.UsedVars(info.TieredBillingSnapshot.ExprString)
@@ -539,18 +547,19 @@ func settleTestQuota(info *relaycommon.RelayInfo, priceData types.PriceData, usa
 
 	quota := 0
 	if !priceData.UsePrice {
-		quota = usage.PromptTokens + int(math.Round(float64(usage.CompletionTokens)*priceData.CompletionRatio))
-		quota = int(math.Round(float64(quota) * priceData.ModelRatio))
+		completionQuota := common.QuotaRound(float64(usage.CompletionTokens) * priceData.CompletionRatio)
+		quota = common.QuotaRound(float64(usage.PromptTokens) + float64(completionQuota))
+		quota = common.QuotaRound(float64(quota) * priceData.ModelRatio)
 		if priceData.ModelRatio != 0 && quota <= 0 {
 			quota = 1
 		}
 		return quota, nil
 	}
 
-	return int(priceData.ModelPrice * common.QuotaPerUnit), nil
+	return common.QuotaFromFloat(priceData.ModelPrice * common.QuotaPerUnit), nil
 }
 
-func buildTestLogOther(c *gin.Context, info *relaycommon.RelayInfo, priceData types.PriceData, usage *dto.Usage, tieredResult *billingexpr.TieredResult) map[string]interface{} {
+func buildTestLogOther(c *gin.Context, info *relaycommon.RelayInfo, priceData hosttypes.PriceData, usage *dto.Usage, tieredResult *billingexpr.TieredResult) *model.LogOther {
 	other := service.GenerateTextOtherInfo(c, info, priceData.ModelRatio, priceData.GroupRatioInfo.GroupRatio, priceData.CompletionRatio,
 		usage.PromptTokensDetails.CachedTokens, priceData.CacheRatio, priceData.ModelPrice, priceData.GroupRatioInfo.GroupSpecialRatio)
 	if tieredResult != nil {
@@ -941,7 +950,7 @@ func testChannelForHealthCheck(ctx context.Context, channel *model.Channel, test
 	}
 
 	if allowDisable && isChannelEnabled && shouldBanChannel && channel.GetAutoBan() {
-		processChannelError(result.context, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(result.context, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError)
+		processChannelError(result.context, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(result.context, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError, nil)
 		summary.Disabled++
 	}
 

@@ -16,35 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import assert from 'node:assert/strict'
-import { after, describe, test } from 'node:test'
-
-import { Window } from 'happy-dom'
-
-const domWindow = new Window()
-const domGlobals = [
-  'window',
-  'document',
-  'navigator',
-  'HTMLElement',
-  'HTMLDivElement',
-  'Node',
-  'Element',
-  'Event',
-  'CustomEvent',
-  'MutationObserver',
-  'requestAnimationFrame',
-  'cancelAnimationFrame',
-  'getComputedStyle',
-  'localStorage',
-] as const
-
-for (const key of domGlobals) {
-  Object.defineProperty(globalThis, key, {
-    configurable: true,
-    value: domWindow[key],
-  })
-}
+import { afterEach, assert, describe, test, vi } from 'vitest'
 
 const { act } = await import('react')
 const { createRoot } = await import('react-dom/client')
@@ -116,8 +88,10 @@ function Harness(props: {
 }
 
 describe('Turnstile branded verification card', () => {
-  after(() => {
-    domWindow.close()
+  afterEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+    Reflect.deleteProperty(window, 'turnstile')
   })
 
   test('renders the brand card with clover logo and verifying status', async () => {

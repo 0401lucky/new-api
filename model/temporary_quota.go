@@ -41,6 +41,35 @@ func (s *WalletSplit) Total() int {
 	return s.Temporary + s.Permanent
 }
 
+// AfterRefund returns the remaining charge without mutating the original split.
+// Permanent quota is released first, followed by the most recently used buckets.
+// Expired quota leaves the charge too, even when it cannot be restored to a wallet.
+func (s *WalletSplit) AfterRefund(amount int) *WalletSplit {
+	if s == nil {
+		return &WalletSplit{}
+	}
+	remaining := &WalletSplit{
+		Temporary:   max(s.Temporary, 0),
+		Permanent:   max(s.Permanent, 0),
+		Allocations: append([]TemporaryAllocation(nil), s.Allocations...),
+	}
+	amount = max(amount, 0)
+	permanent := min(amount, remaining.Permanent)
+	remaining.Permanent -= permanent
+	amount = min(amount-permanent, remaining.Temporary)
+	remaining.Temporary -= amount
+	for i := len(remaining.Allocations) - 1; i >= 0 && amount > 0; i-- {
+		allocation := &remaining.Allocations[i]
+		refunded := min(amount, max(allocation.Amount, 0))
+		allocation.Amount -= refunded
+		amount -= refunded
+		if allocation.Amount <= 0 {
+			remaining.Allocations = remaining.Allocations[:i]
+		}
+	}
+	return remaining
+}
+
 // LastCheckinId 返回最后一个限时额度桶的签到记录 ID（用于日志展示），无则返回 0。
 func (s *WalletSplit) LastCheckinId() int {
 	if n := len(s.Allocations); n > 0 {
@@ -139,13 +168,23 @@ func increaseUserQuotaTx(tx *gorm.DB, id int, quota int) error {
 	if quota <= 0 {
 		return nil
 	}
-	result := tx.Model(&User{}).Where("id = ?", id).
+	if err := common.ValidateWalletQuota(quota); err != nil {
+		return err
+	}
+	result := tx.Model(&User{}).Where("id = ? AND quota <= ?", id, common.MaxWalletQuota-quota).
 		Update("quota", gorm.Expr("quota + ?", quota))
 	if result.Error != nil {
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
+		var count int64
+		if err := tx.Model(&User{}).Where("id = ?", id).Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return ErrWalletQuotaLimitExceeded
 	}
 	return nil
 }

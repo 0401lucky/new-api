@@ -66,7 +66,7 @@ func TestMemoryConcurrencyLimiterUnlimited(t *testing.T) {
 func restoreModelRateLimitSettings(
 	t *testing.T,
 	oldRedisEnabled bool,
-	oldRateLimiter common.InMemoryRateLimiter,
+	oldRateLimiter *common.InMemoryRateLimiter,
 	oldConcurrencyLimiter *memoryConcurrencyLimiter,
 	oldEnabled bool,
 	oldDuration int,
@@ -111,7 +111,7 @@ func TestModelRequestRateLimitRejectsConcurrentRequest(t *testing.T) {
 	)
 
 	common.RedisEnabled = false
-	inMemoryRateLimiter = common.InMemoryRateLimiter{}
+	inMemoryRateLimiter = &common.InMemoryRateLimiter{}
 	inMemoryConcurrencyLimiter = newMemoryConcurrencyLimiter()
 	setting.ModelRequestRateLimitMutex.Lock()
 	setting.ModelRequestRateLimitEnabled = true
@@ -184,7 +184,7 @@ func TestModelRequestRateLimitAdminNoLongerBypasses(t *testing.T) {
 	)
 
 	common.RedisEnabled = false
-	inMemoryRateLimiter = common.InMemoryRateLimiter{}
+	inMemoryRateLimiter = &common.InMemoryRateLimiter{}
 	inMemoryConcurrencyLimiter = newMemoryConcurrencyLimiter()
 	setting.ModelRequestRateLimitMutex.Lock()
 	setting.ModelRequestRateLimitEnabled = true
@@ -251,7 +251,7 @@ func TestTokenRateLimitAppliesWhenGlobalDisabled(t *testing.T) {
 	)
 
 	common.RedisEnabled = false
-	inMemoryRateLimiter = common.InMemoryRateLimiter{}
+	inMemoryRateLimiter = &common.InMemoryRateLimiter{}
 	inMemoryConcurrencyLimiter = newMemoryConcurrencyLimiter()
 	setting.ModelRequestRateLimitMutex.Lock()
 	setting.ModelRequestRateLimitEnabled = false // 全局关闭
@@ -324,7 +324,7 @@ func TestTokenRateLimitSuccessCount(t *testing.T) {
 	)
 
 	common.RedisEnabled = false
-	inMemoryRateLimiter = common.InMemoryRateLimiter{}
+	inMemoryRateLimiter = &common.InMemoryRateLimiter{}
 	inMemoryConcurrencyLimiter = newMemoryConcurrencyLimiter()
 	setting.ModelRequestRateLimitMutex.Lock()
 	setting.ModelRequestRateLimitEnabled = false

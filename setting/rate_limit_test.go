@@ -1,6 +1,11 @@
 package setting
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestParseModelRequestRateLimitGroup(t *testing.T) {
 	tests := []struct {
@@ -42,14 +47,13 @@ func TestParseModelRequestRateLimitGroupRejectsInvalidValues(t *testing.T) {
 		`{"default":[30,20,3,1]}`,
 		`{"default":[30,0,3]}`,
 		`{"default":[30,20,-1]}`,
-		`{"default":[2147483648,20,1]}`,
+		fmt.Sprintf(`{"default":[%d,20,1]}`, maxModelRequestRateLimitCount+1),
 	}
 
 	for _, raw := range tests {
 		t.Run(raw, func(t *testing.T) {
-			if _, err := ParseModelRequestRateLimitGroup(raw); err == nil {
-				t.Fatal("expected invalid group rate limit to return error")
-			}
+			_, err := ParseModelRequestRateLimitGroup(raw)
+			require.Error(t, err)
 		})
 	}
 }

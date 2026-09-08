@@ -3,15 +3,16 @@ package service
 import (
 	"testing"
 
-	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBuildClaudeUsageFromOpenAIUsageCacheWriteSemantics(t *testing.T) {
-	t.Run("legacy cache creation keeps existing input semantics", func(t *testing.T) {
+	t.Run("anthropic semantics keep text input separate from cached prefixes", func(t *testing.T) {
 		usage := buildClaudeUsageFromOpenAIUsage(&dto.Usage{
 			PromptTokens:     100,
 			CompletionTokens: 7,
+			UsageSemantic:    dto.BillingUsageSemanticAnthropic,
 			PromptTokensDetails: dto.InputTokenDetails{
 				CachedTokens:         30,
 				CachedCreationTokens: 20,
@@ -55,4 +56,8 @@ func TestBuildClaudeUsageFromOpenAIUsageCacheWriteSemantics(t *testing.T) {
 		require.Equal(t, 0, usage.InputTokens)
 		require.Equal(t, 25, usage.CacheCreationInputTokens)
 	})
+}
+
+func buildClaudeUsageFromOpenAIUsage(usage *dto.Usage) *dto.ClaudeUsage {
+	return ResponseOpenAI2Claude(&dto.OpenAITextResponse{Usage: *usage}, nil).Usage
 }
