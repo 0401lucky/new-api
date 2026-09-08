@@ -195,15 +195,18 @@ export function SubscriptionPlansCard({
     billingPreference === 'subscription_first' ||
     billingPreference === 'subscription_only'
 
-  const planPurchaseCountMap = useMemo(() => {
+  const activePlanCountMap = useMemo(() => {
     const map = new Map<number, number>()
-    for (const sub of allSubscriptions) {
-      const planId = sub?.subscription?.plan_id
-      if (!planId) continue
-      map.set(planId, (map.get(planId) || 0) + 1)
+    const now = Date.now() / 1000
+    for (const record of activeSubscriptions) {
+      const sub = record?.subscription
+      if (!sub?.plan_id || sub.status !== 'active' || sub.end_time <= now) {
+        continue
+      }
+      map.set(sub.plan_id, (map.get(sub.plan_id) || 0) + 1)
     }
     return map
-  }, [allSubscriptions])
+  }, [activeSubscriptions])
 
   useEffect(() => {
     onAvailabilityChange?.(isAvailable)
@@ -529,7 +532,7 @@ export function SubscriptionPlansCard({
               const price = Number(plan.price_amount || 0).toFixed(2)
               const isPopular = index === 0 && plans.length > 1
               const limit = Number(plan.max_purchase_per_user || 0)
-              const count = planPurchaseCountMap.get(plan.id) || 0
+              const count = activePlanCountMap.get(plan.id) || 0
               const reached = limit > 0 && count >= limit
 
               const benefits = [
@@ -540,7 +543,7 @@ export function SubscriptionPlansCard({
                 totalAmount > 0
                   ? `${t('Total Quota')}: ${formatQuota(totalAmount)}`
                   : `${t('Total Quota')}: ${t('Unlimited')}`,
-                limit > 0 ? `${t('Purchase Limit')}: ${limit}` : null,
+                limit > 0 ? `${t('Active Subscription Limit')}: ${limit}` : null,
                 plan.upgrade_group
                   ? `${t('Upgrade Group')}: ${plan.upgrade_group}`
                   : null,
@@ -604,7 +607,10 @@ export function SubscriptionPlansCard({
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                          {t('Purchase limit reached')} ({count}/{limit})
+                          {t('Purchase limit reached')} ({count}/{limit}).{' '}
+                          {t(
+                            'You can purchase again after an existing subscription expires or is cancelled.'
+                          )}
                         </TooltipContent>
                       </Tooltip>
                     ) : (
@@ -654,7 +660,7 @@ export function SubscriptionPlansCard({
         }
         purchaseCount={
           selectedPlan?.plan?.id
-            ? planPurchaseCountMap.get(selectedPlan.plan.id)
+            ? activePlanCountMap.get(selectedPlan.plan.id)
             : undefined
         }
       />

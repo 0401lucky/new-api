@@ -501,7 +501,9 @@ export function SubscriptionsMutateDrawer({
                         />
                       </FormControl>
                       <FormDescription>
-                        {t('0 means unlimited')}
+                        {t(
+                          'Maximum active subscriptions per user for this plan. Expired or cancelled subscriptions do not count. 0 means unlimited.'
+                        )}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
