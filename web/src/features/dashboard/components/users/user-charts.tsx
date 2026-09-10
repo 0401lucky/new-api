@@ -1,3 +1,6 @@
+import { useQuery } from '@tanstack/react-query'
+import { VChart } from '@visactor/react-vchart'
+import { Users, Loader2 } from 'lucide-react'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -24,16 +27,9 @@ import {
   useCallback,
   type ReactNode,
 } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { VChart } from '@visactor/react-vchart'
-import { Users, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { IconBadge } from '@/components/ui/icon-badge'
-import { formatNumber, formatQuota } from '@/lib/format'
-import { getRollingDateRange, type TimeGranularity } from '@/lib/time'
-import { VCHART_OPTION } from '@/lib/vchart'
-import { useTheme } from '@/context/theme-provider'
+import { sideDrawerContentClassName } from '@/components/drawer-layout'
 import { Badge } from '@/components/ui/badge'
 import {
   Card,
@@ -43,6 +39,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
+import { IconBadge } from '@/components/ui/icon-badge'
 import {
   Sheet,
   SheetContent,
@@ -60,7 +57,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { sideDrawerContentClassName } from '@/components/drawer-layout'
+import { useTheme } from '@/context/theme-provider'
 import {
   getUserModelUsageStats,
   getUserQuotaDataByUsers,
@@ -80,6 +77,10 @@ import type {
   UserChartsFilters,
   UserModelUsageResponse,
 } from '@/features/dashboard/types'
+import { formatNumber, formatQuota } from '@/lib/format'
+import { requireServerSuccess } from '@/lib/server-error-message'
+import { getRollingDateRange, type TimeGranularity } from '@/lib/time'
+import { VCHART_OPTION } from '@/lib/vchart'
 
 let themeManagerPromise: Promise<
   (typeof import('@visactor/vchart'))['ThemeManager']
@@ -421,7 +422,8 @@ export function UserCharts(props: UserChartsProps) {
 
   const { data: userData, isLoading } = useQuery({
     queryKey: ['dashboard', 'user-quota', timeRange],
-    queryFn: () => getUserQuotaDataByUsers(timeRange),
+    queryFn: async () =>
+      requireServerSuccess(await getUserQuotaDataByUsers(timeRange)),
     select: (res) => (res.success ? res.data : []),
     staleTime: 60_000,
   })

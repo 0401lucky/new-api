@@ -687,10 +687,12 @@ const ModelRatioVisualEditorComponent = forwardRef<
   }
 
   return (
-    <div className='flex flex-col gap-4'>
+    <div className='flex min-h-0 flex-1 flex-col gap-4'>
       <div
+        role='region'
+        aria-label={t('Model prices')}
         className={cn(
-          'grid h-[clamp(720px,calc(100vh-12rem),900px)] min-h-0 gap-4',
+          'grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] gap-4',
           editorOpen &&
             'xl:grid-cols-[minmax(320px,0.68fr)_minmax(640px,1.32fr)]'
         )}
