@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -136,6 +137,7 @@ func main() {
 
 	// Subscription quota reset task (daily/weekly/monthly/custom)
 	service.StartSubscriptionQuotaResetTask()
+	service.StartDonationRecovery()
 
 	// Blackroom maintenance task (expire due bans, optionally scan multi-IP abuse)
 	service.StartBlackroomTask()
@@ -236,7 +238,7 @@ func main() {
 	}
 
 	srv := &http.Server{
-		Addr:    ":" + port,
+		Addr:    net.JoinHostPort(os.Getenv("HTTP_LISTEN_HOST"), port),
 		Handler: server,
 	}
 

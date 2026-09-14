@@ -108,7 +108,9 @@ func TestSetUserPermissionsStoresOnlyOverrides(t *testing.T) {
 		ResourceTaskPlugin: {
 			ActionBind: false,
 		},
-		ResourceAudit: {ActionRead: false},
+		ResourceAudit:           {ActionRead: false},
+		ResourceDonationConfig:  {ActionRead: true, ActionWrite: true},
+		ResourceDonationRecords: {ActionRead: true},
 	}, ExplicitUserPermissions(42))
 	assert.Equal(t, PermissionsMap{
 		ResourceChannel: {
@@ -140,9 +142,27 @@ func TestSetUserPermissionsStoresOnlyOverrides(t *testing.T) {
 		ResourceTaskPlugin: {
 			ActionBind: false,
 		},
-		ResourceAudit: {ActionRead: false},
+		ResourceAudit:           {ActionRead: false},
+		ResourceDonationConfig:  {ActionRead: true, ActionWrite: true},
+		ResourceDonationRecords: {ActionRead: true},
 	}, ExplicitUserPermissions(42))
 	assert.Empty(t, ExplicitUserOverrides(42))
+}
+
+func TestDonationPermissionsSeparateConfigurationAndRecords(t *testing.T) {
+	db := newAuthzTestDB(t)
+	require.NoError(t, Init(db))
+	assert.False(t, Can(42, common.RoleCommonUser, DonationConfigRead))
+	assert.False(t, Can(42, common.RoleCommonUser, DonationRecordsRead))
+	assert.True(t, Can(42, common.RoleAdminUser, DonationConfigWrite))
+	assert.True(t, Can(42, common.RoleAdminUser, DonationRecordsRead))
+	require.NoError(t, SetUserPermissions(42, PermissionsMap{
+		ResourceDonationConfig:  {ActionRead: true, ActionWrite: false},
+		ResourceDonationRecords: {ActionRead: false},
+	}))
+	assert.True(t, Can(42, common.RoleAdminUser, DonationConfigRead))
+	assert.False(t, Can(42, common.RoleAdminUser, DonationConfigWrite))
+	assert.False(t, Can(42, common.RoleAdminUser, DonationRecordsRead))
 }
 
 func TestClearUserAuthorizationRemovesOverrides(t *testing.T) {
