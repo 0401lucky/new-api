@@ -16,13 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { type DragEvent, useEffect, useMemo, useState } from 'react'
-import * as z from 'zod'
-import { useFieldArray, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ExternalLink, GripVertical, Plus, Trash2 } from 'lucide-react'
+import { type DragEvent, useEffect, useMemo, useState } from 'react'
+import { useFieldArray, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { cn } from '@/lib/utils'
+import * as z from 'zod'
+
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import { cn } from '@/lib/utils'
 
 import {
   SettingsControlChildren,
@@ -67,6 +68,7 @@ const customLinkSchema = z.object({
 const headerNavSchema = z.object({
   home: z.boolean(),
   console: z.boolean(),
+  donations: z.boolean(),
   pricingEnabled: z.boolean(),
   pricingRequireAuth: z.boolean(),
   rankingsEnabled: z.boolean(),
@@ -88,6 +90,7 @@ type HeaderNavigationSectionProps = {
 }
 
 const toFormValues = (config: HeaderNavModulesConfig): HeaderNavFormValues => ({
+  donations: config.donations ?? HEADER_NAV_DEFAULT.donations,
   home:
     config.home === undefined ? HEADER_NAV_DEFAULT.home : Boolean(config.home),
   console:
@@ -165,6 +168,7 @@ export function HeaderNavigationSection({
       ...config,
       home: values.home,
       console: values.console,
+      donations: values.donations,
       docs: values.docs,
       about: values.about,
       pricing: {
@@ -249,7 +253,7 @@ export function HeaderNavigationSection({
     event.preventDefault()
     const rawSourceIndex = event.dataTransfer.getData(CUSTOM_LINK_DRAG_TYPE)
     const sourceIndex =
-      draggedLinkIndex ?? (rawSourceIndex ? Number(rawSourceIndex) : NaN)
+      draggedLinkIndex ?? (rawSourceIndex ? Number(rawSourceIndex) : Number.NaN)
 
     if (
       Number.isInteger(sourceIndex) &&
@@ -268,6 +272,11 @@ export function HeaderNavigationSection({
     title: string
     description: string
   }> = [
+    {
+      key: 'donations',
+      title: t('Donations'),
+      description: t('Donate API keys and view permanent rewards.'),
+    },
     {
       key: 'home',
       title: t('Home'),
@@ -412,9 +421,7 @@ export function HeaderNavigationSection({
                           <Switch
                             checked={Boolean(field.value)}
                             onCheckedChange={field.onChange}
-                            disabled={
-                              !Boolean(form.watch(module.requireAuthDependsOn))
-                            }
+                            disabled={!form.watch(module.requireAuthDependsOn)}
                           />
                         </FormControl>
                         <FormMessage />

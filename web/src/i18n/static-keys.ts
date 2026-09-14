@@ -19,6 +19,42 @@ For commercial licensing, please contact support@quantumnous.com
 // Static translation keys that don't get picked up by the t('...') regex.
 // These cover dynamic labels (e.g. constants, configs) that are passed into t at runtime.
 export const STATIC_I18N_KEYS = [
+  // Donation API, validation, and backend permission catalog messages.
+  'Campaign names can contain at most 120 characters.',
+  'Configure the donation connection, campaigns, and permanent rewards.',
+  'Please shorten the campaign description.',
+  'Donate API keys and view permanent rewards.',
+  'Donation Records',
+  'Donation Settings',
+  'Donation identity material needs administrator attention.',
+  'Donation record not found.',
+  'End time must be after start time',
+  'Enter a 32–256 character integration credential.',
+  'Enter a campaign name.',
+  'Enter a positive reward within the supported quota range.',
+  'Enter a valid record ID.',
+  'Enter a valid service URL.',
+  'Enter at least one API key.',
+  'Enter the integration credential.',
+  'IDs must be positive integers.',
+  'Manage donation settings',
+  'Session expired!',
+  'Submit at most 100 keys at a time.',
+  'The donation integration version is not supported.',
+  'The donation request could not be completed. Try again.',
+  'The donation settings or input are invalid. Check the fields and try again.',
+  'The integration credential could not be verified.',
+  'The original submission has different content. Use the same keys and line positions.',
+  'The selected group changed. Refresh its configuration before submitting.',
+  'This connection belongs to a different integration instance.',
+  'This donation target is unavailable. Refresh and try again.',
+  'This submission is too large. Use fewer keys.',
+  'Toggle navigation menu',
+  'View all donation records',
+  'View campaigns and target groups without secrets.',
+  'View donation ownership, masked keys, and reward records.',
+  'View donation settings',
+
   // Billing expression simulation diagnostics and conditional labels.
   '{{start}}–{{end}}',
 

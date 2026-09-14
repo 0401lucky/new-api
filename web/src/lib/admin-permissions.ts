@@ -27,6 +27,8 @@ export const ADMIN_PERMISSION_RESOURCES = {
   AUDIT: 'audit',
   CHANNEL: 'channel',
   TASK_PLUGIN: 'task_plugin',
+  DONATION_CONFIG: 'donation_config',
+  DONATION_RECORDS: 'donation_records',
 } as const
 
 export const ADMIN_PERMISSION_ACTIONS = {

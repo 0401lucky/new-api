@@ -33,6 +33,7 @@ export type HeaderNavCustomLinkConfig = {
 export type HeaderNavModulesConfig = {
   home: boolean
   console: boolean
+  donations: boolean
   pricing: HeaderNavAccessConfig
   rankings: HeaderNavAccessConfig
   model_health: HeaderNavAccessConfig
@@ -52,6 +53,7 @@ export type SidebarModulesAdminConfig = Record<string, SidebarSectionConfig>
 export const HEADER_NAV_DEFAULT: HeaderNavModulesConfig = {
   home: true,
   console: true,
+  donations: true,
   pricing: {
     enabled: true,
     requireAuth: false,

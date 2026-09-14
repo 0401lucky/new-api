@@ -44,6 +44,9 @@ import { Route as AuthenticatedChannelsIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedChatChatIdRouteImport } from './routes/_authenticated/chat/$chatId'
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard/index'
 import { Route as AuthenticatedDashboardSectionRouteImport } from './routes/_authenticated/dashboard/$section'
+import { Route as AuthenticatedDonationsIndexRouteImport } from './routes/_authenticated/donations/index'
+import { Route as AuthenticatedDonationsRecordsRouteImport } from './routes/_authenticated/donations/records'
+import { Route as AuthenticatedDonationsSettingsRouteImport } from './routes/_authenticated/donations/settings'
 import { Route as AuthenticatedDynamicRatioIndexRouteImport } from './routes/_authenticated/dynamic-ratio/index'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedFingerprintsIndexRouteImport } from './routes/_authenticated/fingerprints/index'
@@ -260,6 +263,24 @@ const AuthenticatedDashboardSectionRoute =
   AuthenticatedDashboardSectionRouteImport.update({
     id: '/dashboard/$section',
     path: '/dashboard/$section',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDonationsIndexRoute =
+  AuthenticatedDonationsIndexRouteImport.update({
+    id: '/donations/',
+    path: '/donations/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDonationsRecordsRoute =
+  AuthenticatedDonationsRecordsRouteImport.update({
+    id: '/donations/records',
+    path: '/donations/records',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDonationsSettingsRoute =
+  AuthenticatedDonationsSettingsRouteImport.update({
+    id: '/donations/settings',
+    path: '/donations/settings',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedDynamicRatioIndexRoute =
@@ -512,6 +533,8 @@ export interface FileRoutesByFullPath {
   '/user/reset': typeof authUserResetRoute
   '/chat/$chatId': typeof AuthenticatedChatChatIdRoute
   '/dashboard/$section': typeof AuthenticatedDashboardSectionRoute
+  '/donations/records': typeof AuthenticatedDonationsRecordsRoute
+  '/donations/settings': typeof AuthenticatedDonationsSettingsRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/models/$section': typeof AuthenticatedModelsSectionRoute
   '/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
@@ -520,6 +543,7 @@ export interface FileRoutesByFullPath {
   '/blackroom/': typeof AuthenticatedBlackroomIndexRoute
   '/channels/': typeof AuthenticatedChannelsIndexRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
+  '/donations/': typeof AuthenticatedDonationsIndexRoute
   '/dynamic-ratio/': typeof AuthenticatedDynamicRatioIndexRoute
   '/fingerprints/': typeof AuthenticatedFingerprintsIndexRoute
   '/invite-codes/': typeof AuthenticatedInviteCodesIndexRoute
@@ -583,6 +607,8 @@ export interface FileRoutesByTo {
   '/user/reset': typeof authUserResetRoute
   '/chat/$chatId': typeof AuthenticatedChatChatIdRoute
   '/dashboard/$section': typeof AuthenticatedDashboardSectionRoute
+  '/donations/records': typeof AuthenticatedDonationsRecordsRoute
+  '/donations/settings': typeof AuthenticatedDonationsSettingsRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/models/$section': typeof AuthenticatedModelsSectionRoute
   '/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
@@ -591,6 +617,7 @@ export interface FileRoutesByTo {
   '/blackroom': typeof AuthenticatedBlackroomIndexRoute
   '/channels': typeof AuthenticatedChannelsIndexRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
+  '/donations': typeof AuthenticatedDonationsIndexRoute
   '/dynamic-ratio': typeof AuthenticatedDynamicRatioIndexRoute
   '/fingerprints': typeof AuthenticatedFingerprintsIndexRoute
   '/invite-codes': typeof AuthenticatedInviteCodesIndexRoute
@@ -658,6 +685,8 @@ export interface FileRoutesById {
   '/(auth)/user/reset': typeof authUserResetRoute
   '/_authenticated/chat/$chatId': typeof AuthenticatedChatChatIdRoute
   '/_authenticated/dashboard/$section': typeof AuthenticatedDashboardSectionRoute
+  '/_authenticated/donations/records': typeof AuthenticatedDonationsRecordsRoute
+  '/_authenticated/donations/settings': typeof AuthenticatedDonationsSettingsRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/_authenticated/models/$section': typeof AuthenticatedModelsSectionRoute
   '/_authenticated/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
@@ -666,6 +695,7 @@ export interface FileRoutesById {
   '/_authenticated/blackroom/': typeof AuthenticatedBlackroomIndexRoute
   '/_authenticated/channels/': typeof AuthenticatedChannelsIndexRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
+  '/_authenticated/donations/': typeof AuthenticatedDonationsIndexRoute
   '/_authenticated/dynamic-ratio/': typeof AuthenticatedDynamicRatioIndexRoute
   '/_authenticated/fingerprints/': typeof AuthenticatedFingerprintsIndexRoute
   '/_authenticated/invite-codes/': typeof AuthenticatedInviteCodesIndexRoute
@@ -732,6 +762,8 @@ export interface FileRouteTypes {
     | '/user/reset'
     | '/chat/$chatId'
     | '/dashboard/$section'
+    | '/donations/records'
+    | '/donations/settings'
     | '/errors/$error'
     | '/models/$section'
     | '/usage-logs/$section'
@@ -740,6 +772,7 @@ export interface FileRouteTypes {
     | '/blackroom/'
     | '/channels/'
     | '/dashboard/'
+    | '/donations/'
     | '/dynamic-ratio/'
     | '/fingerprints/'
     | '/invite-codes/'
@@ -803,6 +836,8 @@ export interface FileRouteTypes {
     | '/user/reset'
     | '/chat/$chatId'
     | '/dashboard/$section'
+    | '/donations/records'
+    | '/donations/settings'
     | '/errors/$error'
     | '/models/$section'
     | '/usage-logs/$section'
@@ -811,6 +846,7 @@ export interface FileRouteTypes {
     | '/blackroom'
     | '/channels'
     | '/dashboard'
+    | '/donations'
     | '/dynamic-ratio'
     | '/fingerprints'
     | '/invite-codes'
@@ -877,6 +913,8 @@ export interface FileRouteTypes {
     | '/(auth)/user/reset'
     | '/_authenticated/chat/$chatId'
     | '/_authenticated/dashboard/$section'
+    | '/_authenticated/donations/records'
+    | '/_authenticated/donations/settings'
     | '/_authenticated/errors/$error'
     | '/_authenticated/models/$section'
     | '/_authenticated/usage-logs/$section'
@@ -885,6 +923,7 @@ export interface FileRouteTypes {
     | '/_authenticated/blackroom/'
     | '/_authenticated/channels/'
     | '/_authenticated/dashboard/'
+    | '/_authenticated/donations/'
     | '/_authenticated/dynamic-ratio/'
     | '/_authenticated/fingerprints/'
     | '/_authenticated/invite-codes/'
@@ -1188,6 +1227,27 @@ declare module '@tanstack/react-router' {
       path: '/dashboard/$section'
       fullPath: '/dashboard/$section'
       preLoaderRoute: typeof AuthenticatedDashboardSectionRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/donations/': {
+      id: '/_authenticated/donations/'
+      path: '/donations'
+      fullPath: '/donations/'
+      preLoaderRoute: typeof AuthenticatedDonationsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/donations/records': {
+      id: '/_authenticated/donations/records'
+      path: '/donations/records'
+      fullPath: '/donations/records'
+      preLoaderRoute: typeof AuthenticatedDonationsRecordsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/donations/settings': {
+      id: '/_authenticated/donations/settings'
+      path: '/donations/settings'
+      fullPath: '/donations/settings'
+      preLoaderRoute: typeof AuthenticatedDonationsSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dynamic-ratio/': {
@@ -1540,6 +1600,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedChat2linkRoute: typeof AuthenticatedChat2linkRoute
   AuthenticatedChatChatIdRoute: typeof AuthenticatedChatChatIdRoute
   AuthenticatedDashboardSectionRoute: typeof AuthenticatedDashboardSectionRoute
+  AuthenticatedDonationsRecordsRoute: typeof AuthenticatedDonationsRecordsRoute
+  AuthenticatedDonationsSettingsRoute: typeof AuthenticatedDonationsSettingsRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
   AuthenticatedModelsSectionRoute: typeof AuthenticatedModelsSectionRoute
   AuthenticatedUsageLogsSectionRoute: typeof AuthenticatedUsageLogsSectionRoute
@@ -1548,6 +1610,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedBlackroomIndexRoute: typeof AuthenticatedBlackroomIndexRoute
   AuthenticatedChannelsIndexRoute: typeof AuthenticatedChannelsIndexRoute
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
+  AuthenticatedDonationsIndexRoute: typeof AuthenticatedDonationsIndexRoute
   AuthenticatedDynamicRatioIndexRoute: typeof AuthenticatedDynamicRatioIndexRoute
   AuthenticatedFingerprintsIndexRoute: typeof AuthenticatedFingerprintsIndexRoute
   AuthenticatedInviteCodesIndexRoute: typeof AuthenticatedInviteCodesIndexRoute
@@ -1573,6 +1636,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedChat2linkRoute: AuthenticatedChat2linkRoute,
   AuthenticatedChatChatIdRoute: AuthenticatedChatChatIdRoute,
   AuthenticatedDashboardSectionRoute: AuthenticatedDashboardSectionRoute,
+  AuthenticatedDonationsRecordsRoute: AuthenticatedDonationsRecordsRoute,
+  AuthenticatedDonationsSettingsRoute: AuthenticatedDonationsSettingsRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
   AuthenticatedModelsSectionRoute: AuthenticatedModelsSectionRoute,
   AuthenticatedUsageLogsSectionRoute: AuthenticatedUsageLogsSectionRoute,
@@ -1581,6 +1646,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBlackroomIndexRoute: AuthenticatedBlackroomIndexRoute,
   AuthenticatedChannelsIndexRoute: AuthenticatedChannelsIndexRoute,
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
+  AuthenticatedDonationsIndexRoute: AuthenticatedDonationsIndexRoute,
   AuthenticatedDynamicRatioIndexRoute: AuthenticatedDynamicRatioIndexRoute,
   AuthenticatedFingerprintsIndexRoute: AuthenticatedFingerprintsIndexRoute,
   AuthenticatedInviteCodesIndexRoute: AuthenticatedInviteCodesIndexRoute,

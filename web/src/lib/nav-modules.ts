@@ -36,6 +36,7 @@ export type HeaderNavCustomLink = {
 export type HeaderNavModules = {
   home: boolean
   console: boolean
+  donations: boolean
   pricing: ModuleAccess
   rankings: ModuleAccess
   model_health: ModuleAccess
@@ -48,6 +49,7 @@ export type HeaderNavModules = {
 const DEFAULT_HEADER_NAV_MODULES: HeaderNavModules = {
   home: true,
   console: true,
+  donations: true,
   pricing: { enabled: true, requireAuth: false },
   rankings: { enabled: true, requireAuth: false },
   model_health: { enabled: true, requireAuth: false },

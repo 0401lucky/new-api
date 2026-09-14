@@ -79,6 +79,11 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('Console'), href: '/dashboard' })
   }
 
+  if (modules.donations) {
+    // The authenticated route preserves the normal sign-in return path.
+    links.push({ title: t('Donations'), href: '/donations' })
+  }
+
   // Pricing
   const pricing = modules?.pricing
   if (pricing && typeof pricing === 'object' && pricing.enabled) {
