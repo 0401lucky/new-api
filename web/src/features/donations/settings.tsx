@@ -39,6 +39,7 @@ import { DonationConnectionForm } from './components/connection-form'
 import { DonationLayout } from './components/donation-layout'
 import { useDonationSession } from './hooks/use-donation-session'
 import { donationPermissions } from './lib/access'
+import { validationModeLabel } from './lib/labels'
 import type { DonationSession, ManagedCampaign } from './types'
 
 export function DonationSettings() {
@@ -95,6 +96,9 @@ function SettingsWorkspace(props: {
           <span className='font-medium'>{row.name}</span>
           <span className='text-muted-foreground text-xs'>
             {row.description}
+          </span>
+          <span className='text-muted-foreground text-xs'>
+            {validationModeLabel(row.validation_mode, t)}
           </span>
         </div>
       ),

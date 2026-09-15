@@ -23,6 +23,8 @@ func TestDonationSQLiteBackupRetainsIdentityAndRewards(t *testing.T) {
 	batch := prepareDonationTest(t, f.store, f.user.Id, f.campaign, key)
 	require.NoError(t, f.store.ApplyReceipt(t.Context(), donationReceiptFor(batch)))
 	require.NoError(t, f.store.SettleBatch(t.Context(), batch.ID))
+	var rewardsBeforeBackup int64
+	require.NoError(t, f.db.Model(&DonationReward{}).Count(&rewardsBeforeBackup).Error)
 
 	// VACUUM INTO includes committed WAL data in a standalone SQLite backup.
 	backupPath := filepath.Join(t.TempDir(), "backup.db")
@@ -70,7 +72,7 @@ func TestDonationSQLiteBackupRetainsIdentityAndRewards(t *testing.T) {
 	assert.Equal(t, 125, user.Quota)
 	var rewards int64
 	require.NoError(t, restored.Model(&DonationReward{}).Count(&rewards).Error)
-	assert.EqualValues(t, 1, rewards)
+	assert.Equal(t, rewardsBeforeBackup, rewards, "backup retains both released history and newly credited rewards")
 }
 
 func TestDonationPermanentRewardSurvivesCheckinRetention(t *testing.T) {

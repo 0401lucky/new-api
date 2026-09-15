@@ -64,6 +64,11 @@ func (s *DonationStore) ParseLines(campaignID int, text string) ([]DonationLine,
 
 func (s *DonationStore) SaveCampaign(ctx context.Context, value DonationCampaign, expectedVersion int) (DonationCampaign, error) {
 	value.Name = strings.TrimSpace(value.Name)
+	mode, modeOK := NormalizeDonationValidationMode(value.ValidationMode)
+	if !modeOK {
+		return value, ErrDonationInput
+	}
+	value.ValidationMode = mode
 	if value.Name == "" || utf8.RuneCountInString(value.Name) > 120 || len(value.Description) > 4000 || value.GroupID == 0 || !validDonationQuota(value.RewardQuota) || len(value.TargetRevision) != 64 {
 		return value, ErrDonationInput
 	}
@@ -173,11 +178,15 @@ func (s *DonationStore) PrepareBatch(ctx context.Context, userID int, requestKey
 			return ErrDonationAccount
 		}
 		now := time.Now().UnixMilli()
+		mode, ok := NormalizeDonationValidationMode(campaign.ValidationMode)
+		if !ok {
+			return ErrDonationUnavailable
+		}
 		saved = DonationBatch{ID: batchID, UserID: userID, Username: user.Username, LinuxDOID: user.LinuxDOId,
 			RequestKey: requestKey, RequestDigest: digest, SecretID: s.secretID, CampaignID: campaign.ID, CampaignVersion: campaign.Version,
 			CampaignName: campaign.Name, GroupID: campaign.GroupID, GroupName: campaign.GroupName, InstanceID: campaign.InstanceID,
 			SourceID: campaign.SourceID, TargetRevision: campaign.TargetRevision, RewardQuota: campaign.RewardQuota,
-			ReceptionState: "local_only", CreatedAtMS: now, UpdatedAtMS: now}
+			ValidationMode: mode, ReceptionState: "local_only", CreatedAtMS: now, UpdatedAtMS: now}
 		if err := tx.Create(&saved).Error; donationUniqueError(err) {
 			return errDonationRace
 		} else if err != nil {
@@ -201,7 +210,8 @@ func (s *DonationStore) PrepareBatch(ctx context.Context, userID int, requestKey
 				}
 			}
 			item := DonationItem{ID: line.ID, BatchID: batchID, Line: line.Line, Fingerprint: line.Fingerprint, KeyMask: mask,
-				State: "unconfirmed", RewardState: "none", CreatedAtMS: now, UpdatedAtMS: now}
+				State: "unconfirmed", RewardState: "none", CreatedAtMS: now, UpdatedAtMS: now,
+				EffectiveMode: mode, StagingExpiresAtMS: donationStagingDeadline(now)}
 			if first, duplicate := seen[line.Fingerprint]; duplicate {
 				item.State, item.ReasonCode, item.DuplicateOf = "duplicate", "duplicate_item", first
 			} else if line.Invalid {
@@ -258,6 +268,8 @@ type DonationSummary struct {
 	Invalid       int   `json:"invalid"`
 	Duplicate     int   `json:"duplicate"`
 	Processing    int   `json:"processing"`
+	PendingReview int   `json:"pending_review"`
+	Rejected      int   `json:"rejected"`
 	Rewarded      int   `json:"rewarded"`
 	RewardedQuota int64 `json:"rewarded_quota"`
 }
@@ -275,7 +287,14 @@ func (s *DonationStore) Batch(ctx context.Context, id string, userID int) (Donat
 	if err := s.DB.WithContext(ctx).Where("batch_id = ?", id).Order("line").Find(&result.Items).Error; err != nil {
 		return result, err
 	}
-	for _, item := range result.Items {
+	// Only a confirmed rejection reason is projected to the donor; approval notes
+	// and the administrative review/test ledger stay behind the admin boundary.
+	notes, err := s.ReviewNotes(ctx, id)
+	if err != nil {
+		return result, err
+	}
+	for i := range result.Items {
+		item := &result.Items[i]
 		result.Summary.Total++
 		switch item.State {
 		case "accepted":
@@ -284,8 +303,21 @@ func (s *DonationStore) Batch(ctx context.Context, id string, userID int) (Donat
 			result.Summary.Invalid++
 		case "existing", "duplicate":
 			result.Summary.Duplicate++
+		case "pending_review":
+			// An item whose approval is already applied is mid-receive, not
+			// waiting for a human.
+			if item.ReviewState == "approved" {
+				result.Summary.Processing++
+			} else {
+				result.Summary.PendingReview++
+			}
+		case "rejected":
+			result.Summary.Rejected++
 		default:
 			result.Summary.Processing++
+		}
+		if note, ok := notes[item.ReviewActionID]; ok && item.State == "rejected" && item.ReviewDecision == DonationDecisionRejected {
+			item.ReviewNote = note
 		}
 		if item.RewardState == "rewarded" {
 			result.Summary.Rewarded++
@@ -446,14 +478,14 @@ func (s *DonationStore) FinishRetry(ctx context.Context, id string) error {
 func (s *DonationStore) ClaimRecovery(ctx context.Context, now int64) ([]DonationBatch, error) {
 	var candidates []DonationBatch
 	if err := s.DB.WithContext(ctx).Where("needs_recovery = ? AND next_poll_at_ms <= ? AND lease_until_ms <= ?", true, now, now).
-		Order("next_poll_at_ms, id").Limit(32).Find(&candidates).Error; err != nil {
+		Order("next_poll_at_ms, id").Limit(1).Find(&candidates).Error; err != nil {
 		return nil, err
 	}
 	claimed := make([]DonationBatch, 0, len(candidates))
 	for _, batch := range candidates {
-		token := uuid.NewString()
-		result := s.DB.WithContext(ctx).Model(&DonationBatch{}).Where("id = ? AND lease_until_ms <= ?", batch.ID, now).
-			Updates(map[string]any{"lease_token": token, "lease_until_ms": now + 120000})
+		token := newDonationLeaseToken()
+		result := s.DB.WithContext(ctx).Model(&DonationBatch{}).Where("id = ? AND needs_recovery = ? AND next_poll_at_ms <= ? AND lease_until_ms <= ?", batch.ID, true, now, now).
+			Updates(map[string]any{"lease_token": token, "lease_until_ms": now + donationHotLeaseMS})
 		if result.Error != nil {
 			return nil, result.Error
 		}
@@ -465,8 +497,22 @@ func (s *DonationStore) ClaimRecovery(ctx context.Context, now int64) ([]Donatio
 	return claimed, nil
 }
 
+// ReleaseRecovery re-derives the schedule from the state the reconciliation
+// actually left behind: a batch that still needs recovery backs off, and one
+// that went cold stops competing for hot leases immediately.
 func (s *DonationStore) ReleaseRecovery(ctx context.Context, batch DonationBatch) error {
-	return s.DB.WithContext(ctx).Model(&DonationBatch{}).Where("id = ? AND lease_token = ?", batch.ID, batch.LeaseToken).
-		Updates(map[string]any{"lease_until_ms": 0, "lease_token": "", "poll_attempts": gorm.Expr("poll_attempts + 1"),
-			"next_poll_at_ms": time.Now().UnixMilli() + int64(min(60, 3*(batch.PollAttempts+1)))*1000}).Error
+	return s.transaction(ctx, func(tx *gorm.DB) error {
+		var current DonationBatch
+		if err := lockForUpdate(tx).Where("id = ? AND lease_token = ?", batch.ID, batch.LeaseToken).First(&current).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			return err
+		}
+		updates := map[string]any{"lease_until_ms": 0, "lease_token": "", "poll_attempts": current.PollAttempts + 1}
+		if current.NeedsRecovery {
+			updates["next_poll_at_ms"] = time.Now().UnixMilli() + int64(min(60, 3*(current.PollAttempts+1)))*1000
+		}
+		return tx.Model(&DonationBatch{}).Where("id = ?", batch.ID).Updates(updates).Error
+	})
 }

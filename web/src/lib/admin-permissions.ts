@@ -38,6 +38,8 @@ export const ADMIN_PERMISSION_ACTIONS = {
   SENSITIVE_WRITE: 'sensitive_write',
   SECRET_VIEW: 'secret_view',
   BIND: 'bind',
+  REVIEW: 'review',
+  TEST: 'test',
 } as const
 
 // The role whose baseline grants are used as defaults in the permission editor.

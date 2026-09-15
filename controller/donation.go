@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -28,6 +30,10 @@ func donationError(c *gin.Context, err error) {
 		status, code, message = http.StatusConflict, "DONATION_CONFLICT", "The request conflicts with its saved identity."
 	case errors.Is(err, model.ErrDonationAccount):
 		status, code, message = http.StatusForbidden, "DONATION_ACCOUNT_DISABLED", "This account cannot receive donation rewards."
+	case errors.Is(err, model.ErrDonationReview):
+		status, code, message = http.StatusConflict, "DONATION_NOT_REVIEWABLE", "This donation item cannot be reviewed in its current state."
+	case errors.Is(err, model.ErrDonationTestBusy):
+		status, code, message = http.StatusConflict, "DONATION_TEST_BUSY", "Another test is already running for this donation item."
 	case errors.Is(err, model.ErrDonationUnavailable):
 		status, code, message = http.StatusConflict, "DONATION_UNAVAILABLE", "The donation campaign or confirmed receipt is unavailable."
 	case errors.Is(err, model.ErrDonationSecret):
@@ -249,16 +255,17 @@ func AdminGetDonationCampaigns(c *gin.Context) {
 }
 
 type donationCampaignInput struct {
-	Name        *string `json:"name"`
-	Description *string `json:"description"`
-	GroupID     *uint64 `json:"group_id"`
-	RewardQuota *int    `json:"reward_quota"`
-	Enabled     *bool   `json:"enabled"`
+	Name           *string `json:"name"`
+	Description    *string `json:"description"`
+	GroupID        *uint64 `json:"group_id"`
+	RewardQuota    *int    `json:"reward_quota"`
+	Enabled        *bool   `json:"enabled"`
+	ValidationMode *string `json:"validation_mode"`
 }
 
 func SaveDonationCampaign(c *gin.Context) {
 	var input donationCampaignInput
-	if !readDonationJSON(c, &input, "name", "description", "group_id", "reward_quota", "enabled") {
+	if !readDonationJSON(c, &input, "name", "description", "group_id", "reward_quota", "enabled", "validation_mode") {
 		return
 	}
 	svc := donationService(c)
@@ -297,6 +304,10 @@ func SaveDonationCampaign(c *gin.Context) {
 	}
 	if input.Enabled != nil {
 		value.Enabled = *input.Enabled
+	}
+	// An omitted mode keeps the previous one; a create defaults to auto.
+	if input.ValidationMode != nil {
+		value.ValidationMode = *input.ValidationMode
 	}
 	saved, err := svc.SaveCampaign(c.Request.Context(), value, previous)
 	if err != nil {
@@ -351,5 +362,180 @@ func GetDonationRecord(c *gin.Context) {
 		donationError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "", "data": record})
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "", "data": service.DonationRecordViewOf(record)})
+}
+
+func GetDonationReviewContext(c *gin.Context) {
+	if !model.ValidDonationID(c.Param("item_id")) {
+		donationError(c, model.ErrDonationInput)
+		return
+	}
+	svc := donationService(c)
+	if svc == nil {
+		return
+	}
+	view, err := svc.ReviewContext(c.Request.Context(), c.Param("item_id"))
+	if err != nil {
+		donationError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "", "data": view})
+}
+
+// The Idempotency-Key is the action UUID sent to the receiver, so a lost
+// response is reconciled by replaying exactly the same identity.
+func donationReviewInput(c *gin.Context) (service.DonationReviewInput, bool) {
+	var body struct {
+		Kind                 string `json:"kind"`
+		ExpectedItemRevision *int64 `json:"expected_item_revision"`
+		ReviewTargetRevision string `json:"review_target_revision"`
+		Note                 string `json:"note"`
+	}
+	if !readDonationJSON(c, &body, "kind", "expected_item_revision", "review_target_revision", "note") {
+		return service.DonationReviewInput{}, false
+	}
+	if !model.ValidDonationID(c.Param("item_id")) || !model.ValidDonationID(c.GetHeader("Idempotency-Key")) || body.ExpectedItemRevision == nil || *body.ExpectedItemRevision < 0 {
+		donationError(c, model.ErrDonationInput)
+		return service.DonationReviewInput{}, false
+	}
+	return service.DonationReviewInput{Kind: body.Kind, ExpectedItemRevision: *body.ExpectedItemRevision,
+		ReviewTargetRevision: body.ReviewTargetRevision, Note: body.Note}, true
+}
+
+func PostDonationReviewAction(c *gin.Context) {
+	input, ok := donationReviewInput(c)
+	if !ok {
+		return
+	}
+	svc := donationService(c)
+	if svc == nil {
+		return
+	}
+	action, err := svc.Review(c.Request.Context(), c.GetInt("id"), c.Param("item_id"), c.GetHeader("Idempotency-Key"), input)
+	if err != nil {
+		donationError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "", "data": service.DonationReviewActionViewOf(action)})
+}
+
+func GetDonationReviewAction(c *gin.Context) {
+	if !model.ValidDonationID(c.Param("item_id")) || !model.ValidDonationID(c.Param("action_id")) {
+		donationError(c, model.ErrDonationInput)
+		return
+	}
+	svc := donationService(c)
+	if svc == nil {
+		return
+	}
+	action, err := svc.ReviewActionView(c.Request.Context(), c.Param("item_id"), c.Param("action_id"))
+	if err != nil {
+		donationError(c, err)
+		return
+	}
+	if action.ItemID != c.Param("item_id") {
+		donationError(c, gorm.ErrRecordNotFound)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "", "data": service.DonationReviewActionViewOf(action)})
+}
+
+func donationTestInput(c *gin.Context) (service.DonationTestInput, bool) {
+	var body struct {
+		ExpectedItemRevision *int64 `json:"expected_item_revision"`
+		ReviewTargetRevision string `json:"review_target_revision"`
+		Model                string `json:"model"`
+		Prompt               string `json:"prompt"`
+		SystemPrompt         string `json:"system_prompt"`
+		MaxOutputTokens      *int   `json:"max_output_tokens"`
+		Stream               *bool  `json:"stream"`
+	}
+	if !readDonationJSON(c, &body, "expected_item_revision", "review_target_revision", "model", "prompt", "system_prompt", "max_output_tokens", "stream") {
+		return service.DonationTestInput{}, false
+	}
+	if !model.ValidDonationID(c.Param("item_id")) || !model.ValidDonationID(c.GetHeader("Idempotency-Key")) || body.ExpectedItemRevision == nil || *body.ExpectedItemRevision < 0 {
+		donationError(c, model.ErrDonationInput)
+		return service.DonationTestInput{}, false
+	}
+	input := service.DonationTestInput{ExpectedItemRevision: *body.ExpectedItemRevision, ReviewTargetRevision: body.ReviewTargetRevision,
+		Model: body.Model, Prompt: body.Prompt, SystemPrompt: body.SystemPrompt, MaxOutputTokens: model.DonationDefaultOutputTokens}
+	if body.MaxOutputTokens != nil {
+		input.MaxOutputTokens = *body.MaxOutputTokens
+	}
+	if body.Stream != nil {
+		input.Stream = *body.Stream
+	}
+	return input, true
+}
+
+func PostDonationTest(c *gin.Context) {
+	input, ok := donationTestInput(c)
+	if !ok {
+		return
+	}
+	svc := donationService(c)
+	if svc == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), time.Duration(model.DonationTestTotalTimeout)*time.Second)
+	defer cancel()
+	c.Request = c.Request.WithContext(ctx)
+	attempt, batch, created, err := svc.BeginTest(ctx, c.GetInt("id"), c.Param("item_id"), c.GetHeader("Idempotency-Key"), input)
+	if err != nil {
+		donationError(c, err)
+		return
+	}
+	if !created {
+		// A replayed test ID returns its persisted metadata and never re-calls.
+		writeDonationTestResponse(c, service.DonationTestAttemptViewOf(attempt))
+		return
+	}
+	if !input.Stream {
+		result, err := svc.RunTest(ctx, attempt, batch, input)
+		if err != nil {
+			donationError(c, err)
+			return
+		}
+		writeDonationTestResponse(c, result)
+		return
+	}
+	flusher, _ := c.Writer.(http.Flusher)
+	flush := func() {
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
+	// The stream always carries its own terminal event, including on failure.
+	if err := svc.StreamTest(ctx, attempt, batch, input, c.Writer, flush); err != nil && !c.Writer.Written() {
+		donationError(c, err)
+	}
+}
+
+func writeDonationTestResponse(c *gin.Context, data any) {
+	deadline := time.Now().Add(20 * time.Second)
+	if requestDeadline, ok := c.Request.Context().Deadline(); ok && requestDeadline.Before(deadline) {
+		deadline = requestDeadline
+	}
+	if err := http.NewResponseController(c.Writer).SetWriteDeadline(deadline); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		donationError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "", "data": data})
+}
+
+func GetDonationTest(c *gin.Context) {
+	if !model.ValidDonationID(c.Param("item_id")) || !model.ValidDonationID(c.Param("test_id")) {
+		donationError(c, model.ErrDonationInput)
+		return
+	}
+	svc := donationService(c)
+	if svc == nil {
+		return
+	}
+	view, err := svc.TestAttempt(c.Request.Context(), c.Param("item_id"), c.Param("test_id"))
+	if err != nil {
+		donationError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "", "data": view})
 }

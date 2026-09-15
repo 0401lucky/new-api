@@ -86,6 +86,7 @@ export function DonationCampaignForm(props: {
         ? String(quotaUnitsToDollars(props.campaign.reward_quota))
         : '',
       enabled: props.campaign?.enabled ?? false,
+      manual_review: props.campaign?.validation_mode === 'manual_review',
     },
   })
   const getSignal = useDonationLifetime(props.session, () => {})
@@ -98,26 +99,42 @@ export function DonationCampaignForm(props: {
   })
   const selectedId = form.watch('group_id')
   const enabled = form.watch('enabled')
-  const selected = groups.data?.find((group) => group.id === selectedId)
-  const selectedAvailable = Boolean(
-    selected?.enabled &&
-    selected.can_probe &&
-    selected.connection_type === 'api_key'
+  const manualReview = form.watch('manual_review')
+  // Manual review needs the receiver's `manual_review_v1` feature and a group
+  // that qualifies for it. Missing either one must block the mode instead of
+  // silently falling back to automatic validation.
+  const manualReviewAvailable = Boolean(
+    groups.data?.some((entry) => entry.can_manual_review === true)
   )
+  const selected = groups.data?.find((group) => group.id === selectedId)
+  const selectedEligible = Boolean(
+    selected?.enabled &&
+    selected.connection_type === 'api_key' &&
+    (manualReview ? selected.can_manual_review : selected.can_probe)
+  )
+  const selectedAvailable =
+    manualReview && !manualReviewAvailable ? false : selectedEligible
   const closing = Boolean(
-    props.campaign && !enabled && selectedId === props.campaign.group_id
+    props.campaign &&
+    !enabled &&
+    selectedId === props.campaign.group_id &&
+    manualReview === (props.campaign.validation_mode === 'manual_review')
   )
   const canSave =
     closing || (!groups.isError && !groups.isPending && selectedAvailable)
-  const options = (groups.data ?? []).map((group) => ({
-    value: String(group.id),
-    label: group.name,
-    disabled:
-      !group.enabled || !group.can_probe || group.connection_type !== 'api_key',
-    description: group.can_probe
-      ? group.channel_id
-      : reasonLabel(group.unavailable_reason, t),
-  }))
+  const options = (groups.data ?? []).map((group) => {
+    const eligible = manualReview ? group.can_manual_review : group.can_probe
+    const reason = manualReview
+      ? (group.manual_unavailable_reason ?? group.unavailable_reason)
+      : group.unavailable_reason
+    return {
+      value: String(group.id),
+      label: group.name,
+      disabled:
+        !group.enabled || group.connection_type !== 'api_key' || !eligible,
+      description: eligible ? group.channel_id : reasonLabel(reason, t),
+    }
+  })
   if (
     props.campaign &&
     !options.some((option) => option.value === String(props.campaign?.group_id))
@@ -145,6 +162,7 @@ export function DonationCampaignForm(props: {
           group_id: values.group_id,
           reward_quota: rewardQuota,
           enabled: values.enabled,
+          validation_mode: values.manual_review ? 'manual_review' : 'auto',
         },
         props.campaign?.id,
         getSignal()
@@ -320,6 +338,47 @@ export function DonationCampaignForm(props: {
                   </AlertDescription>
                 </Alert>
               )}
+            <FormField
+              control={form.control}
+              name='manual_review'
+              render={({ field }) => (
+                <FormItem className='flex items-center justify-between gap-4'>
+                  <div className='flex flex-col gap-1'>
+                    <FormLabel>
+                      {t('Skip model testing and review manually')}
+                    </FormLabel>
+                    <FormDescription>
+                      {t(
+                        'Keys stay in temporary storage until an administrator reviews them. The reward is credited only after the review passes and the key is received.'
+                      )}
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={
+                        mutation.isPending ||
+                        (!field.value && !manualReviewAvailable)
+                      }
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            {!manualReviewAvailable && groups.data && (
+              <Alert variant={manualReview ? 'destructive' : 'default'}>
+                <AlertDescription>
+                  {manualReview
+                    ? t(
+                        'This campaign uses manual review, but no group currently qualifies for it. Upgrade gpt-load or choose another mode before saving.'
+                      )
+                    : t(
+                        'Manual review is unavailable: the connected gpt-load does not support it, or no group qualifies for it.'
+                      )}
+                </AlertDescription>
+              </Alert>
+            )}
             <FormField
               control={form.control}
               name='reward_amount'

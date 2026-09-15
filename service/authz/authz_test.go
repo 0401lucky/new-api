@@ -110,7 +110,7 @@ func TestSetUserPermissionsStoresOnlyOverrides(t *testing.T) {
 		},
 		ResourceAudit:           {ActionRead: false},
 		ResourceDonationConfig:  {ActionRead: true, ActionWrite: true},
-		ResourceDonationRecords: {ActionRead: true},
+		ResourceDonationRecords: {ActionRead: true, ActionDonationReview: true, ActionDonationTest: true},
 	}, ExplicitUserPermissions(42))
 	assert.Equal(t, PermissionsMap{
 		ResourceChannel: {
@@ -144,7 +144,7 @@ func TestSetUserPermissionsStoresOnlyOverrides(t *testing.T) {
 		},
 		ResourceAudit:           {ActionRead: false},
 		ResourceDonationConfig:  {ActionRead: true, ActionWrite: true},
-		ResourceDonationRecords: {ActionRead: true},
+		ResourceDonationRecords: {ActionRead: true, ActionDonationReview: true, ActionDonationTest: true},
 	}, ExplicitUserPermissions(42))
 	assert.Empty(t, ExplicitUserOverrides(42))
 }
@@ -163,6 +163,29 @@ func TestDonationPermissionsSeparateConfigurationAndRecords(t *testing.T) {
 	assert.True(t, Can(42, common.RoleAdminUser, DonationConfigRead))
 	assert.False(t, Can(42, common.RoleAdminUser, DonationConfigWrite))
 	assert.False(t, Can(42, common.RoleAdminUser, DonationRecordsRead))
+}
+
+// A record reader is not a reviewer: read access must never imply the write
+// capabilities that spend a staging key or a permanent reward.
+func TestDonationRecordReadOnlyAdminCannotReviewOrTest(t *testing.T) {
+	db := newAuthzTestDB(t)
+	require.NoError(t, Init(db))
+	assert.False(t, Can(42, common.RoleCommonUser, DonationRecordsReview))
+	assert.False(t, Can(42, common.RoleCommonUser, DonationRecordsTest))
+	assert.True(t, Can(42, common.RoleAdminUser, DonationRecordsReview))
+	assert.True(t, Can(42, common.RoleAdminUser, DonationRecordsTest))
+
+	require.NoError(t, SetUserPermissions(42, PermissionsMap{
+		ResourceDonationRecords: {ActionRead: true, ActionDonationReview: false, ActionDonationTest: false},
+	}))
+	assert.True(t, Can(42, common.RoleAdminUser, DonationRecordsRead))
+	assert.False(t, Can(42, common.RoleAdminUser, DonationRecordsReview))
+	assert.False(t, Can(42, common.RoleAdminUser, DonationRecordsTest))
+
+	capabilities := Capabilities(42, common.RoleAdminUser)
+	assert.True(t, capabilities[ResourceDonationRecords][ActionRead])
+	assert.False(t, capabilities[ResourceDonationRecords][ActionDonationReview])
+	assert.False(t, capabilities[ResourceDonationRecords][ActionDonationTest])
 }
 
 func TestClearUserAuthorizationRemovesOverrides(t *testing.T) {

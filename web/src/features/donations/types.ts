@@ -30,7 +30,10 @@ export interface DonationCampaign {
   enabled: boolean
   available: boolean
   unavailable_reason: string
+  validation_mode: DonationValidationMode
 }
+
+export type DonationValidationMode = 'auto' | 'manual_review'
 
 export interface ManagedCampaign {
   id: number
@@ -43,6 +46,7 @@ export interface ManagedCampaign {
   target_revision: string
   reward_quota: number
   enabled: boolean
+  validation_mode: DonationValidationMode
   created_at_ms: number
   updated_at_ms: number
 }
@@ -65,6 +69,10 @@ export interface DonationGroup {
   can_probe: boolean
   target_revision: string
   unavailable_reason: string
+  /** Added by the `manual_review_v1` integration feature. Absent on older receivers. */
+  can_manual_review?: boolean
+  manual_target_revision?: string
+  manual_unavailable_reason?: string
 }
 
 export type DonationIntakeState =
@@ -74,6 +82,8 @@ export type DonationIntakeState =
   | 'committing'
   | 'accepted'
   | 'retry_pending'
+  | 'pending_review'
+  | 'rejected'
   | 'invalid'
   | 'existing'
   | 'duplicate'
@@ -95,6 +105,17 @@ export interface DonationItem {
   rewarded_at_ms: number | null
   created_at_ms: number
   updated_at_ms: number
+  /** Manual-review facts, independent from the automatic probe state. */
+  effective_mode?: DonationValidationMode
+  item_revision?: number
+  review_target_revision?: string
+  /** pending_review | approved | rejected | expired, empty outside manual review. */
+  review_state?: string
+  review_action_id?: string
+  /** Donor-visible note of the final applied reject action. */
+  review_note?: string
+  reviewed_at_ms?: number | null
+  staging_expires_at_ms?: number | null
 }
 
 export interface DonationBatch {
@@ -110,6 +131,7 @@ export interface DonationBatch {
   group_id: number
   group_name: string
   reward_quota: number
+  validation_mode?: DonationValidationMode
   reception_state: 'local_only' | 'unconfirmed' | 'confirmed'
   last_error: string
   created_at_ms: number
@@ -126,6 +148,8 @@ export interface DonationBatchDetail extends DonationBatch {
     processing: number
     rewarded: number
     rewarded_quota: number
+    pending_review?: number
+    rejected?: number
   }
 }
 
@@ -139,6 +163,10 @@ export interface DonationRecord {
     quota: number
     credited_at_ms: number
   } | null
+  pending_review_action?: DonationReviewAction | null
+  latest_test?: DonationTestMetadata | null
+  recent_review_actions?: DonationReviewAction[]
+  recent_tests?: DonationTestMetadata[]
   events?: Array<{
     id: number
     item_id: string
@@ -172,7 +200,114 @@ export interface DonationRecordFilters {
 export type CampaignWrite = Pick<
   ManagedCampaign,
   'name' | 'description' | 'group_id' | 'reward_quota' | 'enabled'
->
+> & {
+  validation_mode: DonationValidationMode
+}
+
+export type DonationReviewKind = 'enter_review' | 'approve' | 'reject'
+
+export interface DonationReviewLimits {
+  max_prompt_bytes: number
+  max_request_bytes: number
+  default_output_tokens: number
+  max_output_tokens: number
+  max_response_bytes: number
+  max_event_bytes: number
+  total_timeout_seconds: number
+  first_byte_timeout_seconds: number
+  idle_timeout_seconds: number
+  max_note_bytes: number
+}
+
+export interface DonationReviewContext {
+  batch_id: string
+  item_id: string
+  group_id: number
+  state: DonationIntakeState
+  effective_mode: DonationValidationMode
+  item_revision: number
+  review_target_revision: string
+  expires_at_ms: number
+  can_review: boolean
+  can_reject: boolean
+  can_test: boolean
+  review_action: '' | 'enter_review' | 'approve'
+  unavailable_reason: string
+  test_models: string[]
+  review_limits: DonationReviewLimits
+}
+
+export interface DonationReviewIntent {
+  kind: DonationReviewKind
+  expected_item_revision: number
+  review_target_revision?: string
+  note?: string
+}
+
+/** new-api's ledger projection of one review intent. `status` is the command
+ * outcome: `rejected` means the command was not applied, not that the donation
+ * was rejected. */
+export interface DonationReviewAction {
+  action_id: string
+  batch_id: string
+  item_id: string
+  actor_id: number
+  kind: DonationReviewKind
+  expected_item_revision: number
+  review_target_revision: string
+  status: 'pending' | 'applied' | 'rejected'
+  reason_code: string
+  effect_revision: number
+  note?: string
+  applied_at_ms: number | null
+  created_at_ms: number
+}
+
+export type DonationTestState =
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'cancelled'
+  | 'interrupted'
+
+export interface DonationTestUsage {
+  input_tokens?: number
+  output_tokens?: number
+}
+
+export interface DonationTestMetadata {
+  test_id: string
+  actor_id?: number
+  batch_id: string
+  item_id: string
+  model: string
+  stream: boolean
+  state: DonationTestState
+  reason_code: string
+  status_code: number
+  start_revision: number
+  target_revision: string
+  started_at_ms: number
+  finished_at_ms: number | null
+  output_bytes: number
+  input_tokens?: number
+  output_tokens?: number
+  usage?: DonationTestUsage
+}
+
+export interface DonationTestResult extends DonationTestMetadata {
+  text?: string
+}
+
+export interface DonationTestIntent {
+  expected_item_revision: number
+  review_target_revision: string
+  model: string
+  prompt: string
+  system_prompt?: string
+  max_output_tokens?: number
+  stream: boolean
+}
 export interface DonationSubmission {
   campaign_id: number
   keys_text: string

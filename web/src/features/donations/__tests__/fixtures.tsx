@@ -40,11 +40,16 @@ import {
   useSystemConfigStore,
 } from '@/stores/system-config-store'
 
+import { DONATION_REVIEW_LIMIT_DEFAULTS } from '../lib/schema'
 import type {
   DonationBatchDetail,
   DonationCampaign,
   DonationConnection,
+  DonationGroup,
+  DonationItem,
+  DonationReviewContext,
   DonationSession,
+  DonationTestResult,
   ManagedCampaign,
 } from '../types'
 
@@ -74,6 +79,20 @@ export const admin: AuthBundle = {
   ...alice,
   user: { ...alice.user, role: 100 },
 }
+/** Admin who may only read donation records; the review and test actions are not granted. */
+export const readOnlyRecordsAdmin: AuthBundle = {
+  ...alice,
+  user: {
+    ...alice.user,
+    role: 10,
+    permissions: {
+      admin_permissions: {
+        donation_records: { read: true },
+        donation_config: { read: true, write: true },
+      },
+    },
+  },
+}
 export const aliceSession: DonationSession = {
   userId: 1,
   sid: 'alice-session',
@@ -87,6 +106,7 @@ export const campaign: DonationCampaign = {
   enabled: true,
   available: true,
   unavailable_reason: '',
+  validation_mode: 'auto',
 }
 export const connection: DonationConnection = {
   base_url: 'https://donation.example',
@@ -103,10 +123,11 @@ export const managedCampaign: ManagedCampaign = {
   group_id: 7,
   group_name: 'Gemini community',
   target_revision: 'revision',
+  validation_mode: 'auto',
   created_at_ms: 1000,
   updated_at_ms: 1000,
 }
-export const group = {
+export const group: DonationGroup = {
   id: 7,
   name: 'Gemini community',
   channel_id: 'gemini',
@@ -115,6 +136,9 @@ export const group = {
   can_probe: true,
   target_revision: 'revision',
   unavailable_reason: '',
+  can_manual_review: true,
+  manual_target_revision: 'manual-revision',
+  manual_unavailable_reason: '',
 }
 const originalMatchMedia = window.matchMedia.bind(window)
 
@@ -216,6 +240,129 @@ export function unconfirmedBatchFixture(): DonationBatchDetail {
       rewarded: 0,
       rewarded_quota: 0,
     },
+  }
+}
+
+const MANUAL_TARGET_REVISION = 'a'.repeat(64)
+
+export function pendingReviewItem(
+  overrides: Partial<DonationItem> = {}
+): DonationItem {
+  const base = batchFixture().items[0]
+  if (!base) throw new Error('Expected fixture item')
+  return {
+    ...base,
+    state: 'pending_review',
+    reason_code: '',
+    retryable: false,
+    credential_id: null,
+    accepted_at_ms: null,
+    reward_state: 'none',
+    rewarded_quota: 0,
+    rewarded_at_ms: null,
+    effective_mode: 'manual_review',
+    item_revision: 3,
+    review_target_revision: MANUAL_TARGET_REVISION,
+    review_state: 'pending_review',
+    review_action_id: '',
+    review_note: '',
+    reviewed_at_ms: null,
+    staging_expires_at_ms: Date.now() + 6 * 24 * 60 * 60 * 1000,
+    ...overrides,
+  }
+}
+
+export function batchWithItems(items: DonationItem[]): DonationBatchDetail {
+  const base = batchFixture()
+  return {
+    ...base,
+    items,
+    summary: {
+      ...base.summary,
+      total: items.length,
+      accepted: items.filter((item) => item.state === 'accepted').length,
+      pending_review: items.filter((item) => item.state === 'pending_review')
+        .length,
+    },
+  }
+}
+
+export function reviewContextFixture(
+  overrides: Partial<DonationReviewContext> = {}
+): DonationReviewContext {
+  return {
+    batch_id: batchFixture().id,
+    item_id: pendingReviewItem().id,
+    group_id: group.id,
+    state: 'pending_review',
+    effective_mode: 'manual_review',
+    item_revision: 3,
+    review_target_revision: MANUAL_TARGET_REVISION,
+    expires_at_ms: Date.now() + 6 * 24 * 60 * 60 * 1000,
+    can_review: true,
+    can_reject: true,
+    can_test: true,
+    review_action: 'approve',
+    unavailable_reason: '',
+    test_models: ['z-ai/glm-5.3-flash'],
+    review_limits: DONATION_REVIEW_LIMIT_DEFAULTS,
+    ...overrides,
+  }
+}
+
+export function streamingTestBody(): string {
+  return [
+    'event: meta',
+    `data: ${JSON.stringify({
+      test_id: 'test-uuid',
+      batch_id: batchFixture().id,
+      item_id: pendingReviewItem().id,
+      model: 'z-ai/glm-5.3-flash',
+      start_revision: 3,
+      target_revision: MANUAL_TARGET_REVISION,
+      started_at_ms: 1789400000000,
+    })}`,
+    '',
+    'event: delta',
+    `data: ${JSON.stringify({ text: 'Hello' })}`,
+    '',
+    'event: delta',
+    `data: ${JSON.stringify({ text: ' from the donation key' })}`,
+    '',
+    'event: done',
+    `data: ${JSON.stringify({
+      state: 'succeeded',
+      reason_code: '',
+      status_code: 200,
+      finished_at_ms: 1789400001000,
+      output_bytes: 25,
+      usage: { input_tokens: 4, output_tokens: 6 },
+    })}`,
+    '',
+    '',
+  ].join('\n')
+}
+
+export function successfulTestResult(
+  overrides: Partial<DonationTestResult> = {}
+): DonationTestResult {
+  return {
+    test_id: 'test-uuid',
+    batch_id: batchFixture().id,
+    item_id: pendingReviewItem().id,
+    model: 'z-ai/glm-5.3-flash',
+    stream: false,
+    state: 'succeeded',
+    reason_code: '',
+    status_code: 200,
+    start_revision: 3,
+    target_revision: MANUAL_TARGET_REVISION,
+    started_at_ms: 1789400000000,
+    finished_at_ms: 1789400001000,
+    output_bytes: 25,
+    usage: { input_tokens: 4, output_tokens: 6 },
+    text: 'Hello from the donation key',
+    ...overrides,
   }
 }
 

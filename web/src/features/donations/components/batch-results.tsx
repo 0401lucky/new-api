@@ -183,6 +183,16 @@ export function DonationBatchResults(props: {
             </AlertDescription>
           </Alert>
         )}
+        {(batch.summary.pending_review ?? 0) > 0 && (
+          <Alert>
+            <AlertDescription>
+              {t(
+                '{{count}} keys are waiting for manual review. Rewards are credited only after an administrator approves the keys and they are received.',
+                { count: batch.summary.pending_review }
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
         {batch.last_error && (
           <p className='text-muted-foreground text-sm'>
             {reasonLabel(batch.last_error, t)}

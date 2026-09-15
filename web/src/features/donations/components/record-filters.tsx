@@ -154,6 +154,8 @@ export function DonationRecordFilterBar(props: {
                   options={[
                     { value: 'all', label: t('All results') },
                     ...[
+                      'pending_review',
+                      'rejected',
                       'unconfirmed',
                       'queued',
                       'validating',

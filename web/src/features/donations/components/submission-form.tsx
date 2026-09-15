@@ -173,6 +173,13 @@ export function DonationSubmissionForm(props: {
                       {selected?.description && (
                         <span className='block'>{selected.description}</span>
                       )}
+                      {selected?.validation_mode === 'manual_review' && (
+                        <span className='block'>
+                          {t(
+                            'An administrator reviews each key manually. The reward is credited only after the review passes and the key is received.'
+                          )}
+                        </span>
+                      )}
                       {reward !== undefined && (
                         <span className='block'>
                           {t('Permanent reward per key: {{quota}}', {

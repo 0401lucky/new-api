@@ -36,11 +36,18 @@ import type {
   DonationCampaign,
   DonationConnection,
   DonationGroup,
+  DonationItem,
   DonationPage,
   DonationRecord,
   DonationRecordFilters,
+  DonationReviewAction,
+  DonationReviewContext,
+  DonationReviewIntent,
   DonationSession,
   DonationSubmission,
+  DonationTestIntent,
+  DonationTestMetadata,
+  DonationTestResult,
   ManagedCampaign,
 } from './types'
 
@@ -292,15 +299,99 @@ export const donationApi = {
       {},
       signal
     ),
+  reviewContext: (session: DonationSession, id: string, signal?: AbortSignal) =>
+    donationRequest<DonationReviewContext>(
+      session,
+      `/admin/records/${encodeURIComponent(id)}/review-context`,
+      {},
+      signal
+    ),
+  createReviewAction: (
+    session: DonationSession,
+    id: string,
+    actionId: string,
+    intent: DonationReviewIntent,
+    signal?: AbortSignal
+  ) =>
+    donationRequest<DonationReviewAction>(
+      session,
+      `/admin/records/${encodeURIComponent(id)}/review-actions`,
+      {
+        method: 'POST',
+        data: intent,
+        headers: { 'Idempotency-Key': actionId },
+      },
+      signal
+    ),
+  reviewAction: (
+    session: DonationSession,
+    id: string,
+    actionId: string,
+    signal?: AbortSignal
+  ) =>
+    donationRequest<DonationReviewAction>(
+      session,
+      `/admin/records/${encodeURIComponent(id)}/review-actions/${encodeURIComponent(actionId)}`,
+      {},
+      signal
+    ),
+  runTest: (
+    session: DonationSession,
+    id: string,
+    testId: string,
+    intent: DonationTestIntent,
+    signal?: AbortSignal
+  ) =>
+    donationRequest<DonationTestResult>(
+      session,
+      `/admin/records/${encodeURIComponent(id)}/tests`,
+      {
+        method: 'POST',
+        data: intent,
+        headers: { 'Idempotency-Key': testId },
+      },
+      signal
+    ),
+  testMetadata: (
+    session: DonationSession,
+    id: string,
+    testId: string,
+    signal?: AbortSignal
+  ) =>
+    donationRequest<DonationTestMetadata>(
+      session,
+      `/admin/records/${encodeURIComponent(id)}/tests/${encodeURIComponent(testId)}`,
+      {},
+      signal
+    ),
 }
 
+/** A batch only needs fast polling while a key is still being validated or received.
+ * Waiting for a human decision is not automatic progress, so pending_review and
+ * rejected items must not keep the high-frequency poll alive. */
 export function donationBatchIsProcessing(batch: DonationBatchDetail): boolean {
+  if (batch.reception_state === 'unconfirmed') return true
+  return batch.items.some(donationItemIsProcessing)
+}
+
+/** A human waiting to review needs no polling. In-flight tests and durable
+ * decisions must still converge to their final record and reward status. */
+export function donationRecordIsProcessing(record: DonationRecord): boolean {
   return (
-    batch.reception_state === 'unconfirmed' ||
-    batch.summary.processing > 0 ||
-    batch.items.some(
-      (item) => item.state === 'accepted' && item.reward_state !== 'rewarded'
-    )
+    record.pending_review_action?.status === 'pending' ||
+    record.latest_test?.state === 'running' ||
+    donationItemIsProcessing(record.item)
+  )
+}
+
+function donationItemIsProcessing(item: DonationItem): boolean {
+  if (item.state === 'accepted') return item.reward_state !== 'rewarded'
+  return (
+    item.state !== 'pending_review' &&
+    item.state !== 'rejected' &&
+    item.state !== 'invalid' &&
+    item.state !== 'existing' &&
+    item.state !== 'duplicate'
   )
 }
 

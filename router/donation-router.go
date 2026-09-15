@@ -24,4 +24,9 @@ func setDonationRoutes(api *gin.RouterGroup) {
 	admin.PATCH("/campaigns/:id", middleware.RequirePermission(authz.DonationConfigWrite), controller.SaveDonationCampaign)
 	admin.GET("/records", middleware.RequirePermission(authz.DonationRecordsRead), controller.GetDonationRecords)
 	admin.GET("/records/:item_id", middleware.RequirePermission(authz.DonationRecordsRead), controller.GetDonationRecord)
+	admin.GET("/records/:item_id/review-context", middleware.RequirePermission(authz.DonationRecordsRead), controller.GetDonationReviewContext)
+	admin.POST("/records/:item_id/review-actions", middleware.RequirePermission(authz.DonationRecordsRead), middleware.RequirePermission(authz.DonationRecordsReview), controller.PostDonationReviewAction)
+	admin.GET("/records/:item_id/review-actions/:action_id", middleware.RequirePermission(authz.DonationRecordsRead), controller.GetDonationReviewAction)
+	admin.POST("/records/:item_id/tests", middleware.RequirePermission(authz.DonationRecordsRead), middleware.RequirePermission(authz.DonationRecordsTest), controller.PostDonationTest)
+	admin.GET("/records/:item_id/tests/:test_id", middleware.RequirePermission(authz.DonationRecordsRead), controller.GetDonationTest)
 }

@@ -20,6 +20,8 @@ import { z } from 'zod'
 
 import { parseQuotaFromDollars, quotaUnitsToDollars } from '@/lib/format'
 
+import type { DonationReviewLimits } from '../types'
+
 export const donationSubmissionSchema = z.object({
   campaign_id: z.number().int().positive('Choose a donation campaign.'),
   keys_text: z
@@ -83,8 +85,104 @@ export const donationCampaignSchema = (originalQuota?: number) =>
       )
     }, 'Enter a positive reward within the supported quota range.'),
     enabled: z.boolean(),
+    manual_review: z.boolean(),
   })
 
 export type DonationCampaignValues = z.infer<
   ReturnType<typeof donationCampaignSchema>
 >
+
+/** First-version review limits, used until the receiver reports its own. */
+export const DONATION_REVIEW_LIMIT_DEFAULTS: DonationReviewLimits = {
+  max_prompt_bytes: 16384,
+  max_request_bytes: 65536,
+  default_output_tokens: 1024,
+  max_output_tokens: 4096,
+  max_response_bytes: 131072,
+  max_event_bytes: 65536,
+  total_timeout_seconds: 120,
+  first_byte_timeout_seconds: 30,
+  idle_timeout_seconds: 20,
+  max_note_bytes: 2048,
+}
+
+function utf8Bytes(value: string): number {
+  return new TextEncoder().encode(value).length
+}
+
+export function donationReviewNoteSchema(maxBytes: number) {
+  return z
+    .string()
+    .refine(
+      (value) => utf8Bytes(value) <= maxBytes,
+      'Please shorten this note.'
+    )
+}
+
+export function donationTestSchema(limits: DonationReviewLimits) {
+  return z
+    .object({
+      model: z.string().min(1, 'Choose a text model.'),
+      prompt: z
+        .string()
+        .refine((value) => value.trim() !== '', 'Enter a prompt for the test.'),
+      system_prompt: z.string(),
+      max_output_tokens: z
+        .number()
+        .int()
+        .min(1, 'Enter at least one output token.')
+        .max(
+          limits.max_output_tokens,
+          'This exceeds the supported output token limit.'
+        ),
+      stream: z.boolean(),
+    })
+    .refine(
+      (value) =>
+        utf8Bytes(value.prompt) + utf8Bytes(value.system_prompt) <=
+        limits.max_prompt_bytes,
+      {
+        path: ['prompt'],
+        message: 'Please shorten the prompt or the system prompt.',
+      }
+    )
+}
+
+export type DonationTestValues = z.infer<ReturnType<typeof donationTestSchema>>
+
+const testUsageSchema = z.object({
+  input_tokens: z.number().int().nonnegative().optional(),
+  output_tokens: z.number().int().nonnegative().optional(),
+})
+
+export const donationTestMetaSchema = z.object({
+  test_id: z.uuid(),
+  batch_id: z.uuid(),
+  item_id: z.uuid(),
+  model: z.string().min(1),
+  start_revision: z.number().int().nonnegative(),
+  target_revision: z.string().regex(/^[a-f0-9]{64}$/),
+  started_at_ms: z.number().int().nonnegative(),
+})
+
+export const donationTestDoneSchema = z.object({
+  state: z.enum(['succeeded', 'failed', 'cancelled', 'interrupted']),
+  reason_code: z.string().max(256),
+  status_code: z.number().int().min(0).max(599),
+  finished_at_ms: z.number().int().nonnegative(),
+  output_bytes: z.number().int().nonnegative(),
+  usage: testUsageSchema.optional(),
+})
+
+export const donationTestResultSchema = donationTestMetaSchema.extend({
+  stream: z.boolean(),
+  state: z.enum(['running', 'succeeded', 'failed', 'cancelled', 'interrupted']),
+  reason_code: z.string().max(256),
+  status_code: z.number().int().min(0).max(599),
+  finished_at_ms: z.number().int().nonnegative().nullable(),
+  output_bytes: z.number().int().nonnegative(),
+  usage: testUsageSchema.optional(),
+  input_tokens: z.number().int().nonnegative().optional(),
+  output_tokens: z.number().int().nonnegative().optional(),
+  text: z.string().optional(),
+})

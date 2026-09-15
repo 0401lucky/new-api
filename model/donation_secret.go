@@ -46,7 +46,7 @@ func OpenDonationStore(db *gorm.DB) (*DonationStore, error) {
 	var saved DonationSecret
 	err := quiet.Where("slot = ?", "v1").First(&saved).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		for _, table := range []any{&DonationConnection{}, &DonationCampaign{}, &DonationCampaignRevision{}, &DonationBatch{}, &DonationItem{}, &DonationResource{}, &DonationReward{}, &DonationRetry{}, &DonationEvent{}} {
+		for _, table := range []any{&DonationConnection{}, &DonationCampaign{}, &DonationCampaignRevision{}, &DonationBatch{}, &DonationItem{}, &DonationResource{}, &DonationReward{}, &DonationRetry{}, &DonationEvent{}, &DonationReviewAction{}, &DonationTestAttempt{}} {
 			var count int64
 			if err := quiet.Model(table).Count(&count).Error; err != nil || count != 0 {
 				return nil, ErrDonationSecret

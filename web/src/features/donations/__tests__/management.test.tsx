@@ -54,6 +54,7 @@ it('rejects a campaign description beyond the backend UTF-8 byte boundary', () =
     group_id: 7,
     reward_amount: '1',
     enabled: true,
+    manual_review: false,
   })
   expect(result.success).toBe(false)
 })
@@ -79,7 +80,9 @@ it('keeps management pages inaccessible to a normal account without loading admi
   )
   api.defaults.adapter = send
   const view = await renderDonation(<DonationSettings />)
-  expect(await screen.findByText('Access Forbidden')).toBeVisible()
+  await waitFor(() =>
+    expect(screen.getByText('Access Forbidden')).toBeVisible()
+  )
   expect(
     screen.queryByLabelText('Integration credential')
   ).not.toBeInTheDocument()
@@ -90,7 +93,9 @@ it('keeps management pages inaccessible to a normal account without loading admi
   view.unmount()
   view.client.clear()
   const records = await renderDonation(<DonationRecords />)
-  expect(await screen.findByText('Access Forbidden')).toBeVisible()
+  await waitFor(() =>
+    expect(screen.getByText('Access Forbidden')).toBeVisible()
+  )
   expect(send).not.toHaveBeenCalled()
   records.unmount()
   records.client.clear()
@@ -219,6 +224,159 @@ it('preserves the original exact integer reward when an existing campaign is ren
   })
   expect(payload).not.toHaveProperty('platform')
   expect(payload).not.toHaveProperty('expires_at')
+  view.unmount()
+  view.client.clear()
+})
+
+it('persists manual review mode and states when the reward is credited', async () => {
+  const manual = {
+    ...managedCampaign,
+    validation_mode: 'manual_review' as const,
+  }
+  let write: InternalAxiosRequestConfig | undefined
+  const closed = vi.fn()
+  api.defaults.adapter = async (config) => {
+    if (config.method === 'patch') {
+      write = config
+      return response(config, manual)
+    }
+    return response(config, [
+      { ...group, can_probe: false, unavailable_reason: 'probe_unavailable' },
+    ])
+  }
+  const view = await renderDonation(
+    <DonationCampaignForm
+      session={aliceSession}
+      campaign={manual}
+      onClose={closed}
+    />
+  )
+  const mode = screen.getByRole('switch', {
+    name: 'Skip model testing and review manually',
+  })
+  expect(mode).toBeChecked()
+  expect(
+    screen.getByText(
+      'Keys stay in temporary storage until an administrator reviews them. The reward is credited only after the review passes and the key is received.'
+    )
+  ).toBeVisible()
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+  await waitFor(() => expect(closed).toHaveBeenCalledOnce())
+  expect(JSON.parse(String(write?.data))).toMatchObject({
+    validation_mode: 'manual_review',
+    group_id: manual.group_id,
+    reward_quota: manual.reward_quota,
+  })
+  view.unmount()
+  view.client.clear()
+})
+
+it('does not use the offline close exception to change an existing manual campaign to automatic mode', async () => {
+  let offline = false
+  api.defaults.adapter = async (config) => {
+    if (offline) {
+      throw new AxiosError('offline', 'ERR_NETWORK', config)
+    }
+    return response(config, [group])
+  }
+  const view = await renderDonation(
+    <DonationCampaignForm
+      session={aliceSession}
+      campaign={{ ...managedCampaign, validation_mode: 'manual_review' }}
+      onClose={() => {}}
+    />
+  )
+  const user = userEvent.setup()
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  )
+  offline = true
+  await user.click(screen.getByRole('button', { name: 'Refresh groups' }))
+  await screen.findByText('Unable to load groups')
+  await user.click(screen.getByRole('switch', { name: 'Accept donations' }))
+  expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  await user.click(
+    screen.getByRole('switch', {
+      name: 'Skip model testing and review manually',
+    })
+  )
+  expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  view.unmount()
+  view.client.clear()
+})
+
+it('blocks manual review when the connected gpt-load does not advertise the capability', async () => {
+  api.defaults.adapter = async (config) =>
+    response(config, [
+      {
+        ...group,
+        can_manual_review: undefined,
+        manual_target_revision: undefined,
+        manual_unavailable_reason: undefined,
+      },
+    ])
+  const view = await renderDonation(
+    <DonationCampaignForm
+      session={aliceSession}
+      campaign={null}
+      onClose={() => {}}
+    />
+  )
+  const mode = await screen.findByRole('switch', {
+    name: 'Skip model testing and review manually',
+  })
+  expect(mode).toHaveAttribute('aria-disabled', 'true')
+  expect(
+    await screen.findByText(
+      'Manual review is unavailable: the connected gpt-load does not support it, or no group qualifies for it.'
+    )
+  ).toBeVisible()
+  view.unmount()
+  view.client.clear()
+})
+
+it('refuses to save an existing manual campaign against a receiver without the capability', async () => {
+  const manual = {
+    ...managedCampaign,
+    validation_mode: 'manual_review' as const,
+  }
+  const writes: InternalAxiosRequestConfig[] = []
+  api.defaults.adapter = async (config) => {
+    if (config.method === 'patch') {
+      writes.push(config)
+      return response(config, manual)
+    }
+    return response(config, [
+      {
+        ...group,
+        can_manual_review: undefined,
+        manual_target_revision: undefined,
+        manual_unavailable_reason: undefined,
+      },
+    ])
+  }
+  const view = await renderDonation(
+    <DonationCampaignForm
+      session={aliceSession}
+      campaign={manual}
+      onClose={() => {}}
+    />
+  )
+  expect(
+    screen.getByRole('switch', {
+      name: 'Skip model testing and review manually',
+    })
+  ).toBeChecked()
+  expect(
+    await screen.findByText(
+      'This campaign uses manual review, but no group currently qualifies for it. Upgrade gpt-load or choose another mode before saving.'
+    )
+  ).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  expect(writes).toHaveLength(0)
   view.unmount()
   view.client.clear()
 })

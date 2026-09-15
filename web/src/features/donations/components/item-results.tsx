@@ -22,7 +22,12 @@ import { useTranslation } from 'react-i18next'
 
 import { DataTablePage, useDataTable } from '@/components/data-table'
 import { StatusBadge } from '@/components/status-badge'
-import { formatQuota } from '@/lib/format'
+import { toIntlLocale } from '@/i18n/languages'
+import {
+  formatQuota,
+  formatTimestampRelative,
+  formatTimestampToDate,
+} from '@/lib/format'
 import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import {
@@ -60,19 +65,47 @@ export function DonationRewardStatus(props: { item: DonationItem }) {
 }
 
 export function DonationIntakeStatus(props: { item: DonationItem }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const awaitingReview = props.item.state === 'pending_review'
+  const expired = props.item.reason_code === 'staging_expired'
   return (
     <div className='flex flex-col items-start gap-1'>
       <StatusBadge
-        label={intakeLabel(props.item.state, t)}
-        variant={intakeVariant(props.item.state)}
+        label={
+          expired
+            ? t('Temporary storage expired')
+            : intakeLabel(props.item.state, t)
+        }
+        variant={expired ? 'warning' : intakeVariant(props.item.state)}
         copyable={false}
       />
-      {props.item.reason_code && (
+      {props.item.reason_code &&
+        props.item.reason_code !== 'review_rejected' && (
+          <span className='text-muted-foreground text-xs'>
+            {reasonLabel(props.item.reason_code, t)}
+          </span>
+        )}
+      {props.item.review_note && (
         <span className='text-muted-foreground text-xs'>
-          {reasonLabel(props.item.reason_code, t)}
+          {props.item.review_note}
         </span>
       )}
+      {awaitingReview && props.item.staging_expires_at_ms ? (
+        <span className='text-muted-foreground text-xs'>
+          {t('Temporary storage expires')}{' '}
+          {formatTimestampToDate(
+            props.item.staging_expires_at_ms,
+            'milliseconds'
+          )}{' '}
+          (
+          {formatTimestampRelative(
+            props.item.staging_expires_at_ms,
+            'milliseconds',
+            toIntlLocale(i18n.language)
+          )}
+          )
+        </span>
+      ) : null}
     </div>
   )
 }

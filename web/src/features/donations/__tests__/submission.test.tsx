@@ -31,14 +31,17 @@ import zh from '@/i18n/locales/zh.json'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
+import { donationBatchIsProcessing } from '../api'
 import { Donations } from '../index'
 import type { DonationBatchDetail } from '../types'
 import {
   batchFixture,
+  batchWithItems,
   bob,
   campaign,
   deferredDonationResponse,
   initializeDonationSession,
+  pendingReviewItem,
   renderDonation,
   response,
   unconfirmedBatchFixture,
@@ -427,6 +430,148 @@ it('clears the old account input immediately and discards its late submission re
   ).not.toBeInTheDocument()
   expect(screen.queryByText('Reward credited')).not.toBeInTheDocument()
   expect(useAuthStore.getState().auth.user?.id).toBe(bob.user.id)
+  view.unmount()
+  view.client.clear()
+})
+
+it('separates keys awaiting manual review from keys still handled automatically', async () => {
+  const reviewing = pendingReviewItem()
+  const validating = {
+    ...pendingReviewItem({
+      id: '77777777-7777-4777-8777-777777777777',
+      line: 2,
+    }),
+    state: 'validating' as const,
+    effective_mode: 'auto' as const,
+    staging_expires_at_ms: null,
+  }
+  const rejected = {
+    ...pendingReviewItem({
+      id: '88888888-8888-4888-8888-888888888888',
+      line: 3,
+    }),
+    state: 'rejected' as const,
+    reason_code: 'review_rejected',
+    review_state: 'rejected' as const,
+    review_note: 'The key stopped working before the review.',
+  }
+  const batch = batchWithItems([reviewing, validating, rejected])
+  batch.summary.processing = 1
+  submissionNetwork({
+    current: () => batch,
+    post: (config) => response(config, batch),
+  })
+  const view = await renderDonation(<Donations />)
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: 'View results' }))
+  const result = await screen.findByRole('region', {
+    name: 'Submission results',
+  })
+  expect(within(result).getByText('Pending review')).toBeVisible()
+  expect(within(result).getByText('Validating')).toBeVisible()
+  expect(within(result).getByText('Review rejected')).toBeVisible()
+  expect(within(result).getByText(/Temporary storage expires/)).toBeVisible()
+  expect(
+    within(result).getByText('The key stopped working before the review.')
+  ).toBeVisible()
+  expect(
+    within(result).queryByText(
+      'Processing is temporarily unavailable. Refresh or retry later.'
+    )
+  ).not.toBeInTheDocument()
+  expect(
+    within(result).getByText(
+      '1 keys are waiting for manual review. Rewards are credited only after an administrator approves the keys and they are received.'
+    )
+  ).toBeVisible()
+  expect(
+    within(result).queryByRole('button', { name: 'Approve' })
+  ).not.toBeInTheDocument()
+  expect(
+    within(result).queryByRole('button', { name: 'Reject' })
+  ).not.toBeInTheDocument()
+  expect(
+    within(result).queryByRole('button', { name: 'Run test' })
+  ).not.toBeInTheDocument()
+  view.unmount()
+  view.client.clear()
+})
+
+it('only keeps fast polling alive while keys are still handled automatically', () => {
+  expect(donationBatchIsProcessing(batchWithItems([pendingReviewItem()]))).toBe(
+    false
+  )
+  expect(
+    donationBatchIsProcessing(
+      batchWithItems([pendingReviewItem({ state: 'rejected' })])
+    )
+  ).toBe(false)
+  expect(
+    donationBatchIsProcessing(
+      batchWithItems([pendingReviewItem({ state: 'validating' })])
+    )
+  ).toBe(true)
+  expect(
+    donationBatchIsProcessing(
+      batchWithItems([
+        pendingReviewItem(),
+        pendingReviewItem({ state: 'accepted', reward_state: 'pending' }),
+      ])
+    )
+  ).toBe(true)
+  expect(
+    donationBatchIsProcessing(
+      batchWithItems([
+        pendingReviewItem({ state: 'rejected', effective_mode: 'auto' }),
+      ])
+    )
+  ).toBe(false)
+})
+
+it('describes expired temporary storage without labeling the donated key invalid', async () => {
+  const expired = pendingReviewItem({
+    state: 'invalid',
+    reason_code: 'staging_expired',
+    review_state: 'expired',
+  })
+  const batch = batchWithItems([expired])
+  submissionNetwork({
+    current: () => batch,
+    post: (config) => response(config, batch),
+  })
+  const view = await renderDonation(<Donations />)
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: 'View results' }))
+  const result = await screen.findByRole('region', {
+    name: 'Submission results',
+  })
+  expect(within(result).getByText('Temporary storage expired')).toBeVisible()
+  expect(within(result).queryByText('Invalid')).not.toBeInTheDocument()
+  view.unmount()
+  view.client.clear()
+})
+
+it('warns the donor that a manual campaign is reviewed before the reward is credited', async () => {
+  api.defaults.adapter = async (config) => {
+    const url = config.url ?? ''
+    if (url === '/api/donations/campaigns') {
+      return response(config, [
+        { ...campaign, validation_mode: 'manual_review' },
+      ])
+    }
+    if (url === '/api/donations/batches') {
+      return response(config, { page: 1, page_size: 10, total: 0, items: [] })
+    }
+    throw new Error(`Unexpected test endpoint: ${url}`)
+  }
+  const view = await renderDonation(<Donations />)
+  const user = userEvent.setup()
+  await chooseCampaign(user)
+  expect(
+    await screen.findByText(
+      'An administrator reviews each key manually. The reward is credited only after the review passes and the key is received.'
+    )
+  ).toBeVisible()
   view.unmount()
   view.client.clear()
 })

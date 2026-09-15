@@ -16,7 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { CopyButton } from '@/components/copy-button'
@@ -29,12 +30,20 @@ import { ErrorState } from '@/components/error-state'
 import { LoadingState } from '@/components/loading-state'
 import { StatusBadge } from '@/components/status-badge'
 import { formatQuota, formatTimestampToDate } from '@/lib/format'
+import { useAuthStore } from '@/stores/auth-store'
 import { useSystemConfigStore } from '@/stores/system-config-store'
 
-import { donationApi, donationQueryKey } from '../api'
+import {
+  donationApi,
+  donationQueryKey,
+  donationRecordIsProcessing,
+} from '../api'
+import { donationPermissions } from '../lib/access'
 import { intakeLabel, intakeVariant, reasonLabel } from '../lib/labels'
 import type { DonationRecord, DonationSession } from '../types'
 import { DonationIntakeStatus, DonationRewardStatus } from './item-results'
+import { DonationRecordHistory } from './record-history'
+import { DonationRecordReview } from './record-review'
 
 type Event = NonNullable<DonationRecord['events']>[number]
 
@@ -45,14 +54,32 @@ export function DonationRecordDetail(props: {
 }) {
   const { t } = useTranslation()
   useSystemConfigStore((state) => state.config.currency)
+  const user = useAuthStore((state) => state.auth.user)
+  const permissions = donationPermissions(user)
+  const queryClient = useQueryClient()
   const query = useQuery({
     queryKey: donationQueryKey(props.session, 'record', props.itemId),
     queryFn: ({ signal }) =>
       donationApi.record(props.session, props.itemId, signal),
+    refetchInterval: (query) =>
+      query.state.data && donationRecordIsProcessing(query.state.data)
+        ? 5000
+        : false,
     retry: false,
     gcTime: 0,
     meta: { errorToast: false },
   })
+  const onChanged = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: donationQueryKey(props.session, 'record', props.itemId),
+    })
+    void queryClient.invalidateQueries({
+      queryKey: donationQueryKey(props.session, 'records'),
+    })
+    void queryClient.invalidateQueries({
+      queryKey: donationQueryKey(props.session, 'batches'),
+    })
+  }, [queryClient, props.session, props.itemId])
   const columns: StaticDataTableColumn<Event>[] = [
     {
       id: 'time',
@@ -200,6 +227,14 @@ export function DonationRecordDetail(props: {
               </div>
             )}
           </dl>
+          <DonationRecordReview
+            session={props.session}
+            record={record}
+            canReview={permissions.recordsReview}
+            canTest={permissions.recordsTest}
+            onChanged={onChanged}
+          />
+          <DonationRecordHistory record={record} />
           <section
             aria-label={t('Processing history')}
             className='flex flex-col gap-2'

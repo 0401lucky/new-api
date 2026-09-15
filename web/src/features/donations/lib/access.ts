@@ -48,5 +48,19 @@ export function donationPermissions(user: AuthUser | null) {
         ADMIN_PERMISSION_RESOURCES.DONATION_RECORDS,
         ADMIN_PERMISSION_ACTIONS.READ
       ),
+    recordsReview:
+      admin &&
+      hasPermission(
+        user,
+        ADMIN_PERMISSION_RESOURCES.DONATION_RECORDS,
+        ADMIN_PERMISSION_ACTIONS.REVIEW
+      ),
+    recordsTest:
+      admin &&
+      hasPermission(
+        user,
+        ADMIN_PERMISSION_RESOURCES.DONATION_RECORDS,
+        ADMIN_PERMISSION_ACTIONS.TEST
+      ),
   }
 }

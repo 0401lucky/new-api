@@ -453,6 +453,225 @@ func TestDonationIntegrationRealServices(t *testing.T) {
 	assert.Empty(t, f.upstream.problems(), "Gemini validation must use the expected generation endpoint and submitted credential")
 }
 
+func TestDonationManualReviewIntegrationRealServices(t *testing.T) {
+	f := newDonationIntegrationFixture(t)
+	const reward = int64(41)
+	const goodKey = "synthetic-manual-review-good"
+	const rejectedKey = "synthetic-manual-review-reject"
+	const legacyKey = "synthetic-manual-review-legacy"
+	const slowKey = "synthetic-manual-review-cancel"
+	const inventoryKey = "synthetic-manual-review-inventory"
+	f.secrets = append(f.secrets, goodKey, rejectedKey, legacyKey, slowKey, inventoryKey)
+	gate := newDonationProbeGate()
+	f.upstream.configure(inventoryKey, http.StatusOK, nil)
+	f.upstream.configureChat(goodKey, http.StatusOK, nil)
+	f.upstream.configureChat(rejectedKey, http.StatusUnauthorized, nil)
+	f.upstream.configureChat(legacyKey, http.StatusOK, nil)
+	f.upstream.configureChat(slowKey, http.StatusOK, gate)
+	f.start(t)
+	f.api(t, "", http.MethodPost, "/api/setup", map[string]any{
+		"username": "manualroot", "password": f.password, "confirmPassword": f.password,
+		"SelfUseModeEnabled": false, "DemoSiteEnabled": false,
+	}, "", nil)
+	admin := f.login(t, "manualroot")
+	alice := f.register(t, "manualdonor")
+	reader := f.createDonationReader(t, admin, "manualreader")
+	initialWallet := f.wallet(t, alice)
+	initialAdminWallet := f.wallet(t, admin)
+	group := f.createGroup(t, "manual-review-gemini", inventoryKey)
+	f.api(t, admin.Token, http.MethodPut, "/api/donations/admin/connection", map[string]any{
+		"base_url": f.bridge.server.URL, "token": f.integrationToken,
+	}, "", nil)
+	var campaign donationIntegrationCampaign
+	f.api(t, admin.Token, http.MethodPost, "/api/donations/admin/campaigns", map[string]any{
+		"name": "Manual review fixture", "group_id": group, "reward_quota": reward,
+		"enabled": true, "validation_mode": "manual_review",
+	}, "", &campaign)
+	batch := f.submit(t, alice, campaign.ID, uuid.NewString(), goodKey+"\n"+rejectedKey+"\n"+slowKey+"\n"+inventoryKey)
+	batch = f.awaitBatch(t, alice, batch.ID, func(batch donationIntegrationBatch) bool {
+		return batch.Summary.PendingReview == 3 && batch.Summary.Duplicate == 1
+	})
+	require.Equal(t, "manual_review", batch.ValidationMode)
+	assert.Len(t, f.credentials(t, group).Items, 1, "pending donations must not enter the serving pool")
+	assert.Equal(t, initialWallet, f.wallet(t, alice))
+	assert.Zero(t, f.upstream.count(goodKey), "manual intake must not issue an automatic probe")
+	good := batch.itemAt(1)
+	contextView := f.reviewContext(t, admin, good.ID)
+	require.True(t, contextView.CanReview)
+	require.True(t, contextView.CanReject)
+	require.True(t, contextView.CanTest)
+	require.Equal(t, "manual_review", contextView.EffectiveMode)
+	require.Equal(t, "approve", contextView.ReviewAction)
+	f.record(t, reader, good.ID)
+	for _, actor := range []donationIntegrationActor{alice, reader} {
+		for _, suffix := range []string{"/review-actions", "/tests"} {
+			response := f.request(t, actor.Token, http.MethodPost,
+				f.newAPI.url+"/api/donations/admin/records/"+good.ID+suffix, map[string]any{}, uuid.NewString(), nil)
+			assert.Equal(t, http.StatusForbidden, response.status)
+		}
+	}
+	testPath := "/api/donations/admin/records/" + good.ID + "/tests"
+	testInput := map[string]any{
+		"expected_item_revision": contextView.ItemRevision, "review_target_revision": contextView.ReviewTargetRevision,
+		"model": "gemini-donation-test", "prompt": "Explain why this manual review request uses the submitted key.",
+		"system_prompt": "Answer briefly.", "max_output_tokens": 1024, "stream": false,
+	}
+	var result donationIntegrationTestResult
+	testID := uuid.NewString()
+	f.api(t, admin.Token, http.MethodPost, testPath, testInput, testID, &result)
+	require.Equal(t, "succeeded", result.State)
+	assert.Contains(t, result.Text, "manual reply")
+	assert.Equal(t, 1, f.upstream.count(goodKey))
+	assert.Equal(t, testInput["prompt"], f.upstream.chatPrompt(goodKey))
+	var metadata donationIntegrationTestResult
+	f.api(t, reader.Token, http.MethodGet, testPath+"/"+testID, nil, "", &metadata)
+	assert.Equal(t, "succeeded", metadata.State)
+	assert.Empty(t, metadata.Text, "metadata queries must not return saved conversation text")
+	f.api(t, admin.Token, http.MethodPost, testPath, testInput, testID, &metadata)
+	assert.Equal(t, 1, f.upstream.count(goodKey), "same test ID must not call the upstream again")
+	changedInput := make(map[string]any, len(testInput))
+	for name, value := range testInput {
+		changedInput[name] = value
+	}
+	changedInput["max_output_tokens"] = 2048
+	conflict := f.request(t, admin.Token, http.MethodPost, f.newAPI.url+testPath, changedInput, testID, nil)
+	assert.Equal(t, http.StatusConflict, conflict.status, "the same test ID must bind the token limit")
+
+	contextView = f.reviewContext(t, admin, good.ID)
+	testInput["expected_item_revision"] = contextView.ItemRevision
+	testInput["review_target_revision"] = contextView.ReviewTargetRevision
+	testInput["stream"] = true
+	streamID := uuid.NewString()
+	streamResult := f.streamTest(t, admin, good.ID, streamID, testInput)
+	require.Equal(t, "succeeded", streamResult.State, "%s", f.snapshot(streamResult))
+	assert.Contains(t, streamResult.Text, "manual reply")
+	assert.Equal(t, 2, f.upstream.count(goodKey))
+	f.api(t, admin.Token, http.MethodPost, testPath, testInput, streamID, &metadata)
+	assert.Equal(t, "succeeded", metadata.State)
+	assert.Empty(t, metadata.Text)
+	assert.Equal(t, 2, f.upstream.count(goodKey))
+	assert.Equal(t, initialWallet, f.wallet(t, alice), "tests must not reward or bill the donor")
+	assert.Equal(t, initialAdminWallet, f.wallet(t, admin), "tests must not debit the administrator")
+
+	contextView = f.reviewContext(t, admin, good.ID)
+	approveInput := map[string]any{
+		"kind": "approve", "expected_item_revision": contextView.ItemRevision,
+		"review_target_revision": contextView.ReviewTargetRevision, "note": "Verified with the submitted credential",
+	}
+	approveID := uuid.NewString()
+	actionPath := "/api/donations/admin/records/" + good.ID + "/review-actions"
+	var action donationIntegrationReviewAction
+	f.api(t, admin.Token, http.MethodPost, actionPath, approveInput, approveID, &action)
+	require.Equal(t, "applied", action.Status)
+	batch = f.awaitBatch(t, alice, batch.ID, func(batch donationIntegrationBatch) bool {
+		if batch.LastError == "invalid_receipt" {
+			receiver := f.request(t, f.integrationToken, http.MethodGet,
+				f.gptLoad.url+"/integrations/donations/v1/batches/"+batch.ID, nil, "", nil)
+			review := f.request(t, admin.Token, http.MethodGet,
+				f.newAPI.url+actionPath+"/"+approveID, nil, "", nil)
+			t.Fatalf("approved receipt rejected: receiver=%s action=%s", f.redact(string(receiver.envelope.Data)), f.redact(string(review.envelope.Data)))
+		}
+		return batch.itemAt(1).RewardState == "rewarded"
+	})
+	assert.Equal(t, initialWallet.Quota+reward, f.wallet(t, alice).Quota)
+	f.api(t, admin.Token, http.MethodPost, actionPath, approveInput, approveID, &action)
+	assert.Equal(t, initialWallet.Quota+reward, f.wallet(t, alice).Quota)
+
+	slow := batch.itemAt(3)
+	slowContext := f.reviewContext(t, admin, slow.ID)
+	cancelID := uuid.NewString()
+	cancelInput, err := common.Marshal(map[string]any{
+		"expected_item_revision": slowContext.ItemRevision, "review_target_revision": slowContext.ReviewTargetRevision,
+		"model": "gemini-donation-test", "prompt": "Cancel this pending request.", "max_output_tokens": 1024, "stream": false,
+	})
+	require.NoError(t, err)
+	callContext, cancelCall := context.WithCancel(t.Context())
+	t.Cleanup(cancelCall)
+	cancelDone := make(chan error, 1)
+	go func() {
+		_, callErr := f.exchange(callContext, admin.Token, http.MethodPost,
+			f.newAPI.url+"/api/donations/admin/records/"+slow.ID+"/tests", cancelInput, cancelID, nil)
+		cancelDone <- callErr
+	}()
+	f.awaitProbe(t, gate)
+	cancelCall()
+	select {
+	case callErr := <-cancelDone:
+		require.Error(t, callErr)
+	case <-time.After(5 * time.Second):
+		t.Fatal("cancelled test did not release the requesting client")
+	}
+	f.await(t, "cancelled manual test metadata", func() (bool, string) {
+		f.api(t, admin.Token, http.MethodGet, "/api/donations/admin/records/"+slow.ID+"/tests/"+cancelID, nil, "", &metadata)
+		return metadata.State != "running", f.snapshot(metadata)
+	})
+	assert.Contains(t, []string{"cancelled", "interrupted"}, metadata.State)
+	assert.Equal(t, 1, f.upstream.count(slowKey))
+
+	legacyCampaign := f.createCampaign(t, admin, group, reward, "Legacy probe fixture")
+	legacy := f.submit(t, alice, legacyCampaign.ID, uuid.NewString(), legacyKey)
+	legacy = f.awaitBatch(t, alice, legacy.ID, func(batch donationIntegrationBatch) bool {
+		return batch.itemAt(1).ReasonCode == "retry_exhausted"
+	})
+	legacyItem := legacy.itemAt(1)
+	legacyContext := f.reviewContext(t, admin, legacyItem.ID)
+	require.Equal(t, "auto", legacyContext.EffectiveMode, "review context must report the actual item mode")
+	require.Equal(t, "enter_review", legacyContext.ReviewAction)
+	require.False(t, legacyContext.CanTest)
+	legacyActionPath := "/api/donations/admin/records/" + legacyItem.ID + "/review-actions"
+	enterInput := map[string]any{"kind": "enter_review", "expected_item_revision": legacyContext.ItemRevision,
+		"review_target_revision": legacyContext.ReviewTargetRevision, "note": "Probe is incompatible"}
+	enterID := uuid.NewString()
+	f.api(t, admin.Token, http.MethodPost, legacyActionPath, enterInput, enterID, &action)
+	require.Equal(t, "applied", action.Status)
+	f.api(t, admin.Token, http.MethodPost, legacyActionPath, enterInput, enterID, &action)
+	legacy = f.awaitBatch(t, alice, legacy.ID, func(batch donationIntegrationBatch) bool {
+		return batch.itemAt(1).State == "pending_review"
+	})
+	assert.Equal(t, "auto", legacy.ValidationMode)
+	assert.Equal(t, "manual_review", legacy.itemAt(1).EffectiveMode)
+	assert.Equal(t, legacyContext.ExpiresAtMS, legacy.itemAt(1).StagingExpiresAtMS)
+	legacyContext = f.reviewContext(t, admin, legacyItem.ID)
+	legacyApproveID := uuid.NewString()
+	f.bridge.loseNextReviewResponse()
+	lost := f.request(t, admin.Token, http.MethodPost, f.newAPI.url+legacyActionPath,
+		map[string]any{"kind": "approve", "expected_item_revision": legacyContext.ItemRevision,
+			"review_target_revision": legacyContext.ReviewTargetRevision}, legacyApproveID, nil)
+	require.False(t, lost.envelope.Success, "the fixture must actually lose the command acknowledgement")
+	f.awaitRemoteAccepted(t, legacy.ID)
+	pending := f.record(t, admin, legacyItem.ID)
+	require.NotNil(t, pending.PendingReviewAction)
+	assert.Equal(t, legacyApproveID, pending.PendingReviewAction.ActionID)
+	assert.Equal(t, initialWallet.Quota+reward, f.wallet(t, alice).Quota)
+	f.newAPI.stop(t)
+	f.bridge.resumeBatchReads()
+	f.startProcess(t, f.newAPI, "/api/setup", "")
+	admin, alice = f.login(t, "manualroot"), f.login(t, "manualdonor")
+	legacy = f.awaitBatch(t, alice, legacy.ID, func(batch donationIntegrationBatch) bool {
+		return batch.itemAt(1).RewardState == "rewarded"
+	})
+	assert.Equal(t, initialWallet.Quota+2*reward, f.wallet(t, alice).Quota)
+	assert.Equal(t, reward, legacy.RewardQuota)
+	assert.Equal(t, 5, f.upstream.count(legacyKey), "manual approval must not start a sixth probe")
+
+	f.gpt(t, f.adminKey, http.MethodDelete, fmt.Sprintf("/api/groups/%d", group), nil, "", nil)
+	rejectItem := batch.itemAt(2)
+	rejectContext := f.reviewContext(t, admin, rejectItem.ID)
+	require.False(t, rejectContext.CanReview)
+	require.True(t, rejectContext.CanReject, "a removed target must not prevent rejection")
+	const rejectNote = "Unable to verify this donation; please check the credential."
+	f.api(t, admin.Token, http.MethodPost, "/api/donations/admin/records/"+rejectItem.ID+"/review-actions",
+		map[string]any{"kind": "reject", "expected_item_revision": rejectContext.ItemRevision, "note": rejectNote},
+		uuid.NewString(), &action)
+	require.Equal(t, "applied", action.Status)
+	batch = f.awaitBatch(t, alice, batch.ID, func(batch donationIntegrationBatch) bool {
+		return batch.itemAt(2).State == "rejected"
+	})
+	assert.Equal(t, rejectNote, batch.itemAt(2).ReviewNote)
+	assert.Equal(t, initialWallet.Quota+2*reward, f.wallet(t, alice).Quota)
+	assert.Empty(t, f.upstream.problems())
+}
+
 // This explicit opt-in fixture keeps the real services available for a browser.
 // Use a freshly built new-api binary containing the UI under review. Only a new
 // directory is accepted; its private metadata describes synthetic credentials
@@ -498,18 +717,26 @@ func TestDonationBrowserFixture(t *testing.T) {
 	const limitedKey = "synthetic-browser-limited-retry"
 	const inventoryKey = "synthetic-browser-existing-stock"
 	const seedKey = "synthetic-browser-empty-group-seed"
+	const manualKey = "synthetic-browser-manual-good"
+	const manualRejectKey = "synthetic-browser-manual-reject"
+	const manualStopKey = "synthetic-browser-manual-stop"
 	for _, key := range []string{desktopKey, mobileKey, otherUserKey, inventoryKey, seedKey} {
 		f.upstream.configure(key, http.StatusOK, nil)
 	}
 	f.upstream.configure(invalidKey, http.StatusUnauthorized, nil)
 	f.upstream.configure(limitedKey, http.StatusTooManyRequests, nil)
-	f.secrets = append(f.secrets, desktopKey, mobileKey, otherUserKey, invalidKey, limitedKey, inventoryKey, seedKey)
+	f.upstream.configureChat(manualKey, http.StatusOK, nil)
+	f.upstream.configureChat(manualRejectKey, http.StatusUnauthorized, nil)
+	f.upstream.configureChat(manualStopKey, http.StatusOK, newDonationProbeGate())
+	f.secrets = append(f.secrets, desktopKey, mobileKey, otherUserKey, invalidKey, limitedKey, inventoryKey, seedKey,
+		manualKey, manualRejectKey, manualStopKey)
 	f.start(t)
 	f.api(t, "", http.MethodPost, "/api/setup", map[string]any{
 		"username": "browserroot", "password": f.password, "confirmPassword": f.password,
 		"SelfUseModeEnabled": false, "DemoSiteEnabled": false,
 	}, "", nil)
 	admin := f.login(t, "browserroot")
+	reader := f.createDonationReader(t, admin, "browser_reader")
 	firstUser := f.register(t, "browser_one")
 	secondUser := f.register(t, "browser_two")
 	group := f.createGroup(t, "browser-gemini", inventoryKey)
@@ -532,6 +759,12 @@ func TestDonationBrowserFixture(t *testing.T) {
 	require.Equal(t, campaign.ID, available[0].ID)
 	require.True(t, available[0].Available)
 
+	var manualCampaign donationIntegrationCampaign
+	f.api(t, admin.Token, http.MethodPost, "/api/donations/admin/campaigns", map[string]any{
+		"name": "Manual review browser fixture", "group_id": group, "reward_quota": rewardQuota,
+		"validation_mode": "manual_review", "enabled": true,
+	}, "", &manualCampaign)
+
 	stopFile := filepath.Join(directory, "stop")
 	resolveLimitFile := filepath.Join(directory, "resolve-rate-limit")
 	metadataPath := filepath.Join(directory, "metadata.json")
@@ -542,9 +775,11 @@ func TestDonationBrowserFixture(t *testing.T) {
 			{"username": "browserroot", "password": f.password, "role": "root", "id": admin.ID},
 			{"username": "browser_one", "password": f.password, "role": "user", "id": firstUser.ID},
 			{"username": "browser_two", "password": f.password, "role": "user", "id": secondUser.ID},
+			{"username": "browser_reader", "password": f.password, "role": "read-only-admin", "id": reader.ID},
 		},
-		"campaign":       map[string]any{"id": campaign.ID, "name": campaignName, "reward_quota": rewardQuota, "group_id": group},
-		"empty_group_id": emptyGroup,
+		"campaign":        map[string]any{"id": campaign.ID, "name": campaignName, "reward_quota": rewardQuota, "group_id": group},
+		"manual_campaign": map[string]any{"id": manualCampaign.ID, "name": "Manual review browser fixture", "reward_quota": rewardQuota, "group_id": group},
+		"empty_group_id":  emptyGroup,
 		"gpt_load": map[string]any{
 			"base_url": f.gptLoad.url, "integration_base_url": f.bridge.server.URL,
 			"admin_key": f.adminKey, "integration_token": f.integrationToken,
@@ -553,6 +788,7 @@ func TestDonationBrowserFixture(t *testing.T) {
 			"valid_desktop": desktopKey, "valid_mobile": mobileKey, "valid_other_user": otherUserKey,
 			"invalid": invalidKey, "rate_limited": limitedKey, "inventory": inventoryKey,
 			"mixed_desktop_text": desktopKey + "\r\n" + invalidKey + "\n" + inventoryKey + "\r\n" + desktopKey + "\n" + limitedKey,
+			"manual_valid":       manualKey, "manual_reject": manualRejectKey, "manual_stop": manualStopKey,
 		},
 		"controls":  map[string]any{"stop_file": stopFile, "resolve_rate_limit_file": resolveLimitFile},
 		"processes": map[string]any{"runner_pid": os.Getpid(), "gpt_load_pid": f.gptLoad.command.Process.Pid, "new_api_pid": f.newAPI.command.Process.Pid},
@@ -628,18 +864,22 @@ type donationIntegrationCampaign struct {
 }
 
 type donationIntegrationItem struct {
-	ID            string  `json:"id"`
-	BatchID       string  `json:"batch_id"`
-	Line          int     `json:"line"`
-	KeyMask       string  `json:"key_mask"`
-	State         string  `json:"state"`
-	ReasonCode    string  `json:"reason_code"`
-	CredentialID  *uint64 `json:"credential_id"`
-	AcceptedAtMS  *int64  `json:"accepted_at_ms"`
-	RewardState   string  `json:"reward_state"`
-	RewardReason  string  `json:"reward_reason"`
-	RewardedQuota int64   `json:"rewarded_quota"`
-	RewardedAtMS  *int64  `json:"rewarded_at_ms"`
+	ID                 string  `json:"id"`
+	BatchID            string  `json:"batch_id"`
+	Line               int     `json:"line"`
+	KeyMask            string  `json:"key_mask"`
+	State              string  `json:"state"`
+	ReasonCode         string  `json:"reason_code"`
+	CredentialID       *uint64 `json:"credential_id"`
+	AcceptedAtMS       *int64  `json:"accepted_at_ms"`
+	RewardState        string  `json:"reward_state"`
+	RewardReason       string  `json:"reward_reason"`
+	RewardedQuota      int64   `json:"rewarded_quota"`
+	RewardedAtMS       *int64  `json:"rewarded_at_ms"`
+	EffectiveMode      string  `json:"effective_mode"`
+	ItemRevision       int64   `json:"item_revision"`
+	ReviewNote         string  `json:"review_note"`
+	StagingExpiresAtMS int64   `json:"staging_expires_at_ms"`
 }
 
 type donationIntegrationSummary struct {
@@ -650,6 +890,8 @@ type donationIntegrationSummary struct {
 	Processing    int   `json:"processing"`
 	Rewarded      int   `json:"rewarded"`
 	RewardedQuota int64 `json:"rewarded_quota"`
+	PendingReview int   `json:"pending_review"`
+	Rejected      int   `json:"rejected"`
 }
 
 type donationIntegrationBatch struct {
@@ -660,6 +902,8 @@ type donationIntegrationBatch struct {
 	GroupID         uint64                     `json:"group_id"`
 	RewardQuota     int64                      `json:"reward_quota"`
 	ReceptionState  string                     `json:"reception_state"`
+	ValidationMode  string                     `json:"validation_mode"`
+	LastError       string                     `json:"last_error"`
 	Items           []donationIntegrationItem  `json:"items"`
 	Summary         donationIntegrationSummary `json:"summary"`
 }
@@ -690,15 +934,42 @@ func (batch donationIntegrationBatch) lines() []int {
 }
 
 type donationIntegrationRecord struct {
-	Item   donationIntegrationItem  `json:"item"`
-	Batch  donationIntegrationBatch `json:"batch"`
-	Reward *struct {
+	Item                donationIntegrationItem          `json:"item"`
+	Batch               donationIntegrationBatch         `json:"batch"`
+	PendingReviewAction *donationIntegrationReviewAction `json:"pending_review_action"`
+	Reward              *struct {
 		ID           string `json:"id"`
 		ItemID       string `json:"item_id"`
 		UserID       int64  `json:"user_id"`
 		Quota        int64  `json:"quota"`
 		CreditedAtMS int64  `json:"credited_at_ms"`
 	} `json:"reward"`
+}
+
+type donationIntegrationReviewContext struct {
+	State                string `json:"state"`
+	EffectiveMode        string `json:"effective_mode"`
+	ReviewAction         string `json:"review_action"`
+	ItemRevision         int64  `json:"item_revision"`
+	ReviewTargetRevision string `json:"review_target_revision"`
+	ExpiresAtMS          int64  `json:"expires_at_ms"`
+	CanReview            bool   `json:"can_review"`
+	CanReject            bool   `json:"can_reject"`
+	CanTest              bool   `json:"can_test"`
+}
+
+type donationIntegrationReviewAction struct {
+	ActionID string `json:"action_id"`
+	Status   string `json:"status"`
+}
+
+type donationIntegrationTestResult struct {
+	TestID       string `json:"test_id"`
+	State        string `json:"state"`
+	ReasonCode   string `json:"reason_code"`
+	StatusCode   int    `json:"status_code"`
+	Text         string `json:"text"`
+	FinishedAtMS int64  `json:"finished_at_ms"`
 }
 
 type donationRemoteIdentity struct {
@@ -1049,6 +1320,92 @@ func (f *donationIntegrationFixture) wallet(t *testing.T, actor donationIntegrat
 	return result
 }
 
+func (f *donationIntegrationFixture) createDonationReader(t *testing.T, admin donationIntegrationActor, username string) donationIntegrationActor {
+	t.Helper()
+	f.api(t, admin.Token, http.MethodPost, "/api/user/", map[string]any{
+		"username": username, "password": f.password, "role": 10,
+		"admin_permissions": map[string]map[string]bool{
+			"donation_records": {"read": true, "review": false, "test": false},
+			"donation_config":  {"read": false, "write": false},
+		},
+	}, "", nil)
+	return f.login(t, username)
+}
+
+func (f *donationIntegrationFixture) reviewContext(t *testing.T, actor donationIntegrationActor, itemID string) donationIntegrationReviewContext {
+	t.Helper()
+	var result donationIntegrationReviewContext
+	f.api(t, actor.Token, http.MethodGet, "/api/donations/admin/records/"+itemID+"/review-context", nil, "", &result)
+	return result
+}
+
+func (f *donationIntegrationFixture) streamTest(t *testing.T, actor donationIntegrationActor, itemID, testID string, input map[string]any) donationIntegrationTestResult {
+	t.Helper()
+	payload, err := common.Marshal(input)
+	require.NoError(t, err)
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+		f.newAPI.url+"/api/donations/admin/records/"+itemID+"/tests", bytes.NewReader(payload))
+	require.NoError(t, err)
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+actor.Token)
+	request.Header.Set("Idempotency-Key", testID)
+	response, err := f.client.Do(request)
+	require.NoError(t, err)
+	defer response.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(response.Body, 2<<20))
+	require.NoError(t, err)
+	f.assertNoSecrets(t, body, "manual review stream")
+	require.Equal(t, http.StatusOK, response.StatusCode, "%s", f.redact(string(body)))
+	require.Contains(t, response.Header.Get("Content-Type"), "text/event-stream")
+	var events []string
+	var output strings.Builder
+	var result donationIntegrationTestResult
+	for _, frame := range strings.Split(strings.ReplaceAll(string(body), "\r\n", "\n"), "\n\n") {
+		var event, data string
+		for line := range strings.SplitSeq(frame, "\n") {
+			if value, ok := strings.CutPrefix(line, "event:"); ok {
+				event = strings.TrimSpace(value)
+			}
+			if value, ok := strings.CutPrefix(line, "data:"); ok {
+				data = strings.TrimSpace(value)
+			}
+		}
+		if event == "" {
+			continue
+		}
+		events = append(events, event)
+		switch event {
+		case "meta":
+			var meta struct {
+				ItemID string `json:"item_id"`
+				TestID string `json:"test_id"`
+			}
+			require.NoError(t, common.UnmarshalJsonStr(data, &meta))
+			assert.Equal(t, itemID, meta.ItemID)
+			assert.Equal(t, testID, meta.TestID)
+		case "delta":
+			var delta struct {
+				Text string `json:"text"`
+			}
+			require.NoError(t, common.UnmarshalJsonStr(data, &delta))
+			output.WriteString(delta.Text)
+		case "done":
+			require.NoError(t, common.UnmarshalJsonStr(data, &result))
+		default:
+			t.Fatalf("unexpected test stream event: %s", event)
+		}
+	}
+	require.GreaterOrEqual(t, len(events), 3)
+	assert.Equal(t, "meta", events[0])
+	assert.Equal(t, "done", events[len(events)-1])
+	for _, event := range events[1 : len(events)-1] {
+		assert.Equal(t, "delta", event)
+	}
+	assert.Positive(t, result.FinishedAtMS)
+	result.Text = output.String()
+	return result
+}
+
 func (f *donationIntegrationFixture) createGroup(t *testing.T, name, inventory string) uint64 {
 	t.Helper()
 	var result struct {
@@ -1187,20 +1544,37 @@ func (gate *donationProbeGate) release() {
 type donationGeminiMode struct {
 	status int
 	gate   *donationProbeGate
+	chat   bool
 }
 
 type donationGeminiUpstream struct {
-	server *httptest.Server
-	mu     sync.Mutex
-	modes  map[string]donationGeminiMode
-	calls  map[string]int
-	issues []string
+	server      *httptest.Server
+	mu          sync.Mutex
+	modes       map[string]donationGeminiMode
+	calls       map[string]int
+	issues      []string
+	chatPrompts map[string]string
 }
 
 func (upstream *donationGeminiUpstream) configure(key string, status int, gate *donationProbeGate) {
 	upstream.mu.Lock()
 	defer upstream.mu.Unlock()
-	upstream.modes[key] = donationGeminiMode{status, gate}
+	upstream.modes[key] = donationGeminiMode{status: status, gate: gate}
+}
+
+func (upstream *donationGeminiUpstream) configureChat(key string, status int, gate *donationProbeGate) {
+	upstream.mu.Lock()
+	defer upstream.mu.Unlock()
+	upstream.modes[key] = donationGeminiMode{status: status, gate: gate, chat: true}
+	if upstream.chatPrompts == nil {
+		upstream.chatPrompts = make(map[string]string)
+	}
+}
+
+func (upstream *donationGeminiUpstream) chatPrompt(key string) string {
+	upstream.mu.Lock()
+	defer upstream.mu.Unlock()
+	return upstream.chatPrompts[key]
 }
 
 func (upstream *donationGeminiUpstream) count(key string) int {
@@ -1238,10 +1612,45 @@ func (upstream *donationGeminiUpstream) ServeHTTP(writer http.ResponseWriter, re
 		upstream.issues = append(upstream.issues, "probe used an unconfigured credential")
 		mode.status = http.StatusUnauthorized
 	}
-	if request.Method != http.MethodPost || request.URL.Path != "/v1beta/models/gemini-donation-test:generateContent" {
+	stream := request.URL.Path == "/v1beta/models/gemini-donation-test:streamGenerateContent"
+	if request.Method != http.MethodPost || (request.URL.Path != "/v1beta/models/gemini-donation-test:generateContent" && !(mode.chat && stream)) {
 		upstream.issues = append(upstream.issues, "probe did not use the configured Gemini generateContent endpoint")
 	}
 	upstream.mu.Unlock()
+	if mode.chat {
+		var body struct {
+			Contents []struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"contents"`
+			GenerationConfig struct {
+				MaxOutputTokens int `json:"maxOutputTokens"`
+			} `json:"generationConfig"`
+		}
+		err := common.DecodeJson(io.LimitReader(request.Body, 65536), &body)
+		var textParts []string
+		for _, content := range body.Contents {
+			for _, part := range content.Parts {
+				textParts = append(textParts, part.Text)
+			}
+		}
+		prompt := strings.Join(textParts, "")
+		if err != nil || prompt == "" {
+			upstream.mu.Lock()
+			upstream.issues = append(upstream.issues, "manual chat omitted the user's text")
+			upstream.mu.Unlock()
+			mode.status = http.StatusBadRequest
+		} else if prompt == "ping" || body.GenerationConfig.MaxOutputTokens == 1 {
+			// This upstream accepts normal chat but deliberately rejects the
+			// existing generic probe shape, modelling the reported provider.
+			mode.status, mode.gate = http.StatusServiceUnavailable, nil
+		} else {
+			upstream.mu.Lock()
+			upstream.chatPrompts[key] = prompt
+			upstream.mu.Unlock()
+		}
+	}
 	if mode.gate != nil {
 		mode.gate.startedOnce.Do(func() { close(mode.gate.started) })
 		select {
@@ -1249,6 +1658,36 @@ func (upstream *donationGeminiUpstream) ServeHTTP(writer http.ResponseWriter, re
 		case <-request.Context().Done():
 			return
 		}
+	}
+	if mode.chat && mode.status == http.StatusOK {
+		if stream {
+			writer.Header().Set("Content-Type", "text/event-stream")
+			writer.WriteHeader(http.StatusOK)
+			for _, text := range []string{"manual reply " + key[:len(key)/2], key[len(key)/2:] + " done"} {
+				candidate := map[string]any{"index": 0, "content": map[string]any{"role": "model", "parts": []map[string]any{{"text": text}}}}
+				data, _ := common.Marshal(map[string]any{"candidates": []map[string]any{candidate}, "modelVersion": "gemini-donation-test"})
+				_, _ = fmt.Fprintf(writer, "data: %s\n\n", data)
+				if flush, ok := writer.(http.Flusher); ok {
+					flush.Flush()
+				}
+			}
+			// Gemini's SDK completes the stream with its final usage-bearing
+			// STOP frame, separate from the body deltas under test.
+			terminal, _ := common.Marshal(map[string]any{
+				"candidates":    []map[string]any{{"index": 0, "content": map[string]any{"role": "model", "parts": []any{}}, "finishReason": "STOP"}},
+				"usageMetadata": map[string]any{"promptTokenCount": 7, "candidatesTokenCount": 11, "totalTokenCount": 18},
+				"modelVersion":  "gemini-donation-test",
+			})
+			_, _ = fmt.Fprintf(writer, "data: %s\n\n", terminal)
+			return
+		}
+		data, _ := common.Marshal(map[string]any{
+			"candidates":   []map[string]any{{"content": map[string]any{"role": "model", "parts": []map[string]any{{"text": "manual reply " + key + " done"}}}, "finishReason": "STOP"}},
+			"modelVersion": "gemini-donation-test",
+		})
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write(data)
+		return
 	}
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(mode.status)
@@ -1269,13 +1708,15 @@ func (upstream *donationGeminiUpstream) ServeHTTP(writer http.ResponseWriter, re
 // This transport fault injector forwards to the real gpt-load process before
 // discarding one receipt. It never fabricates an acceptance or reward outcome.
 type donationReceiptBridge struct {
-	server   *httptest.Server
-	target   string
-	client   *http.Client
-	mu       sync.Mutex
-	loseNext bool
-	posts    map[string]int
-	blocked  map[string]bool
+	server         *httptest.Server
+	target         string
+	client         *http.Client
+	mu             sync.Mutex
+	loseNext       bool
+	posts          map[string]int
+	blocked        map[string]bool
+	loseReview     bool
+	blockedActions map[string]bool
 }
 
 func (bridge *donationReceiptBridge) loseNextBatchResponse() {
@@ -1288,6 +1729,16 @@ func (bridge *donationReceiptBridge) resumeBatchReads() {
 	bridge.mu.Lock()
 	defer bridge.mu.Unlock()
 	clear(bridge.blocked)
+	clear(bridge.blockedActions)
+}
+
+func (bridge *donationReceiptBridge) loseNextReviewResponse() {
+	bridge.mu.Lock()
+	defer bridge.mu.Unlock()
+	bridge.loseReview = true
+	if bridge.blockedActions == nil {
+		bridge.blockedActions = make(map[string]bool)
+	}
 }
 
 func (bridge *donationReceiptBridge) postCount(batchID string) int {
@@ -1304,8 +1755,20 @@ func (bridge *donationReceiptBridge) ServeHTTP(writer http.ResponseWriter, reque
 		return
 	}
 	drop := false
+	actionID := ""
+	if request.Method == http.MethodPost && strings.HasSuffix(request.URL.Path, "/review-actions") {
+		var submitted struct {
+			ActionID string `json:"action_id"`
+		}
+		if common.Unmarshal(body, &submitted) == nil {
+			actionID = submitted.ActionID
+		}
+	}
 	bridge.mu.Lock()
-	if request.Method == http.MethodGet && bridge.blocked[strings.TrimPrefix(request.URL.Path, prefix+"/")] {
+	blockedReviewRead := request.Method == http.MethodGet &&
+		bridge.blockedActions[strings.TrimPrefix(request.URL.Path, "/integrations/donations/v1/review-actions/")]
+	if (request.Method == http.MethodGet && bridge.blocked[strings.TrimPrefix(request.URL.Path, prefix+"/")]) ||
+		blockedReviewRead || (actionID != "" && bridge.blockedActions[actionID]) {
 		bridge.mu.Unlock()
 		writer.Header().Set("Content-Type", "application/json")
 		writer.WriteHeader(http.StatusServiceUnavailable)
@@ -1325,6 +1788,14 @@ func (bridge *donationReceiptBridge) ServeHTTP(writer http.ResponseWriter, reque
 			}
 		}
 	}
+	if actionID != "" && bridge.loseReview {
+		drop, bridge.loseReview = true, false
+		bridge.blockedActions[actionID] = true
+		parts := strings.Split(strings.TrimPrefix(request.URL.Path, prefix+"/"), "/")
+		if len(parts) == 4 {
+			bridge.blocked[parts[0]] = true
+		}
+	}
 	bridge.mu.Unlock()
 	forward, err := http.NewRequestWithContext(request.Context(), request.Method, bridge.target+request.URL.RequestURI(), bytes.NewReader(body))
 	if err != nil {
@@ -1338,6 +1809,27 @@ func (bridge *donationReceiptBridge) ServeHTTP(writer http.ResponseWriter, reque
 		return
 	}
 	defer response.Body.Close()
+	if !drop && strings.HasPrefix(response.Header.Get("Content-Type"), "text/event-stream") {
+		for key, values := range response.Header {
+			writer.Header()[key] = values
+		}
+		writer.WriteHeader(response.StatusCode)
+		buffer := make([]byte, 4096)
+		for {
+			n, readErr := response.Body.Read(buffer)
+			if n > 0 {
+				if _, writeErr := writer.Write(buffer[:n]); writeErr != nil {
+					return
+				}
+				if flush, ok := writer.(http.Flusher); ok {
+					flush.Flush()
+				}
+			}
+			if readErr != nil {
+				return
+			}
+		}
+	}
 	responseBody, err := io.ReadAll(io.LimitReader(response.Body, 2<<20))
 	if err != nil {
 		writer.WriteHeader(http.StatusBadGateway)

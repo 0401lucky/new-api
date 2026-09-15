@@ -54,6 +54,23 @@ export const STATIC_I18N_KEYS = [
   'View campaigns and target groups without secrets.',
   'View donation ownership, masked keys, and reward records.',
   'View donation settings',
+  'Review donation records',
+  'Enter a record into manual review and approve or reject it.',
+  'Run donation tests',
+  'Run one controlled model call with the staging key of a pending donation.',
+
+  // Donation review and model test messages surfaced through runtime values.
+  'Another administrator already reviewed this record.',
+  'The model test stream ended before it reported a result.',
+  'The model test stream failed.',
+  'The review action could not be applied.',
+  'The review context is not available.',
+  'The test could not be started.',
+  'The test result could not be read.',
+  'The saved test result is available, but its response text is not retained.',
+  'The model test timed out before it reported a result.',
+  'The test response exceeded the supported size limit.',
+  'This key is busy in another operation. Try again shortly.',
 
   // Billing expression simulation diagnostics and conditional labels.
   '{{start}}–{{end}}',
