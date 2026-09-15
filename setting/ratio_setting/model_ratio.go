@@ -507,24 +507,13 @@ func GetCompletionRatioInfo(name string) CompletionRatioInfo {
 	return ResolveCompletionRatio(name, configured)
 }
 
-// ResolveCompletionRatio applies relay's enforced and fallback ratios to a
-// configuration snapshot or draft without consulting mutable saved settings.
-// An enforced hardcoded ratio wins over a configured one, except for path-like
-// names (vendor/model), which always honour the configuration.
+// ResolveCompletionRatio resolves a completion ratio against an explicit
+// configuration snapshot or draft. A configured ratio always wins so that an
+// administrator override applies to every model, including ones with a
+// hardcoded engine default; the hardcoded lock state is reported only when
+// nothing is configured.
 func ResolveCompletionRatio(name string, configured *float64) CompletionRatioInfo {
 	name = FormatMatchingModelName(name)
-	if strings.Contains(name, "/") && configured != nil {
-		return CompletionRatioInfo{Ratio: *configured}
-	}
-
-	hardCodedRatio, locked := getHardcodedCompletionModelRatio(name)
-	if locked {
-		return CompletionRatioInfo{
-			Ratio:  hardCodedRatio,
-			Locked: true,
-		}
-	}
-
 	if configured != nil {
 		return CompletionRatioInfo{
 			Ratio:  *configured,
@@ -532,9 +521,10 @@ func ResolveCompletionRatio(name string, configured *float64) CompletionRatioInf
 		}
 	}
 
+	hardCodedRatio, locked := getHardcodedCompletionModelRatio(name)
 	return CompletionRatioInfo{
 		Ratio:  hardCodedRatio,
-		Locked: false,
+		Locked: locked,
 	}
 }
 
