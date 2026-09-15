@@ -490,16 +490,7 @@ func UpdateCompletionRatioByJSONString(jsonStr string) error {
 }
 
 func GetCompletionRatio(name string) float64 {
-	name = FormatMatchingModelName(name)
-
-	if ratio, ok := completionRatioMap.Get(name); ok {
-		return ratio
-	}
-	hardCodedRatio, contain := getHardcodedCompletionModelRatio(name)
-	if contain {
-		return hardCodedRatio
-	}
-	return hardCodedRatio
+	return GetCompletionRatioInfo(name).Ratio
 }
 
 type CompletionRatioInfo struct {
@@ -509,12 +500,21 @@ type CompletionRatioInfo struct {
 
 func GetCompletionRatioInfo(name string) CompletionRatioInfo {
 	name = FormatMatchingModelName(name)
-
+	var configured *float64
 	if ratio, ok := completionRatioMap.Get(name); ok {
-		return CompletionRatioInfo{
-			Ratio:  ratio,
-			Locked: false,
-		}
+		configured = &ratio
+	}
+	return ResolveCompletionRatio(name, configured)
+}
+
+// ResolveCompletionRatio applies relay's enforced and fallback ratios to a
+// configuration snapshot or draft without consulting mutable saved settings.
+// An enforced hardcoded ratio wins over a configured one, except for path-like
+// names (vendor/model), which always honour the configuration.
+func ResolveCompletionRatio(name string, configured *float64) CompletionRatioInfo {
+	name = FormatMatchingModelName(name)
+	if strings.Contains(name, "/") && configured != nil {
+		return CompletionRatioInfo{Ratio: *configured}
 	}
 
 	hardCodedRatio, locked := getHardcodedCompletionModelRatio(name)
@@ -525,9 +525,9 @@ func GetCompletionRatioInfo(name string) CompletionRatioInfo {
 		}
 	}
 
-	if ratio, ok := completionRatioMap.Get(name); ok {
+	if configured != nil {
 		return CompletionRatioInfo{
-			Ratio:  ratio,
+			Ratio:  *configured,
 			Locked: false,
 		}
 	}
@@ -713,10 +713,12 @@ func UpdateImageRatioByJSONString(jsonStr string) error {
 	return types.LoadFromJsonString(imageRatioMap, jsonStr)
 }
 
+const DefaultImageRatio = 1.0
+
 func GetImageRatio(name string) (float64, bool) {
 	ratio, ok := imageRatioMap.Get(name)
 	if !ok {
-		return 1, false // Default to 1 if not found
+		return DefaultImageRatio, false
 	}
 	return ratio, true
 }

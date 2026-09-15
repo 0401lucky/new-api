@@ -22,14 +22,12 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
-	"github.com/QuantumNous/new-api/relaykit/dto"
+	relaykitdto "github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
-	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/bytedance/gopkg/util/gopool"
-	"github.com/samber/lo"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -139,82 +137,11 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		return
 	}
 
-	channelID := common.GetContextKeyInt(c, constant.ContextKeyChannelId)
-	usingGroup := common.GetContextKeyString(c, constant.ContextKeyUsingGroup)
-	if usingGroup == "" {
-		usingGroup = c.GetString("group")
-	}
-	needSensitiveCheck := setting.ShouldCheckPromptForRequest(relayInfo.OriginModelName, usingGroup, channelID)
-	needCountToken := constant.CountToken
-	// Avoid building huge CombineText (strings.Join) when token counting and sensitive check are both disabled.
-	var meta *types.TokenCountMeta
-	if needSensitiveCheck || needCountToken {
-		meta = request.GetTokenCountMeta()
-	} else {
-		meta = fastTokenCountMetaForPricing(request)
-	}
-
-	if needSensitiveCheck && meta != nil {
-		startRecentCallCaptureFromContext(c, relayInfo)
-		verdict := service.CheckPromptText(c.Request.Context(), meta.CombineText)
-		if len(verdict.Matches) > 0 {
-			logger.LogWarn(c, fmt.Sprintf("prompt check matched: action=%s, score=%d, reason=%s", verdict.Action, verdict.Score, verdict.Reason))
-			recentVerdict := verdict
-			if verdict.Mode == setting.PromptCheckModeMonitor && verdict.Action == service.PromptCheckActionAllow {
-				recentVerdict.Action = "monitor"
-			}
-			service.RecentCallsCache().UpsertPromptCheckByContext(c, recentVerdict)
-			recordPromptCheckLog(c, relayInfo, verdict)
-		}
-		if verdict.Action == service.PromptCheckActionWarn {
-			c.Header("X-Prompt-Check-Warning", verdict.Reason)
-		}
-		if verdict.Action == service.PromptCheckActionBlock {
-			service.RecentCallsCache().UpsertErrorByContext(c, verdict.Reason, "prompt_check", string(types.ErrorCodePromptBlocked), http.StatusBadRequest)
-			newAPIError = types.NewErrorWithStatusCode(
-				errors.New("request contains content blocked by prompt check"),
-				types.ErrorCodePromptBlocked,
-				http.StatusBadRequest,
-				types.ErrOptionWithSkipRetry(),
-			)
-			return
-		}
-	}
-
-	tokens, err := service.EstimateRequestToken(c, meta, relayInfo)
-	if err != nil {
-		newAPIError = types.NewError(err, types.ErrorCodeCountTokenFailed)
+	if newAPIError = relay.PrepareRequestBilling(c, relayInfo); newAPIError != nil {
 		return
 	}
-
-	relayInfo.SetEstimatePromptTokens(tokens)
-
-	priceData, err := helper.ModelPriceHelper(c, relayInfo, tokens, meta)
-	if err != nil {
-		newAPIError = types.NewError(err, types.ErrorCodeModelPriceError, types.ErrOptionWithStatusCode(http.StatusBadRequest))
-		return
-	}
-
-	// common.SetContextKey(c, constant.ContextKeyTokenCountMeta, meta)
-
-	if priceData.FreeModel {
-		logger.LogInfo(c, fmt.Sprintf("模型 %s 免费，跳过预扣费", relayInfo.OriginModelName))
-	} else {
-		newAPIError = service.PreConsumeBilling(c, priceData.QuotaToPreConsume, relayInfo)
-		if newAPIError != nil {
-			return
-		}
-	}
-
 	defer func() {
-		// Only return quota if downstream failed and quota was actually pre-consumed
-		if newAPIError != nil {
-			newAPIError = service.NormalizeViolationFeeError(newAPIError)
-			if relayInfo.Billing != nil {
-				relayInfo.Billing.Refund(c)
-			}
-			service.ChargeViolationFeeIfNeeded(c, relayInfo, newAPIError)
-		}
+		newAPIError = relay.RefundFailedRequestBilling(c, relayInfo, newAPIError)
 	}()
 
 	retryParam := &service.RetryParam{
@@ -256,7 +183,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			}
 			break
 		}
-		startRecentCallCapture(c, relayInfo, bodyStorage)
+		service.StartRecentCallCapture(c, relayInfo, bodyStorage)
 		c.Request.Body = io.NopCloser(bodyStorage)
 
 		switch relayFormat {
@@ -336,7 +263,7 @@ func CountClaudeTokens(c *gin.Context) {
 }
 
 var upgrader = websocket.Upgrader{
-	Subprotocols: []string{"realtime"}, // WS 握手支持的协议，如果有使用 Sec-WebSocket-Protocol，则必须在此声明对应的 Protocol TODO add other protocol
+	Subprotocols: []string{"realtime", "responses"}, // WS 握手支持的协议，如果有使用 Sec-WebSocket-Protocol，则必须在此声明对应的 Protocol
 	CheckOrigin: func(r *http.Request) bool {
 		return true // 允许跨域
 	},
@@ -348,76 +275,19 @@ func addUsedChannel(c *gin.Context, channelId int) {
 	c.Set("use_channel", useChannel)
 }
 
-func startRecentCallCapture(c *gin.Context, relayInfo *relaycommon.RelayInfo, bodyStorage common.BodyStorage) {
-	if c == nil || relayInfo == nil || bodyStorage == nil {
-		return
-	}
-	if _, exists := c.Get(service.RecentCallsContextKeyID); exists {
-		return
-	}
-	bodyBytes, err := bodyStorage.Bytes()
-	if err != nil {
-		logger.LogWarn(c, "recent calls read request body failed: "+err.Error())
-		return
-	}
-	service.RecentCallsCache().BeginFromContext(c, relayInfo, bodyBytes)
-	service.AttachRecentCallResponseCapture(c)
-}
-
-func startRecentCallCaptureFromContext(c *gin.Context, relayInfo *relaycommon.RelayInfo) {
-	if c == nil || relayInfo == nil {
-		return
-	}
-	bodyStorage, err := common.GetBodyStorage(c)
-	if err != nil {
-		logger.LogWarn(c, "recent calls read request body failed: "+err.Error())
-		return
-	}
-	startRecentCallCapture(c, relayInfo, bodyStorage)
-}
-
-func fastTokenCountMetaForPricing(request dto.Request) *types.TokenCountMeta {
-	if request == nil {
-		return &types.TokenCountMeta{}
-	}
-	meta := &types.TokenCountMeta{
-		TokenType: types.TokenTypeTokenizer,
-	}
-	switch r := request.(type) {
-	case *dto.GeneralOpenAIRequest:
-		maxCompletionTokens := lo.FromPtrOr(r.MaxCompletionTokens, uint(0))
-		maxTokens := lo.FromPtrOr(r.MaxTokens, uint(0))
-		if maxCompletionTokens > maxTokens {
-			meta.MaxTokens = int(maxCompletionTokens)
-		} else {
-			meta.MaxTokens = int(maxTokens)
-		}
-	case *dto.OpenAIResponsesRequest:
-		meta.MaxTokens = int(lo.FromPtrOr(r.MaxOutputTokens, uint(0)))
-	case *dto.ClaudeRequest:
-		meta.MaxTokens = int(lo.FromPtr(r.MaxTokens))
-	case *dto.ImageRequest:
-		// Pricing for image requests depends on ImagePriceRatio; safe to compute even when CountToken is disabled.
-		return r.GetTokenCountMeta()
-	default:
-		// Best-effort: leave CombineText empty to avoid large allocations.
-	}
-	return meta
-}
-
-func getRelayUserSetting(c *gin.Context) dto.UserSetting {
-	userSetting, ok := common.GetContextKeyType[dto.UserSetting](c, constant.ContextKeyUserSetting)
+func getRelayUserSetting(c *gin.Context) relaykitdto.UserSetting {
+	userSetting, ok := common.GetContextKeyType[relaykitdto.UserSetting](c, constant.ContextKeyUserSetting)
 	if ok {
 		return userSetting
 	}
 	userId := c.GetInt("id")
 	if userId <= 0 {
-		return dto.UserSetting{}
+		return relaykitdto.UserSetting{}
 	}
 	userSetting, err := model.GetUserSetting(userId, false)
 	if err != nil {
 		logger.LogWarn(c, fmt.Sprintf("load user setting for relay failed: %s", err.Error()))
-		return dto.UserSetting{}
+		return relaykitdto.UserSetting{}
 	}
 	common.SetContextKey(c, constant.ContextKeyUserSetting, userSetting)
 	return userSetting
@@ -453,74 +323,6 @@ func recordLeakProtectionBlockedLog(c *gin.Context, reason string) {
 		c.GetString("original_model"),
 		c.GetString("token_name"),
 		"leak protection blocked request: "+reason,
-		c.GetInt("token_id"),
-		useTimeSeconds,
-		common.GetContextKeyBool(c, constant.ContextKeyIsStream),
-		c.GetString("group"),
-		other,
-	)
-}
-
-func recordPromptCheckLog(c *gin.Context, relayInfo *relaycommon.RelayInfo, verdict service.PromptCheckVerdict) {
-	if !constant.ErrorLogEnabled || !setting.PromptCheckLogMatchesEnabled || len(verdict.Matches) == 0 || c == nil {
-		return
-	}
-	userId := c.GetInt("id")
-	if userId <= 0 {
-		return
-	}
-
-	action := verdict.Action
-	if verdict.Mode == setting.PromptCheckModeMonitor && verdict.Action == service.PromptCheckActionAllow {
-		action = "monitor"
-	}
-	other := model.NewLogOther()
-	other.SetPublic("prompt_check", map[string]interface{}{
-		"action":           action,
-		"mode":             verdict.Mode,
-		"score":            verdict.Score,
-		"raw_score":        verdict.RawScore,
-		"threshold":        verdict.Threshold,
-		"strict_threshold": verdict.StrictThreshold,
-		"strict_hit":       verdict.StrictHit,
-		"matches":          verdict.Matches,
-		"preview":          verdict.TextPreview,
-		// full_text is admin-facing review content; non-admin self logs strip it.
-		"full_text":       verdict.TextFull,
-		"extracted_chars": verdict.ExtractedChars,
-		"reviewed":        verdict.Reviewed,
-		"review_flagged":  verdict.ReviewFlagged,
-		"review_model":    verdict.ReviewModel,
-		"review_error":    verdict.ReviewError,
-	})
-	if verdict.Action == service.PromptCheckActionBlock {
-		other.SetAdmin("reject_reason", "prompt_check")
-	}
-	if c.Request != nil && c.Request.URL != nil {
-		other.SetPublic("request_path", c.Request.URL.Path)
-	}
-
-	useTimeSeconds := 0
-	startTime := common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)
-	if !startTime.IsZero() {
-		useTimeSeconds = int(time.Since(startTime).Seconds())
-	}
-
-	modelName := c.GetString("original_model")
-	if relayInfo != nil && relayInfo.OriginModelName != "" {
-		modelName = relayInfo.OriginModelName
-	}
-	reason := verdict.Reason
-	if reason == "" {
-		reason = "prompt check matched"
-	}
-	model.RecordGatewayErrorLog(
-		c,
-		userId,
-		common.GetContextKeyInt(c, constant.ContextKeyChannelId),
-		modelName,
-		c.GetString("token_name"),
-		fmt.Sprintf("prompt check %s: %s", action, reason),
 		c.GetInt("token_id"),
 		useTimeSeconds,
 		common.GetContextKeyBool(c, constant.ContextKeyIsStream),
@@ -582,81 +384,11 @@ func newClientDisconnectedAPIError(c *gin.Context) *types.NewAPIError {
 }
 
 func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) bool {
-	if openaiErr == nil {
-		return false
-	}
-	if service.ShouldSkipRetryAfterChannelAffinityFailure(c) {
-		return false
-	}
-	if types.IsChannelError(openaiErr) {
-		return true
-	}
-	if types.IsSkipRetryError(openaiErr) {
-		return false
-	}
-	if retryTimes <= 0 {
-		return false
-	}
-	if service.GetChannelConstraints(c).SuppressesRetry() {
-		return false
-	}
-	code := openaiErr.StatusCode
-	if code >= 200 && code < 300 {
-		return false
-	}
-	if code < 100 || code > 599 {
-		return true
-	}
-	if operation_setting.IsAlwaysSkipRetryCode(openaiErr.GetErrorCode()) {
-		return false
-	}
-	return operation_setting.ShouldRetryByStatusCode(code)
+	return service.ShouldRetryRelayError(c, openaiErr, retryTimes)
 }
 
 func processChannelError(c *gin.Context, channelError types.ChannelError, err *types.NewAPIError, relayInfo *relaycommon.RelayInfo) {
-	logger.LogError(c, fmt.Sprintf("channel error (channel #%d, status code: %d): %s", channelError.ChannelId, err.StatusCode, common.LocalLogPreview(err.Error())))
-	service.RecentCallsCache().UpsertErrorByContext(c, err.MaskSensitiveError(), fmt.Sprint(err.GetErrorType()), fmt.Sprint(err.GetErrorCode()), err.StatusCode)
-	// 不要使用context获取渠道信息，异步处理时可能会出现渠道信息不一致的情况
-	// do not use context to get channel info, there may be inconsistent channel info when processing asynchronously
-	if service.ShouldDisableChannel(err) && channelError.AutoBan {
-		gopool.Go(func() {
-			service.DisableChannel(channelError, err.ErrorWithStatusCode())
-		})
-	}
-
-	userId := c.GetInt("id")
-	tokenName := c.GetString("token_name")
-	modelName := c.GetString("original_model")
-	tokenId := c.GetInt("token_id")
-	userGroup := c.GetString("group")
-	shouldRecordErrorLog := constant.ErrorLogEnabled && types.IsRecordErrorLog(err)
-	if !shouldRecordErrorLog && modelName != "" {
-		model.RecordModelHealthEventAsync(&model.ModelHealthEvent{
-			ModelName: modelName,
-			CreatedAt: common.GetTimestamp(),
-			IsError:   true,
-		})
-	}
-
-	if shouldRecordErrorLog {
-		// 保存错误日志到mysql中
-		other := model.NewLogOther()
-		if c.Request != nil && c.Request.URL != nil {
-			other.SetPublic("request_path", c.Request.URL.Path)
-		}
-		other.SetPublic("error_type", err.GetErrorType())
-		other.SetPublic("error_code", err.GetErrorCode())
-		other.SetPublic("status_code", err.StatusCode)
-		service.AppendRelayLogAdminInfo(c, relayInfo, other)
-		service.AppendTaskPluginContextAuditInfo(c, other)
-		startTime := common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)
-		if startTime.IsZero() {
-			startTime = time.Now()
-		}
-		useTimeSeconds := int(time.Since(startTime).Seconds())
-		model.RecordErrorLog(c, userId, channelError.ChannelId, modelName, tokenName, err.MaskSensitiveErrorWithStatusCode(), tokenId, useTimeSeconds, common.GetContextKeyBool(c, constant.ContextKeyIsStream), userGroup, other)
-	}
-
+	service.ProcessChannelError(c, channelError, err, relayInfo)
 }
 
 func RelayMidjourney(c *gin.Context) {
@@ -892,7 +624,7 @@ func executeTaskSubmissionWith(
 			}
 			break
 		}
-		startRecentCallCapture(c, relayInfo, bodyStorage)
+		service.StartRecentCallCapture(c, relayInfo, bodyStorage)
 		c.Request.Body = io.NopCloser(bodyStorage)
 
 		stage = "submit"
@@ -1112,7 +844,7 @@ func respondTaskError(c *gin.Context, taskErr *taskdto.TaskError) {
 }
 
 func shouldRetryTaskRelay(c *gin.Context, channelId int, taskErr *taskdto.TaskError, retryTimes int) bool {
-	if taskErr == nil {
+	if taskErr == nil || taskErr.NoRetry {
 		return false
 	}
 	if service.ShouldSkipRetryAfterChannelAffinityFailure(c) {

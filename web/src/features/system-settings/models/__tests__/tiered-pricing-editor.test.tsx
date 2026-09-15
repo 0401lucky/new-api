@@ -35,7 +35,7 @@ test('typing tier names retains focus and deleting an earlier tier keeps the rem
     />
   )
 
-  const firstName = screen.getByDisplayValue('first')
+  const firstName = screen.getAllByRole('textbox', { name: 'Tier name' })[0]
   await user.type(firstName, '-edited')
   expect(firstName).toHaveFocus()
   expect(firstName).toHaveValue('first-edited')
@@ -45,8 +45,14 @@ test('typing tier names retains focus and deleting an earlier tier keeps the rem
     )
   )
 
-  await user.click(screen.getAllByRole('button', { name: 'Remove tier' })[0])
-  const secondName = screen.getByDisplayValue('second')
+  // 第一档是一个分支节点，通过行操作菜单移除它。
+  await user.click(screen.getByRole('button', { name: 'Branch actions 1' }))
+  await user.click(await screen.findByRole('menuitem', { name: 'Remove branch' }))
+
+  await user.click(
+    screen.getByRole('button', { name: 'Edit pricing rule second' })
+  )
+  const secondName = screen.getAllByRole('textbox', { name: 'Tier name' })[0]
   await user.type(secondName, '-kept')
   expect(secondName).toHaveFocus()
   expect(screen.queryByDisplayValue('first-edited')).not.toBeInTheDocument()

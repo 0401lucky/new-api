@@ -15,6 +15,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/gin-gonic/gin"
@@ -519,6 +520,37 @@ func (cch *recentCallsCache) materializeEntry(entry *recentCallEntry, includeBod
 		}
 	}
 	return &dup, true
+}
+
+// StartRecentCallCapture begins recording one relay call once its request body
+// is available. Callers that only have the stored body pass it through
+// StartRecentCallCaptureFromContext instead.
+func StartRecentCallCapture(c *gin.Context, relayInfo *relaycommon.RelayInfo, bodyStorage common.BodyStorage) {
+	if c == nil || relayInfo == nil || bodyStorage == nil {
+		return
+	}
+	if _, exists := c.Get(RecentCallsContextKeyID); exists {
+		return
+	}
+	bodyBytes, err := bodyStorage.Bytes()
+	if err != nil {
+		logger.LogWarn(c, "recent calls read request body failed: "+err.Error())
+		return
+	}
+	RecentCallsCache().BeginFromContext(c, relayInfo, bodyBytes)
+	AttachRecentCallResponseCapture(c)
+}
+
+func StartRecentCallCaptureFromContext(c *gin.Context, relayInfo *relaycommon.RelayInfo) {
+	if c == nil || relayInfo == nil {
+		return
+	}
+	bodyStorage, err := common.GetBodyStorage(c)
+	if err != nil {
+		logger.LogWarn(c, "recent calls read request body failed: "+err.Error())
+		return
+	}
+	StartRecentCallCapture(c, relayInfo, bodyStorage)
 }
 
 func AttachRecentCallResponseCapture(c *gin.Context) {

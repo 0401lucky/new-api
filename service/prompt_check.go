@@ -15,7 +15,11 @@ import (
 	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/model"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/gin-gonic/gin"
 )
 
 const (
@@ -517,4 +521,74 @@ func PromptCheckRedactedPreview(text string, maxRunes int) string {
 // remain readable; length is bounded by the same scan-time limit already applied.
 func PromptCheckFullTextForLog(text string) string {
 	return strings.TrimSpace(PromptCheckRedact(text))
+}
+
+// RecordPromptCheckLog writes one gateway error log entry for a prompt check
+// verdict. Only admin-facing review content is stored.
+func RecordPromptCheckLog(c *gin.Context, relayInfo *relaycommon.RelayInfo, verdict PromptCheckVerdict) {
+	if !constant.ErrorLogEnabled || !setting.PromptCheckLogMatchesEnabled || len(verdict.Matches) == 0 || c == nil {
+		return
+	}
+	userId := c.GetInt("id")
+	if userId <= 0 {
+		return
+	}
+
+	action := verdict.Action
+	if verdict.Mode == setting.PromptCheckModeMonitor && verdict.Action == PromptCheckActionAllow {
+		action = "monitor"
+	}
+	other := model.NewLogOther()
+	other.SetPublic("prompt_check", map[string]interface{}{
+		"action":           action,
+		"mode":             verdict.Mode,
+		"score":            verdict.Score,
+		"raw_score":        verdict.RawScore,
+		"threshold":        verdict.Threshold,
+		"strict_threshold": verdict.StrictThreshold,
+		"strict_hit":       verdict.StrictHit,
+		"matches":          verdict.Matches,
+		"preview":          verdict.TextPreview,
+		// full_text is admin-facing review content; non-admin self logs strip it.
+		"full_text":       verdict.TextFull,
+		"extracted_chars": verdict.ExtractedChars,
+		"reviewed":        verdict.Reviewed,
+		"review_flagged":  verdict.ReviewFlagged,
+		"review_model":    verdict.ReviewModel,
+		"review_error":    verdict.ReviewError,
+	})
+	if verdict.Action == PromptCheckActionBlock {
+		other.SetAdmin("reject_reason", "prompt_check")
+	}
+	if c.Request != nil && c.Request.URL != nil {
+		other.SetPublic("request_path", c.Request.URL.Path)
+	}
+
+	useTimeSeconds := 0
+	startTime := common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)
+	if !startTime.IsZero() {
+		useTimeSeconds = int(time.Since(startTime).Seconds())
+	}
+
+	modelName := c.GetString("original_model")
+	if relayInfo != nil && relayInfo.OriginModelName != "" {
+		modelName = relayInfo.OriginModelName
+	}
+	reason := verdict.Reason
+	if reason == "" {
+		reason = "prompt check matched"
+	}
+	model.RecordGatewayErrorLog(
+		c,
+		userId,
+		common.GetContextKeyInt(c, constant.ContextKeyChannelId),
+		modelName,
+		c.GetString("token_name"),
+		fmt.Sprintf("prompt check %s: %s", action, reason),
+		c.GetInt("token_id"),
+		useTimeSeconds,
+		common.GetContextKeyBool(c, constant.ContextKeyIsStream),
+		c.GetString("group"),
+		other,
+	)
 }
