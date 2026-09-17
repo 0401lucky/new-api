@@ -29,13 +29,13 @@ type CheckinSetting struct {
 
 // 默认配置
 var checkinSetting = CheckinSetting{
-	Enabled:               false,     // 默认关闭
-	MinQuota:              1000,      // 默认最小额度 1000 (约 0.002 USD)
-	MaxQuota:              10000,     // 默认最大额度 10000 (约 0.02 USD)
-	FixedQuota:            1000,      // 默认固定额度
-	RandomMode:            true,      // 保持原有随机额度行为
-	RewardType:            RewardTypePermanent,
-	AvailableFromMinutes:  0,
+	Enabled:              false, // 默认关闭
+	MinQuota:             1000,  // 默认最小额度 1000 (约 0.002 USD)
+	MaxQuota:             10000, // 默认最大额度 10000 (约 0.02 USD)
+	FixedQuota:           1000,  // 默认固定额度
+	RandomMode:           true,  // 保持原有随机额度行为
+	RewardType:           RewardTypePermanent,
+	AvailableFromMinutes: 0,
 }
 
 func init() {
@@ -96,7 +96,7 @@ func (s *CheckinSetting) ValidateCheckinConfig() error {
 		if s.RandomMode {
 			if s.MinQuota <= 0 || s.MaxQuota <= 0 {
 				return &ConfigError{Message: "启用签到时随机奖励必须大于零"}
-		}
+			}
 			if s.MaxQuota < s.MinQuota {
 				return &ConfigError{Message: "随机模式最大值必须大于或等于最小值"}
 			}
