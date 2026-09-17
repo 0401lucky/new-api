@@ -85,6 +85,15 @@ export interface BlackroomSetting {
   escalation_temporary_ban_count: number
   exempt_user_ids: number[]
   exempt_groups: string[]
+  shadow_mode: boolean
+  realtime_enabled: boolean
+  geo_enabled: boolean
+  geo_country_count: number
+  geo_asn_count: number
+  geo_min_gap_seconds: number
+  geo_duration_hours: number
+  country_mmdb_path: string
+  asn_mmdb_path: string
 }
 
 export interface ManualBanPayload {
@@ -98,4 +107,115 @@ export interface ReleasePayload {
   reason: string
 }
 
-export type BlackroomDialogType = 'manual-ban' | 'setting' | 'release'
+/** MMDB 解析器就绪详情，对应 `/api/blackroom/status` 的 `resolver`。 */
+export interface BlackroomGeoResolverStatus {
+  ready: boolean
+  country_ready: boolean
+  asn_ready: boolean
+  version: string
+  /** `not_configured` | `open_failed` | `not_initialized` */
+  error_code?: string
+}
+
+/**
+ * 判定链路的就绪汇总。`blocking` 里的每一项都代表自动封禁被挡住的
+ * 原因，取值：`blackroom_disabled` | `auto_ban_disabled` |
+ * `geo_resolver_not_ready`。
+ */
+export interface BlackroomStatusSummary {
+  enabled: boolean
+  auto_ban_enabled: boolean
+  shadow_mode: boolean
+  realtime_enabled: boolean
+  geo_enabled: boolean
+  geo_effective: boolean
+  resolver: BlackroomGeoResolverStatus
+  blocking: string[]
+}
+
+/** IP 视角下的关联用户。 */
+export interface BlackroomIPAuditUser {
+  user_id: number
+  username: string
+  request_count: number
+}
+
+/** IP 维度的一行聚合结果。 */
+export interface BlackroomIPAuditItem {
+  ip: string
+  request_count: number
+  user_count: number
+  first_seen_at: number
+  last_seen_at: number
+  users: BlackroomIPAuditUser[]
+  /** true 表示只返回了前 5 个关联用户。 */
+  users_truncated: boolean
+}
+
+export interface BlackroomIPAuditResult {
+  start_at: number
+  end_at: number
+  total: number
+  page: number
+  page_size: number
+  items: BlackroomIPAuditItem[]
+}
+
+/**
+ * 一条只追加的封禁事件。状态表上被覆盖掉的中间状态在这里仍然可追溯，
+ * `ban_id` 为 0 表示该事件没有对应封禁（目前只有影子模式命中）。
+ */
+export interface BlackroomBanEvent {
+  id: number
+  ban_id: number
+  user_id: number
+  /** `apply` | `reapply` | `extend` | `release` | `expire` | `shadow_match` */
+  event_type: string
+  source: string
+  reason: string
+  /** JSON 字符串，展示时格式化或折叠。 */
+  evidence: string
+  ip_count: number
+  /** JSON 数组字符串。 */
+  ip_list: string
+  window_start: number
+  window_end: number
+  ban_duration_seconds: number
+  banned_until: number
+  /** 手动操作时的操作人，0 表示系统。 */
+  actor_user_id: number
+  created_at: number
+}
+
+/**
+ * IP 审计视图用到的 URL 查询参数。合法取值由路由的 `validateSearch`
+ * 保证，这里只描述组件与 Hook 需要消费的字段。
+ */
+export interface BlackroomIPAuditSearchParams {
+  ipPage?: number
+  ipPageSize?: number
+  ipFilter?: string
+  /** Unix 秒；0 与缺省同义，表示不设下界。 */
+  ipStart?: number
+  /** Unix 秒；0 与缺省同义，表示不设上界。 */
+  ipEnd?: number
+}
+
+export interface GetBlackroomIPAuditParams {
+  p?: number
+  page_size?: number
+  filter?: string
+  start_at?: number
+  end_at?: number
+}
+
+export interface GetBlackroomEventsParams {
+  user_id: number
+  limit?: number
+}
+
+export type BlackroomDialogType =
+  | 'manual-ban'
+  | 'setting'
+  | 'release'
+  | 'events'

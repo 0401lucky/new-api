@@ -18,6 +18,18 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import type { TFunction } from 'i18next'
 
+export const BLACKROOM_TAB_VALUES = ['bans', 'ip-audit'] as const
+
+export const BLACKROOM_DEFAULT_TAB = 'bans'
+
+export const BLACKROOM_TAB_IP_AUDIT = 'ip-audit'
+
+/** IP 审计默认每页条数。 */
+export const BLACKROOM_IP_AUDIT_DEFAULT_PAGE_SIZE = 20
+
+/** 后端 `/api/blackroom/ip-audit` 接受的每页条数上限。 */
+export const BLACKROOM_IP_AUDIT_MAX_PAGE_SIZE = 100
+
 export const BLACKROOM_STATUS_VALUES = [
   'active',
   'released',
@@ -42,6 +54,33 @@ export const BLACKROOM_SOURCES: Record<
   auto: { labelKey: 'Auto', variant: 'warning' },
   manual: { labelKey: 'Manual', variant: 'neutral' },
   external: { labelKey: 'External', variant: 'danger' },
+}
+
+const BLACKROOM_BAN_EVENT_TYPES: Record<
+  string,
+  { labelKey: string; variant: 'success' | 'warning' | 'danger' | 'neutral' }
+> = {
+  apply: { labelKey: 'Ban applied', variant: 'danger' },
+  reapply: { labelKey: 'Ban reapplied', variant: 'danger' },
+  extend: { labelKey: 'Ban extended', variant: 'warning' },
+  release: { labelKey: 'Ban Released', variant: 'success' },
+  expire: { labelKey: 'Ban expired', variant: 'neutral' },
+  shadow_match: { labelKey: 'Shadow match', variant: 'warning' },
+}
+
+function normalizeBlackroomBanEventType(value: unknown): string {
+  return String(value ?? '').toLowerCase()
+}
+
+export function getBlackroomBanEventConfig(value: unknown): {
+  labelKey: string
+  variant: 'success' | 'warning' | 'danger' | 'neutral'
+} {
+  const eventType = normalizeBlackroomBanEventType(value)
+  if (!Object.hasOwn(BLACKROOM_BAN_EVENT_TYPES, eventType)) {
+    return { labelKey: eventType || '-', variant: 'neutral' }
+  }
+  return BLACKROOM_BAN_EVENT_TYPES[eventType]
 }
 
 export function getBlackroomStatusOptions(t: TFunction) {

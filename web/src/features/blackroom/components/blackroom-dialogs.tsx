@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { BlackroomEventsDialog } from './blackroom-events-dialog'
 import { BlackroomSettingDialog } from './blackroom-setting-dialog'
 import { ManualBanDialog } from './manual-ban-dialog'
 import { ReleaseDialog } from './release-dialog'
@@ -26,6 +27,7 @@ export function BlackroomDialogs() {
       <ManualBanDialog />
       <BlackroomSettingDialog />
       <ReleaseDialog />
+      <BlackroomEventsDialog />
     </>
   )
 }

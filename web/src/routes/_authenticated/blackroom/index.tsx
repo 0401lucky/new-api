@@ -16,23 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import z from 'zod'
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useAuthStore } from '@/stores/auth-store'
 import { ROLE } from '@/lib/roles'
 import { Blackroom } from '@/features/blackroom'
-import {
-  BLACKROOM_SOURCE_VALUES,
-  BLACKROOM_STATUS_VALUES,
-} from '@/features/blackroom/constants'
-
-const blackroomSearchSchema = z.object({
-  page: z.number().optional().catch(1),
-  pageSize: z.number().optional().catch(10),
-  filter: z.string().optional().catch(''),
-  status: z.array(z.enum(BLACKROOM_STATUS_VALUES)).optional().catch([]),
-  source: z.array(z.enum(BLACKROOM_SOURCE_VALUES)).optional().catch([]),
-})
+import { blackroomSearchSchema } from '@/features/blackroom/lib/blackroom-search'
 
 export const Route = createFileRoute('/_authenticated/blackroom/')({
   beforeLoad: () => {

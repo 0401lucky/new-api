@@ -16,8 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { type Row } from '@tanstack/react-table'
-import { MoreHorizontal, Unlock } from 'lucide-react'
+import type { Row } from '@tanstack/react-table'
+import { History, MoreHorizontal, Unlock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import {
@@ -57,6 +57,17 @@ export function DataTableRowActions<TData>({
         <span className='sr-only'>{t('Open menu')}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' className='w-[160px]'>
+        <DropdownMenuItem
+          onClick={() => {
+            setCurrentRow(entry)
+            setOpen('events')
+          }}
+        >
+          {t('View events')}
+          <DropdownMenuShortcut>
+            <History size={16} />
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
         <DropdownMenuItem
           disabled={!canRelease}
           onClick={() => {

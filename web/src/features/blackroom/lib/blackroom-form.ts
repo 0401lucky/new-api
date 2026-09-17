@@ -68,6 +68,27 @@ export function getBlackroomSettingFormSchema(t: TFunction) {
         .min(0, t('Escalation count must be zero or greater')),
       exempt_user_ids_text: z.string(),
       exempt_groups_text: z.string(),
+      shadow_mode: z.boolean(),
+      realtime_enabled: z.boolean(),
+      geo_enabled: z.boolean(),
+      geo_country_count: z.coerce
+        .number()
+        .int()
+        .min(1, t('Country count must be at least 1')),
+      geo_asn_count: z.coerce
+        .number()
+        .int()
+        .min(1, t('ASN count must be at least 1')),
+      geo_min_gap_seconds: z.coerce
+        .number()
+        .int()
+        .min(1, t('Minimum IP switch gap must be at least 1 second')),
+      geo_duration_hours: z.coerce
+        .number()
+        .int()
+        .min(1, t('Geo ban duration must be at least 1 hour')),
+      country_mmdb_path: z.string(),
+      asn_mmdb_path: z.string(),
     })
     .refine((value) => parseRulesText(value.rules_text).length > 0, {
       path: ['rules_text'],
@@ -106,6 +127,15 @@ export const BLACKROOM_SETTING_FORM_DEFAULT_VALUES: BlackroomSettingFormValues =
     escalation_temporary_ban_count: 3,
     exempt_user_ids_text: '',
     exempt_groups_text: '',
+    shadow_mode: false,
+    realtime_enabled: true,
+    geo_enabled: false,
+    geo_country_count: 3,
+    geo_asn_count: 3,
+    geo_min_gap_seconds: 180,
+    geo_duration_hours: 72,
+    country_mmdb_path: '',
+    asn_mmdb_path: '',
   }
 
 function formatRulesText(rules: BlackroomRule[] | undefined): string {
@@ -162,6 +192,15 @@ export function transformFormValuesToSetting(
     escalation_temporary_ban_count: values.escalation_temporary_ban_count,
     exempt_user_ids: parseCSVNumbers(values.exempt_user_ids_text),
     exempt_groups: parseCSVStrings(values.exempt_groups_text),
+    shadow_mode: values.shadow_mode,
+    realtime_enabled: values.realtime_enabled,
+    geo_enabled: values.geo_enabled,
+    geo_country_count: values.geo_country_count,
+    geo_asn_count: values.geo_asn_count,
+    geo_min_gap_seconds: values.geo_min_gap_seconds,
+    geo_duration_hours: values.geo_duration_hours,
+    country_mmdb_path: values.country_mmdb_path.trim(),
+    asn_mmdb_path: values.asn_mmdb_path.trim(),
   }
 }
 
@@ -181,5 +220,14 @@ export function transformSettingToFormDefaults(
     ),
     exempt_user_ids_text: (setting?.exempt_user_ids ?? []).join(','),
     exempt_groups_text: (setting?.exempt_groups ?? []).join(','),
+    shadow_mode: Boolean(setting?.shadow_mode ?? false),
+    realtime_enabled: Boolean(setting?.realtime_enabled ?? true),
+    geo_enabled: Boolean(setting?.geo_enabled ?? false),
+    geo_country_count: Number(setting?.geo_country_count ?? 3),
+    geo_asn_count: Number(setting?.geo_asn_count ?? 3),
+    geo_min_gap_seconds: Number(setting?.geo_min_gap_seconds ?? 180),
+    geo_duration_hours: Number(setting?.geo_duration_hours ?? 72),
+    country_mmdb_path: setting?.country_mmdb_path ?? '',
+    asn_mmdb_path: setting?.asn_mmdb_path ?? '',
   }
 }

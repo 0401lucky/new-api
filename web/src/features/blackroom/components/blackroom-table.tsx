@@ -167,13 +167,12 @@ export function BlackroomTable() {
           },
         ],
       }}
-      getRowClassName={(row, { isMobile }) =>
-        normalizeBlackroomStatus(row.original.status) !== 'active'
-          ? isMobile
-            ? DISABLED_ROW_MOBILE
-            : DISABLED_ROW_DESKTOP
-          : undefined
-      }
+      getRowClassName={(row, { isMobile }) => {
+        if (normalizeBlackroomStatus(row.original.status) === 'active') {
+          return undefined
+        }
+        return isMobile ? DISABLED_ROW_MOBILE : DISABLED_ROW_DESKTOP
+      }}
       mobileProps={{
         getRowKey: (row) => row.original.id,
       }}

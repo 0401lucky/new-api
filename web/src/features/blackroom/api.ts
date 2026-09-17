@@ -19,8 +19,13 @@ For commercial licensing, please contact support@quantumnous.com
 import { api } from '@/lib/api'
 import type {
   ApiResponse,
+  BlackroomBanEvent,
   BlackroomEntry,
+  BlackroomIPAuditResult,
   BlackroomSetting,
+  BlackroomStatusSummary,
+  GetBlackroomEventsParams,
+  GetBlackroomIPAuditParams,
   GetBlackroomParams,
   ManualBanPayload,
   PageInfo,
@@ -53,6 +58,38 @@ export async function updateBlackroomSetting(
   data: BlackroomSetting
 ): Promise<ApiResponse<BlackroomSetting>> {
   const res = await api.put('/api/blackroom/setting', data)
+  return res.data
+}
+
+export async function getBlackroomStatus(): Promise<
+  ApiResponse<BlackroomStatusSummary>
+> {
+  const res = await api.get('/api/blackroom/status')
+  return res.data
+}
+
+export async function getBlackroomIPAudit(
+  params: GetBlackroomIPAuditParams = {}
+): Promise<ApiResponse<BlackroomIPAuditResult>> {
+  const queryParams = new URLSearchParams()
+  queryParams.set('p', String(params.p ?? 1))
+  queryParams.set('page_size', String(params.page_size ?? 20))
+  if (params.filter) queryParams.set('filter', params.filter)
+  if (params.start_at) queryParams.set('start_at', String(params.start_at))
+  if (params.end_at) queryParams.set('end_at', String(params.end_at))
+
+  const res = await api.get(`/api/blackroom/ip-audit?${queryParams.toString()}`)
+  return res.data
+}
+
+export async function getBlackroomEvents(
+  params: GetBlackroomEventsParams
+): Promise<ApiResponse<BlackroomBanEvent[]>> {
+  const queryParams = new URLSearchParams()
+  queryParams.set('user_id', String(params.user_id))
+  if (params.limit) queryParams.set('limit', String(params.limit))
+
+  const res = await api.get(`/api/blackroom/events?${queryParams.toString()}`)
   return res.data
 }
 
