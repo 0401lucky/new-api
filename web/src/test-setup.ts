@@ -32,6 +32,10 @@ beforeAll(async () => {
   await i18next.use(initReactI18next).init({
     lng: 'en',
     fallbackLng: 'en',
+    // 与 src/i18n/config.ts 保持一致。i18next 默认把冒号当作命名空间分隔符，
+    // 不关掉的话，t('Status:') 这类「单词 + 冒号」的 key 在测试里会静默解析
+    // 成空串，而生产环境是正常的。
+    nsSeparator: false,
     resources: {
       en: {
         translation: {},
