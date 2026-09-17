@@ -1483,7 +1483,7 @@ type UpdateUserSettingRequest struct {
 	GotifyPriority                   int     `json:"gotify_priority,omitempty"`
 	UpstreamModelUpdateNotifyEnabled *bool   `json:"upstream_model_update_notify_enabled,omitempty"`
 	AcceptUnsetModelRatioModel       bool    `json:"accept_unset_model_ratio_model"`
-	RecordIpLog                      bool    `json:"record_ip_log"`
+	RecordIpLog                      *bool   `json:"record_ip_log,omitempty"`
 	DisableLeakProtectionBalanced    bool    `json:"disable_leak_protection_balanced"`
 }
 
@@ -1593,7 +1593,11 @@ func UpdateUserSetting(c *gin.Context) {
 	settings.GotifyPriority = 0
 	settings.UpstreamModelUpdateNotifyEnabled = upstreamModelUpdateNotifyEnabled
 	settings.AcceptUnsetRatioModel = req.AcceptUnsetModelRatioModel
-	settings.RecordIpLog = req.RecordIpLog
+	// 未携带该字段时保留用户现有设置：IP 记录是风控判定依赖的审计数据，
+	// 不能被一次无关的设置更新静默关闭。
+	if req.RecordIpLog != nil {
+		settings.RecordIpLog = *req.RecordIpLog
+	}
 	settings.DisableLeakProtectionBalanced = req.DisableLeakProtectionBalanced
 
 	// 如果是webhook类型,添加webhook相关设置

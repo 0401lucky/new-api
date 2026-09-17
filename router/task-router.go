@@ -13,7 +13,8 @@ import (
 // on submit routes and the task id on read routes.
 func SetTaskRouter(router *gin.Engine) {
 	taskSubmitRouter := router.Group("/v1/tasks")
-	taskSubmitRouter.Use(middleware.RouteTag("relay"), middleware.TokenAuth())
+	// 只有提交会消耗额度，读取与内容下载不参与 IP 审计。
+	taskSubmitRouter.Use(middleware.RouteTag("relay"), middleware.TokenAuth(), middleware.BlackroomRelayGuard())
 	{
 		taskSubmitRouter.POST("/:key", middleware.PrepareTaskPluginSubmit(), middleware.Distribute(), controller.RelayTask)
 	}

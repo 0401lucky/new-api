@@ -371,6 +371,8 @@ func migrateDB() error {
 		&PerfMetric{},
 		&ModelHealthSlice5m{},
 		&BlackroomBan{},
+		&BlackroomBanEvent{},
+		&BlackroomIPMinute{},
 		&UserFingerprint{},
 		&HighActiveTaskRecord{},
 		&DynamicRatioRule{},

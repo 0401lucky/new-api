@@ -24,6 +24,7 @@ import (
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/oauth"
+	"github.com/QuantumNous/new-api/pkg/ipgeo"
 	"github.com/QuantumNous/new-api/pkg/jsplugin"
 	perfmetrics "github.com/QuantumNous/new-api/pkg/perf_metrics"
 	"github.com/QuantumNous/new-api/pkg/wsmanager"
@@ -143,6 +144,12 @@ func main() {
 
 	// Blackroom maintenance task (expire due bans, optionally scan multi-IP abuse)
 	service.StartBlackroomTask()
+	// Optional MMDB resolver for blackroom geo/ASN evaluation. Not configuring
+	// MMDB is a supported deployment: the resolver stays unready and the
+	// geo rule is skipped instead of failing startup.
+	if err := ipgeo.InitializeDefault(service.BlackroomGeoResolverPaths()); err != nil {
+		common.SysError("failed to initialize blackroom IP geo resolver: " + err.Error())
+	}
 
 	// Report this process as a system instance so the System Info page can show
 	// all currently alive nodes in multi-instance deployments.

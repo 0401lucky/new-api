@@ -62,13 +62,10 @@ type BlackroomBanInput struct {
 	BannedUntil        int64
 }
 
+// BlackroomIPCandidate 是扫描阶段筛出的候选用户。判定所需的其他数据由
+// 共享判定逻辑按用户 ID 重新读取，避免在筛选阶段使用可能过期的快照。
 type BlackroomIPCandidate struct {
-	UserId       int    `gorm:"column:user_id" json:"user_id"`
-	Username     string `gorm:"column:username" json:"username"`
-	UserGroup    string `gorm:"column:user_group" json:"user_group"`
-	IpCount      int    `gorm:"column:ip_count" json:"ip_count"`
-	RequestCount int    `gorm:"column:request_count" json:"request_count"`
-	Quota        int    `gorm:"column:quota" json:"quota"`
+	UserId int `gorm:"column:user_id" json:"user_id"`
 }
 
 type blackroomCacheEntry struct {
@@ -298,7 +295,7 @@ func UpsertActiveBlackroomBan(input BlackroomBanInput) (*BlackroomBan, bool, err
 			return updateActiveBlackroomBan(tx, &ban, input, now)
 		}
 		created = true
-		return nil
+		return appendBlackroomBanEvent(tx, &ban, BlackroomBanEventApply, 0)
 	})
 	if err != nil {
 		return nil, false, err
@@ -337,16 +334,24 @@ func updateActiveBlackroomBan(tx *gorm.DB, ban *BlackroomBan, input BlackroomBan
 	if err := tx.Model(&BlackroomBan{}).Where("id = ?", ban.Id).Updates(updates).Error; err != nil {
 		return err
 	}
-	return tx.First(ban, "id = ?", ban.Id).Error
+	if err := tx.First(ban, "id = ?", ban.Id).Error; err != nil {
+		return err
+	}
+	// 覆盖前的取值已随上一条事件留存，这里记录本次变更后的快照。
+	return appendBlackroomBanEvent(tx, ban, BlackroomBanEventReapply, 0)
 }
 
 // SetBlackroomUserStatus 仅更新用户的 status 列，供小黑屋 external 来源联动
 // users.status 使用（封禁置 2、解封置 1）。
 func SetBlackroomUserStatus(userID int, status int) error {
+	return setBlackroomUserStatusTx(DB, userID, status)
+}
+
+func setBlackroomUserStatusTx(tx *gorm.DB, userID int, status int) error {
 	if userID <= 0 {
 		return errors.New("无效的用户 ID")
 	}
-	return DB.Model(&User{}).Where("id = ?", userID).Update("status", status).Error
+	return tx.Model(&User{}).Where("id = ?", userID).Update("status", status).Error
 }
 
 func ReleaseBlackroomBan(id int, releasedBy int, reason string) (*BlackroomBan, error) {
@@ -366,28 +371,38 @@ func ReleaseBlackroomBan(id int, releasedBy int, reason string) (*BlackroomBan, 
 		"release_reason": reason,
 		"updated_at":     now,
 	}
-	result := DB.Model(&BlackroomBan{}).Where("id = ? AND status = ?", id, BlackroomBanStatusActive).Updates(updates)
-	if result.Error != nil {
-		return nil, result.Error
-	}
-	if result.RowsAffected == 0 {
-		return nil, errors.New("该小黑屋记录不是生效状态")
-	}
-	if ban.Source == BlackroomBanSourceExternal {
-		if err := SetBlackroomUserStatus(ban.UserId, common.UserStatusEnabled); err != nil {
-			return nil, err
+
+	var released BlackroomBan
+	err = DB.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&BlackroomBan{}).Where("id = ? AND status = ?", id, BlackroomBanStatusActive).Updates(updates)
+		if result.Error != nil {
+			return result.Error
 		}
+		if result.RowsAffected == 0 {
+			return errors.New("该小黑屋记录不是生效状态")
+		}
+		if ban.Source == BlackroomBanSourceExternal {
+			if err := setBlackroomUserStatusTx(tx, ban.UserId, common.UserStatusEnabled); err != nil {
+				return err
+			}
+		}
+		if err := tx.First(&released, "id = ?", id).Error; err != nil {
+			return err
+		}
+		return appendBlackroomBanEvent(tx, &released, BlackroomBanEventRelease, releasedBy)
+	})
+	if err != nil {
+		return nil, err
 	}
 	InvalidateBlackroomUserAuthCache(ban.UserId)
-	return GetBlackroomBanByID(id)
+	return &released, nil
 }
 
 func ExpireDueBlackroomBans() (int64, error) {
 	now := common.GetTimestamp()
+	// 取完整记录：过期事件需要写入当时的完整快照。
 	var bans []BlackroomBan
-	if err := DB.Model(&BlackroomBan{}).
-		Select("id", "user_id", "source").
-		Where("status = ? AND banned_until > 0 AND banned_until <= ?", BlackroomBanStatusActive, now).
+	if err := DB.Where("status = ? AND banned_until > 0 AND banned_until <= ?", BlackroomBanStatusActive, now).
 		Find(&bans).Error; err != nil {
 		return 0, err
 	}
@@ -398,6 +413,7 @@ func ExpireDueBlackroomBans() (int64, error) {
 	// 恢复失败的记录留给下一轮重试，避免记录过期后账号永远停在禁用状态。
 	ids := make([]int, 0, len(bans))
 	userIDs := make([]int, 0, len(bans))
+	expiring := make([]BlackroomBan, 0, len(bans))
 	for _, ban := range bans {
 		if ban.Source == BlackroomBanSourceExternal {
 			if err := SetBlackroomUserStatus(ban.UserId, common.UserStatusEnabled); err != nil {
@@ -407,6 +423,7 @@ func ExpireDueBlackroomBans() (int64, error) {
 		}
 		ids = append(ids, ban.Id)
 		userIDs = append(userIDs, ban.UserId)
+		expiring = append(expiring, ban)
 	}
 	if len(ids) == 0 {
 		return 0, nil
@@ -420,6 +437,12 @@ func ExpireDueBlackroomBans() (int64, error) {
 		})
 	if result.Error != nil {
 		return 0, result.Error
+	}
+	// 过期是批量自动行为，事件写入失败只记录日志，不回滚已生效的过期状态。
+	for i := range expiring {
+		if err := appendBlackroomBanEvent(DB, &expiring[i], BlackroomBanEventExpire, 0); err != nil {
+			common.SysError(fmt.Sprintf("blackroom expire event failed: ban_id=%d error=%v", expiring[i].Id, err))
+		}
 	}
 	for _, userID := range userIDs {
 		InvalidateBlackroomUserAuthCache(userID)
@@ -457,53 +480,4 @@ func CountRecentTemporaryBlackroomBans(userID int, since int64) (int64, error) {
 		Where("user_id = ? AND ban_duration_seconds > 0 AND created_at >= ?", userID, since).
 		Count(&count).Error
 	return count, err
-}
-
-func FindBlackroomIPCandidates(windowStart int64, windowEnd int64, minIPCount int, minRequests int, limit int) ([]BlackroomIPCandidate, error) {
-	if minIPCount <= 0 {
-		return []BlackroomIPCandidate{}, nil
-	}
-	if LOG_DB == nil {
-		return nil, errors.New("日志数据库未初始化")
-	}
-	if limit <= 0 {
-		limit = 1000
-	}
-
-	selectExpr := fmt.Sprintf(
-		"user_id, MAX(username) AS username, MAX(%s) AS user_group, COUNT(DISTINCT ip) AS ip_count, COUNT(*) AS request_count, COALESCE(SUM(quota), 0) AS quota",
-		logGroupCol,
-	)
-	tx := LOG_DB.Model(&Log{}).
-		Select(selectExpr).
-		Where("type = ? AND user_id > 0 AND ip <> '' AND created_at >= ? AND created_at <= ?", LogTypeConsume, windowStart, windowEnd).
-		Group("user_id").
-		Having("COUNT(DISTINCT ip) >= ?", minIPCount)
-	if minRequests > 0 {
-		tx = tx.Having("COUNT(*) >= ?", minRequests)
-	}
-
-	var candidates []BlackroomIPCandidate
-	err := tx.Order("ip_count desc").Limit(limit).Scan(&candidates).Error
-	return candidates, err
-}
-
-func GetDistinctIPsForUser(userID int, windowStart int64, windowEnd int64, limit int) ([]string, error) {
-	if userID <= 0 {
-		return []string{}, nil
-	}
-	if LOG_DB == nil {
-		return nil, errors.New("日志数据库未初始化")
-	}
-	if limit <= 0 {
-		limit = 200
-	}
-	var ips []string
-	err := LOG_DB.Model(&Log{}).
-		Distinct("ip").
-		Where("user_id = ? AND type = ? AND ip <> '' AND created_at >= ? AND created_at <= ?", userID, LogTypeConsume, windowStart, windowEnd).
-		Order("ip asc").
-		Limit(limit).
-		Pluck("ip", &ips).Error
-	return ips, err
 }

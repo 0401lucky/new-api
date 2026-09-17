@@ -56,6 +56,8 @@ func TestMain(m *testing.M) {
 		&UserSubscription{},
 		&PerfMetric{},
 		&BlackroomBan{},
+		&BlackroomBanEvent{},
+		&BlackroomIPMinute{},
 		&Redemption{},
 		&InvitationCode{},
 		&Model{},
@@ -95,6 +97,8 @@ func truncateTables(t *testing.T) {
 		DB.Exec("DELETE FROM user_subscriptions")
 		DB.Exec("DELETE FROM perf_metrics")
 		DB.Exec("DELETE FROM blackroom_bans")
+		DB.Exec("DELETE FROM blackroom_ban_events")
+		DB.Exec("DELETE FROM blackroom_ip_minutes")
 		DB.Exec("DELETE FROM redemptions")
 		DB.Exec("DELETE FROM invitation_codes")
 		DB.Exec("DELETE FROM models")

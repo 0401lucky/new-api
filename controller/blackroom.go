@@ -5,6 +5,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/pkg/ipgeo"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/config"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
@@ -91,6 +92,15 @@ func UpdateBlackroomSetting(c *gin.Context) {
 		"blackroom_setting.escalation_temporary_ban_count": strconv.Itoa(req.EscalationTemporaryBanCount),
 		"blackroom_setting.exempt_user_ids":                string(exemptUserIDsBytes),
 		"blackroom_setting.exempt_groups":                  string(exemptGroupsBytes),
+		"blackroom_setting.shadow_mode":                    strconv.FormatBool(req.ShadowMode),
+		"blackroom_setting.realtime_enabled":               strconv.FormatBool(req.RealtimeEnabled),
+		"blackroom_setting.geo_enabled":                    strconv.FormatBool(req.GeoEnabled),
+		"blackroom_setting.geo_country_count":              strconv.Itoa(req.GeoCountryCount),
+		"blackroom_setting.geo_asn_count":                  strconv.Itoa(req.GeoASNCount),
+		"blackroom_setting.geo_min_gap_seconds":            strconv.Itoa(req.GeoMinGapSeconds),
+		"blackroom_setting.geo_duration_hours":             strconv.Itoa(req.GeoDurationHours),
+		"blackroom_setting.country_mmdb_path":              req.CountryMMDBPath,
+		"blackroom_setting.asn_mmdb_path":                  req.ASNMMDBPath,
 	}
 	if err := model.UpdateOptionsBulk(values); err != nil {
 		common.ApiError(c, err)
@@ -108,9 +118,89 @@ func UpdateBlackroomSetting(c *gin.Context) {
 			"min_requests":                   strconv.Itoa(req.MinRequests),
 			"escalation_window_days":         strconv.Itoa(req.EscalationWindowDays),
 			"escalation_temporary_ban_count": strconv.Itoa(req.EscalationTemporaryBanCount),
+			"shadow_mode":                    strconv.FormatBool(req.ShadowMode),
+			"realtime_enabled":               strconv.FormatBool(req.RealtimeEnabled),
+			"geo_enabled":                    strconv.FormatBool(req.GeoEnabled),
+			"geo_country_count":              strconv.Itoa(req.GeoCountryCount),
+			"geo_asn_count":                  strconv.Itoa(req.GeoASNCount),
+			"geo_min_gap_seconds":            strconv.Itoa(req.GeoMinGapSeconds),
+			"geo_duration_hours":             strconv.Itoa(req.GeoDurationHours),
+			"country_mmdb_path":              req.CountryMMDBPath,
+			"asn_mmdb_path":                  req.ASNMMDBPath,
 		})
 	}
+	// MMDB 路径可能已变更，按新配置重新加载解析器；失败会自动降级为
+	// 未就绪，地理判定停用但不影响其余功能，因此不作为请求错误返回。
+	if err := service.ReloadBlackroomGeoResolver(); err != nil {
+		common.SysError("failed to reload blackroom IP geo resolver: " + err.Error())
+	}
 	common.ApiSuccess(c, operation_setting.GetBlackroomSetting())
+}
+
+// GetBlackroomIPAudit 返回按 IP 聚合的观测视图，用于发现「一个 IP 被大量
+// 账号共用」这类用户维度看不到的信号。
+func GetBlackroomIPAudit(c *gin.Context) {
+	pageInfo := common.GetPageQuery(c)
+	startAt, _ := strconv.ParseInt(c.Query("start_at"), 10, 64)
+	endAt, _ := strconv.ParseInt(c.Query("end_at"), 10, 64)
+
+	result, err := model.ListBlackroomIPAudit(model.BlackroomIPAuditQuery{
+		StartAt:  startAt,
+		EndAt:    endAt,
+		Keyword:  c.Query("filter"),
+		Page:     pageInfo.GetPage(),
+		PageSize: pageInfo.GetPageSize(),
+	})
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, result)
+}
+
+// GetBlackroomBanEvents 返回某个用户的封禁事件时间线。
+func GetBlackroomBanEvents(c *gin.Context) {
+	userID, err := strconv.Atoi(c.Query("user_id"))
+	if err != nil || userID <= 0 {
+		common.ApiErrorMsg(c, "无效的用户 ID")
+		return
+	}
+	limit, _ := strconv.Atoi(c.Query("limit"))
+	events, err := model.ListBlackroomBanEvents(userID, limit)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, events)
+}
+
+// GetBlackroomStatus 汇总判定链路的就绪情况，供管理界面说明「为什么没有
+// 自动封禁」。
+func GetBlackroomStatus(c *gin.Context) {
+	setting := operation_setting.GetBlackroomSetting()
+	resolver := ipgeo.DefaultStatus()
+
+	blocking := make([]string, 0, 3)
+	if !setting.Enabled {
+		blocking = append(blocking, "blackroom_disabled")
+	}
+	if !setting.AutoBanEnabled {
+		blocking = append(blocking, "auto_ban_disabled")
+	}
+	if setting.GeoEnabled && !resolver.Ready {
+		blocking = append(blocking, "geo_resolver_not_ready")
+	}
+
+	common.ApiSuccess(c, gin.H{
+		"enabled":          setting.Enabled,
+		"auto_ban_enabled": setting.AutoBanEnabled,
+		"shadow_mode":      setting.ShadowMode,
+		"realtime_enabled": setting.RealtimeEnabled,
+		"geo_enabled":      setting.GeoEnabled,
+		"geo_effective":    setting.GeoEnabled && resolver.Ready,
+		"resolver":         resolver,
+		"blocking":         blocking,
+	})
 }
 
 func ManualBanBlackroomUser(c *gin.Context) {

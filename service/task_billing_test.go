@@ -54,6 +54,8 @@ func TestMain(m *testing.M) {
 		&model.TopUp{},
 		&model.UserSubscription{},
 		&model.BlackroomBan{},
+		&model.BlackroomBanEvent{},
+		&model.BlackroomIPMinute{},
 		&model.SystemTask{},
 		&model.SystemTaskLock{},
 		&model.Checkin{},
@@ -80,6 +82,8 @@ func truncate(t *testing.T) {
 		model.DB.Exec("DELETE FROM top_ups")
 		model.DB.Exec("DELETE FROM user_subscriptions")
 		model.DB.Exec("DELETE FROM blackroom_bans")
+		model.DB.Exec("DELETE FROM blackroom_ban_events")
+		model.DB.Exec("DELETE FROM blackroom_ip_minutes")
 		model.DB.Exec("DELETE FROM system_task_locks")
 		model.DB.Exec("DELETE FROM system_tasks")
 		model.DB.Exec("DELETE FROM checkins")

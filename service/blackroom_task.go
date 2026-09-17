@@ -98,7 +98,7 @@ func runBlackroomMaintenance(manual bool) (BlackroomScanSummary, error) {
 	summary.WindowStart = windowStart
 	summary.WindowEnd = now
 
-	candidates, err := model.FindBlackroomIPCandidates(windowStart, now, minIPCount, setting.MinRequests, blackroomCandidateLimit)
+	candidates, err := model.FindBlackroomAuditCandidates(windowStart, now, minIPCount, setting.MinRequests, blackroomCandidateLimit)
 	if err != nil {
 		logger.LogWarn(ctx, fmt.Sprintf("blackroom scan query failed: %v", err))
 		return summary, err
@@ -106,7 +106,7 @@ func runBlackroomMaintenance(manual bool) (BlackroomScanSummary, error) {
 
 	for _, candidate := range candidates {
 		summary.Scanned++
-		created, updated, skipped, err := handleBlackroomCandidate(setting, candidate, windowStart, now)
+		created, updated, skipped, err := handleBlackroomCandidate(setting, candidate.UserId, now)
 		if err != nil {
 			summary.Skipped++
 			logger.LogWarn(ctx, fmt.Sprintf("blackroom candidate skipped: user_id=%d error=%v", candidate.UserId, err))
@@ -136,105 +136,29 @@ func runBlackroomMaintenance(manual bool) (BlackroomScanSummary, error) {
 	return summary, nil
 }
 
-func handleBlackroomCandidate(setting *operation_setting.BlackroomSetting, candidate model.BlackroomIPCandidate, windowStart int64, windowEnd int64) (created bool, updated bool, skipped bool, err error) {
-	user, err := model.GetUserById(candidate.UserId, false)
+func handleBlackroomCandidate(setting *operation_setting.BlackroomSetting, userId int, windowEnd int64) (created bool, updated bool, skipped bool, err error) {
+	user, err := model.GetUserById(userId, false)
 	if err != nil {
 		return false, false, false, err
-	}
-	if user.Role >= common.RoleAdminUser || user.Status != common.UserStatusEnabled {
-		return false, false, true, nil
-	}
-	if operation_setting.IsBlackroomUserExempt(setting, user.Id, user.Group) ||
-		operation_setting.IsBlackroomUserExempt(setting, user.Id, candidate.UserGroup) {
-		return false, false, true, nil
-	}
-
-	// 上次封禁已覆盖的日志不再参与定罪：旧日志会在回看窗口内反复命中，
-	// 导致到期后被重新封禁、生效中被误续期、升级计数被重复累加。
-	effectiveStart := windowStart
-	lastWindowEnd, err := model.GetLatestBlackroomBanWindowEnd(user.Id)
-	if err != nil {
-		return false, false, false, err
-	}
-	if lastWindowEnd >= windowStart {
-		effectiveStart = lastWindowEnd + 1
-	}
-	ips, err := model.GetDistinctIPsForUser(user.Id, effectiveStart, windowEnd, 200)
-	if err != nil {
-		return false, false, false, err
-	}
-	ipCount := candidate.IpCount
-	if effectiveStart != windowStart {
-		ipCount = len(ips)
-	}
-
-	rule, ok := operation_setting.MatchBlackroomRule(setting, ipCount)
-	if !ok {
-		return false, false, true, nil
 	}
 
 	existing, existingErr := model.GetActiveBlackroomBan(user.Id)
 	if existingErr != nil && !errors.Is(existingErr, gorm.ErrRecordNotFound) {
 		return false, false, false, existingErr
 	}
-	if existingErr == nil && existing != nil && existing.Source == model.BlackroomBanSourceManual {
+	// 管理员手动封禁优先：自动判定既不覆盖也不延长它。
+	if existing != nil && existing.Source == model.BlackroomBanSourceManual {
 		return false, false, true, nil
 	}
 
-	decision, err := resolveBlackroomBanDecision(setting, user.Id, ipCount, windowEnd, existingErr != nil)
+	decision, err := evaluateBlackroomUser(setting, user.Id, user.Username, windowEnd, existingErr != nil)
 	if err != nil {
 		return false, false, false, err
 	}
-	durationSeconds := decision.DurationSeconds
-	bannedUntil := decision.BannedUntil
-	escalated := decision.Escalated
-
-	ipListBytes, err := common.Marshal(ips)
-	if err != nil {
-		return false, false, false, err
-	}
-	reason := fmt.Sprintf("%d 小时内使用了 %d 个不同 IP", setting.LookbackHours, ipCount)
-	if effectiveStart != windowStart {
-		reason = fmt.Sprintf("上次封禁后使用了 %d 个不同 IP", ipCount)
-	}
-	if escalated {
-		reason += "，已触发多次封禁升级"
-	}
-	evidenceBytes, err := common.Marshal(map[string]any{
-		"window_start":   effectiveStart,
-		"window_end":     windowEnd,
-		"lookback_hours": setting.LookbackHours,
-		"ip_count":       ipCount,
-		"request_count":  candidate.RequestCount,
-		"quota":          candidate.Quota,
-		"ips":            ips,
-		"rule":           rule,
-		"escalated":      escalated,
-	})
-	if err != nil {
-		return false, false, false, err
-	}
-
-	ban, wasCreated, err := model.UpsertActiveBlackroomBan(model.BlackroomBanInput{
-		UserId:             user.Id,
-		Username:           user.Username,
-		Source:             model.BlackroomBanSourceAuto,
-		Reason:             reason,
-		Evidence:           string(evidenceBytes),
-		IpCount:            ipCount,
-		IpList:             string(ipListBytes),
-		WindowStart:        effectiveStart,
-		WindowEnd:          windowEnd,
-		BanDurationSeconds: durationSeconds,
-		BannedUntil:        bannedUntil,
-	})
-	if err != nil {
-		return false, false, false, err
-	}
-	if ban == nil {
+	if decision == nil || decision.Skipped || decision.ShadowMatched {
 		return false, false, true, nil
 	}
-	return wasCreated, !wasCreated, false, nil
+	return decision.NewlyApplied, !decision.NewlyApplied, false, nil
 }
 
 func CreateManualBlackroomBan(userID int, durationHours int, permanent bool, reason string) (*model.BlackroomBan, error) {

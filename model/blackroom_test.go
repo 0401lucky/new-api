@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -339,4 +340,123 @@ func TestReleaseAutoBlackroomBanKeepsUserStatus(t *testing.T) {
 	var reloaded User
 	require.NoError(t, DB.First(&reloaded, "id = ?", user.Id).Error)
 	require.Equal(t, common.UserStatusDisabled, reloaded.Status)
+}
+
+// 每次封禁变更都留下不可变事件：状态表被覆盖掉的中间状态仍可追溯。
+func TestBlackroomBanEventsRecordLifecycle(t *testing.T) {
+	truncateTables(t)
+
+	user := User{
+		Username: "blackroom-event-user",
+		Password: "password",
+		Role:     common.RoleCommonUser,
+		Status:   common.UserStatusEnabled,
+		Group:    "default",
+	}
+	require.NoError(t, DB.Create(&user).Error)
+	now := common.GetTimestamp()
+
+	ban, created, err := UpsertActiveBlackroomBan(BlackroomBanInput{
+		UserId:             user.Id,
+		Username:           user.Username,
+		Source:             BlackroomBanSourceAuto,
+		Reason:             "首次命中",
+		BanDurationSeconds: 3600,
+		BannedUntil:        now + 3600,
+	})
+	require.NoError(t, err)
+	require.True(t, created)
+
+	events, err := ListBlackroomBanEvents(user.Id, 10)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	assert.Equal(t, BlackroomBanEventApply, events[0].EventType)
+	assert.Equal(t, "首次命中", events[0].Reason)
+	assert.Equal(t, now+3600, events[0].BannedUntil)
+
+	// 同一用户再次命中会覆盖状态表上的 reason/evidence，事件表必须留住两条。
+	_, created, err = UpsertActiveBlackroomBan(BlackroomBanInput{
+		UserId:             user.Id,
+		Username:           user.Username,
+		Source:             BlackroomBanSourceAuto,
+		Reason:             "再次命中",
+		BanDurationSeconds: 7200,
+		BannedUntil:        now + 7200,
+	})
+	require.NoError(t, err)
+	require.False(t, created)
+
+	events, err = ListBlackroomBanEvents(user.Id, 10)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	assert.Equal(t, BlackroomBanEventReapply, events[0].EventType)
+	assert.Equal(t, "再次命中", events[0].Reason)
+	assert.Equal(t, BlackroomBanEventApply, events[1].EventType)
+	assert.Equal(t, "首次命中", events[1].Reason)
+
+	_, err = ReleaseBlackroomBan(ban.Id, 42, "误判")
+	require.NoError(t, err)
+
+	events, err = ListBlackroomBanEvents(user.Id, 10)
+	require.NoError(t, err)
+	require.Len(t, events, 3)
+	assert.Equal(t, BlackroomBanEventRelease, events[0].EventType)
+	assert.Equal(t, 42, events[0].ActorUserId)
+}
+
+// 到期封禁同样留下事件。
+func TestBlackroomBanEventsRecordExpiry(t *testing.T) {
+	truncateTables(t)
+
+	user := User{
+		Username: "blackroom-expire-event-user",
+		Password: "password",
+		Role:     common.RoleCommonUser,
+		Status:   common.UserStatusEnabled,
+		Group:    "default",
+	}
+	require.NoError(t, DB.Create(&user).Error)
+	now := common.GetTimestamp()
+
+	_, _, err := UpsertActiveBlackroomBan(BlackroomBanInput{
+		UserId:             user.Id,
+		Username:           user.Username,
+		Source:             BlackroomBanSourceAuto,
+		Reason:             "到期用例",
+		BanDurationSeconds: 60,
+		BannedUntil:        now - 1,
+	})
+	require.NoError(t, err)
+
+	count, err := ExpireDueBlackroomBans()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+
+	events, err := ListBlackroomBanEvents(user.Id, 10)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	assert.Equal(t, BlackroomBanEventExpire, events[0].EventType)
+	assert.Equal(t, "到期用例", events[0].Reason)
+}
+
+// 事件是审计凭据，不允许改写或删除。
+func TestBlackroomBanEventsAreImmutable(t *testing.T) {
+	truncateTables(t)
+
+	event := BlackroomBanEvent{
+		UserId:    77,
+		EventType: BlackroomBanEventApply,
+		Reason:    "不可变用例",
+		CreatedAt: common.GetTimestamp(),
+	}
+	require.NoError(t, DB.Create(&event).Error)
+
+	require.ErrorIs(t, DB.Model(&BlackroomBanEvent{}).
+		Where("id = ?", event.Id).
+		Update("reason", "被改写").Error, ErrBlackroomBanEventImmutable)
+	require.ErrorIs(t, DB.Delete(&BlackroomBanEvent{}, event.Id).Error, ErrBlackroomBanEventImmutable)
+
+	var reloaded BlackroomBanEvent
+	require.NoError(t, DB.First(&reloaded, event.Id).Error)
+	assert.Equal(t, "不可变用例", reloaded.Reason)
 }
