@@ -27,6 +27,8 @@ import type {
   BatchSetTagParams,
   Channel,
   ChannelBalanceResponse,
+  ChannelModelUsageData,
+  ChannelModelUsageResponse,
   ChannelOpsResponse,
   ChannelTestResponse,
   CopyChannelParams,
@@ -352,6 +354,26 @@ export async function getChannelKey(
     })
   )
   return res.data
+}
+
+// ============================================================================
+// Channel Model Usage
+// ============================================================================
+
+/**
+ * 渠道各模型的调用次数统计，按成功计费的消费日志聚合。
+ */
+export async function getChannelModelUsage(
+  channelId: number
+): Promise<ChannelModelUsageData> {
+  const res = await api.get<ChannelModelUsageResponse>(
+    '/api/data/channel_model_usage',
+    {
+      params: { channel_id: channelId },
+      disableDuplicate: true,
+    }
+  )
+  return requireServerSuccess(res.data).data
 }
 
 // ============================================================================

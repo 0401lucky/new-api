@@ -210,6 +210,25 @@ export interface FetchModelsResponse {
   data?: string[]
 }
 
+export interface ChannelModelUsageStat {
+  model_name: string
+  request_count: number
+}
+
+export interface ChannelModelUsageData {
+  channel_id: number
+  start_timestamp: number
+  end_timestamp: number
+  models: ChannelModelUsageStat[]
+  total_requests: number
+}
+
+export interface ChannelModelUsageResponse {
+  success: boolean
+  message?: string
+  data: ChannelModelUsageData
+}
+
 export interface CopyChannelResponse {
   success: boolean
   message?: string

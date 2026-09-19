@@ -91,6 +91,7 @@ import { useChannels } from './channels-provider'
 import { DataTableRowActions } from './data-table-row-actions'
 import { DataTableTagRowActions } from './data-table-tag-row-actions'
 import { BalanceQueryDialog } from './dialogs/balance-query-dialog'
+import { ChannelModelUsageSheet } from './dialogs/channel-model-usage-sheet'
 import {
   CodexUsageDialog,
   type CodexUsageDialogData,
@@ -350,6 +351,7 @@ export function BalanceCell({ channel }: { channel: Channel }) {
   const [codexUsageOpen, setCodexUsageOpen] = useState(false)
   const [codexUsageResponse, setCodexUsageResponse] =
     useState<CodexUsageDialogData | null>(null)
+  const [modelUsageOpen, setModelUsageOpen] = useState(false)
   const currencyLabel = getCurrencyLabel()
   const tokenSuffix = currencyLabel === 'Tokens' ? ' Tokens' : ''
   const withSuffix = (value: string) =>
@@ -529,18 +531,27 @@ export function BalanceCell({ channel }: { channel: Channel }) {
         <Tooltip>
           <TooltipTrigger
             render={
-              <StatusBadge
-                label={sensitiveVisible ? usedDisplay : SENSITIVE_MASK}
-                variant='neutral'
+              <Button
+                variant='ghost'
                 size='sm'
-                copyable={false}
-                showDot={false}
-                className='cursor-help'
-              />
+                className='h-auto rounded-full p-0'
+                aria-label={t('Channel Model Usage')}
+                aria-haspopup='dialog'
+                onClick={() => setModelUsageOpen(true)}
+              >
+                <StatusBadge
+                  label={sensitiveVisible ? usedDisplay : SENSITIVE_MASK}
+                  variant='neutral'
+                  size='sm'
+                  copyable={false}
+                  showDot={false}
+                />
+              </Button>
             }
           />
           <TooltipContent>
             <p>{sensitiveVisible ? usedLabel : maskedUsedLabel}</p>
+            <p>{t('Click to view model call counts')}</p>
           </TooltipContent>
         </Tooltip>
         <Tooltip>
@@ -596,6 +607,12 @@ export function BalanceCell({ channel }: { channel: Channel }) {
           }
         }}
         isRefreshing={isUpdating}
+      />
+      <ChannelModelUsageSheet
+        open={modelUsageOpen}
+        onOpenChange={setModelUsageOpen}
+        channelId={channel.id}
+        channelName={sensitiveVisible ? channel.name : SENSITIVE_MASK}
       />
       {rawBalanceResponse !== null && (
         <BalanceQueryDialog

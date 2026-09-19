@@ -95,6 +95,37 @@ func GetUserModelUsageStats(c *gin.Context) {
 	})
 }
 
+func GetChannelModelUsageStats(c *gin.Context) {
+	channelId, _ := strconv.Atoi(c.Query("channel_id"))
+	if channelId <= 0 {
+		common.ApiErrorMsg(c, "无效的渠道ID")
+		return
+	}
+
+	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
+	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
+	limit, _ := strconv.Atoi(c.Query("limit"))
+
+	stats, err := model.GetChannelModelUsageStats(channelId, startTimestamp, endTimestamp, limit)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	var totalRequests int64
+	for _, stat := range stats {
+		totalRequests += stat.RequestCount
+	}
+
+	common.ApiSuccess(c, gin.H{
+		"channel_id":      channelId,
+		"start_timestamp": startTimestamp,
+		"end_timestamp":   endTimestamp,
+		"models":          stats,
+		"total_requests":  totalRequests,
+	})
+}
+
 func GetUserQuotaDates(c *gin.Context) {
 	userId := c.GetInt("id")
 	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)

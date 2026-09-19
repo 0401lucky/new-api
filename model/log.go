@@ -735,6 +735,41 @@ func GetUserModelUsageStats(userId int, startTimestamp int64, endTimestamp int64
 	return stats, nil
 }
 
+type ChannelModelUsageStat struct {
+	ModelName    string `json:"model_name"`
+	RequestCount int64  `json:"request_count"`
+}
+
+// GetChannelModelUsageStats 按模型名聚合渠道的消费日志，得到各模型被成功计费的调用次数。
+func GetChannelModelUsageStats(channelId int, startTimestamp int64, endTimestamp int64, limit int) ([]ChannelModelUsageStat, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
+	var stats []ChannelModelUsageStat
+	query := LOG_DB.Model(&Log{}).
+		Select("model_name, count(*) AS request_count").
+		Where("channel_id = ? AND type = ?", channelId, LogTypeConsume)
+	if startTimestamp != 0 {
+		query = query.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		query = query.Where("created_at <= ?", endTimestamp)
+	}
+	if err := query.
+		Group("model_name").
+		Order("request_count desc").
+		Limit(limit).
+		Scan(&stats).Error; err != nil {
+		common.SysError("failed to query channel model usage stats: " + err.Error())
+		return nil, errors.New("查询渠道模型统计失败")
+	}
+	return stats, nil
+}
+
 func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, userId int, tokenName string, channel int, group string) (stat Stat, err error) {
 	tx := LOG_DB.Table("logs").Select("COALESCE(sum(quota), 0) quota")
 
