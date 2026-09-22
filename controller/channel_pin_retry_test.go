@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/dto"
+	kitdto "github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
@@ -104,6 +105,80 @@ func newPinRetryContext() *gin.Context {
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
 	return c
+}
+
+// 会话绑定的渠道只声明了 /v1/chat/completions：请求打到 /v1/responses 时命中
+// request_path 过滤而不可用，这属于「这条请求的路径不属于该渠道」，不应该抹掉
+// 会话粘性——否则该会话后续的匹配请求会连同绑定一起丢失。
+func TestChannelAffinitySurvivesRequestPathMismatch(t *testing.T) {
+	require.NoError(t, i18n.Init())
+	db := modelManagementDB(t, "sqlite", "")
+
+	previousGroups := setting.UserUsableGroups2JSONString()
+	previousRatios, err := common.Marshal(ratio_setting.GetGroupRatioCopy())
+	require.NoError(t, err)
+	require.NoError(t, setting.UpdateUserUsableGroupsByJSONString(`{"default":"Default"}`))
+	require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(`{"default":1}`))
+	t.Cleanup(func() {
+		require.NoError(t, setting.UpdateUserUsableGroupsByJSONString(previousGroups))
+		require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(string(previousRatios)))
+	})
+
+	bound := model.Channel{
+		Id: 1, Name: "path-bound", Type: constant.ChannelTypeAdvancedCustom, Key: "test-only",
+		Status: common.ChannelStatusEnabled, Models: "path-test", Group: "default",
+		Priority: common.GetPointer(int64(10)),
+	}
+	bound.SetOtherSettings(kitdto.ChannelOtherSettings{
+		AdvancedCustom: &kitdto.AdvancedCustomConfig{
+			Routes: []kitdto.AdvancedCustomRoute{{
+				IncomingPath: "/v1/chat/completions",
+				Models:       []string{"path-test"},
+			}},
+		},
+	})
+	require.NoError(t, db.Create(&bound).Error)
+	require.NoError(t, bound.AddAbilities(db))
+
+	affinity := operation_setting.GetChannelAffinitySetting()
+	previousAffinity := *affinity
+	previousMemoryCache := common.MemoryCacheEnabled
+	t.Cleanup(func() {
+		*affinity = previousAffinity
+		common.MemoryCacheEnabled = previousMemoryCache
+	})
+	common.MemoryCacheEnabled = true
+	model.InitChannelCache()
+	snapshot, err := model.BuildRequestPolicy(map[string]string{
+		"channel_affinity_setting.enabled":      "true",
+		"channel_affinity_setting.session_mode": "prefer",
+		"channel_affinity_setting.rules":        `[{"name":"session","model_regex":[".*"],"key_sources":[{"type":"request_header","key":"X-Session"}]}]`,
+	})
+	require.NoError(t, err)
+	*affinity = snapshot.Affinity
+
+	seed := newPinRetryContext()
+	seed.Request.Header.Set("X-Session", t.Name())
+	_, found := service.GetPreferredChannelByAffinity(seed, "path-test", "default")
+	require.False(t, found)
+	seed.Set("channel_id", 1)
+	service.RecordChannelAffinity(seed, 1)
+	t.Cleanup(func() { service.ClearCurrentChannelAffinityCache(seed) })
+	boundID, found := service.GetPreferredChannelByAffinity(seed, "path-test", "default")
+	require.True(t, found)
+	require.Equal(t, 1, boundID)
+
+	request := newPinRetryContext()
+	request.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"path-test"}`))
+	request.Request.Header.Set("Content-Type", "application/json")
+	request.Request.Header.Set("X-Session", t.Name())
+	common.SetContextKey(request, constant.ContextKeyUsingGroup, "default")
+	middleware.Distribute()(request)
+
+	require.True(t, request.IsAborted(), "the only candidate fails the request-path filter")
+	stillBound, found := service.GetPreferredChannelByAffinity(seed, "path-test", "default")
+	assert.True(t, found, "a request-path mismatch must not drop the session binding")
+	assert.Equal(t, 1, stillBound)
 }
 
 func TestRequestPolicyConfigReturnsSettingsWithoutMigration(t *testing.T) {

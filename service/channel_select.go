@@ -314,8 +314,14 @@ func SelectChannelForRequest(c *gin.Context, modelName string, retry *RetryParam
 			affinityUsable := false
 			preferred, err := model.CacheGetChannel(preferredChannelID)
 			affinitySatisfied := false
+			pathMismatch := false
 			if err == nil && preferred != nil && preferred.Status == common.ChannelStatusEnabled {
-				affinitySatisfied, _ = model.ChannelSatisfiesFilters(preferred, modelName, constraints.Filters)
+				var mismatchKind dto.ChannelFilterKind
+				affinitySatisfied, mismatchKind = model.ChannelSatisfiesFilters(preferred, modelName, constraints.Filters)
+				// 请求路径不匹配只说明这条请求的路径不在该渠道声明的路由里，
+				// 不代表会话粘性失效（例如进阶自定义渠道同时服务多个端点），
+				// 因此保留缓存，让下一条路径匹配的请求继续命中同一渠道。
+				pathMismatch = mismatchKind == dto.FilterRequestPath
 			}
 			if affinitySatisfied {
 				if usingGroup == "auto" {
@@ -337,7 +343,7 @@ func SelectChannelForRequest(c *gin.Context, modelName string, retry *RetryParam
 					MarkChannelAffinityUsed(c, usingGroup, preferred.Id)
 				}
 			}
-			if !affinityUsable && !ShouldKeepChannelAffinityOnChannelDisabled() {
+			if !affinityUsable && !pathMismatch && !ShouldKeepChannelAffinityOnChannelDisabled() {
 				ClearCurrentChannelAffinityCache(c)
 			}
 			if !affinityUsable && RequestPolicy(c).SessionMode == "strict" {
