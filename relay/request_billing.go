@@ -63,6 +63,7 @@ func PrepareRequestBilling(c *gin.Context, info *relaycommon.RelayInfo) *types.N
 			c.Header("X-Prompt-Check-Warning", verdict.Reason)
 		}
 		if verdict.Action == service.PromptCheckActionBlock {
+			service.RequestPolicy(c).AddEvent(service.PolicyEvent{ErrorCode: string(types.ErrorCodePromptBlocked), ErrorSource: "local", Decision: service.PolicyDecision{Action: "stop", Reason: "prompt_check", Source: "global"}, Health: "unchanged"})
 			service.RecentCallsCache().UpsertErrorByContext(c, verdict.Reason, "prompt_check", string(types.ErrorCodePromptBlocked), http.StatusBadRequest)
 			return types.NewErrorWithStatusCode(
 				errors.New("request contains content blocked by prompt check"),

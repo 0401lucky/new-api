@@ -17,7 +17,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { RateLimitSection } from '../request-limits/rate-limit-section'
-import { SensitiveWordsSection } from '../request-limits/sensitive-words-section'
 import { SSRFSection } from '../request-limits/ssrf-section'
 import { TokenLimitSection } from '../request-limits/token-limit-section'
 import type { SecuritySettings } from '../types'
@@ -41,35 +40,6 @@ const SECURITY_SECTIONS = [
           ModelRequestRateLimitGroup: settings.ModelRequestRateLimitGroup,
           ModelRequestRateLimitExemptUserIDs:
             settings.ModelRequestRateLimitExemptUserIDs,
-        }}
-      />
-    ),
-  },
-  {
-    id: 'sensitive-words',
-    titleKey: 'Prompt Check',
-    build: (settings: SecuritySettings) => (
-      <SensitiveWordsSection
-        defaultValues={{
-          CheckSensitiveEnabled: settings.CheckSensitiveEnabled,
-          CheckSensitiveOnPromptEnabled: settings.CheckSensitiveOnPromptEnabled,
-          SensitiveWords: settings.SensitiveWords,
-          PromptCheckMode: settings.PromptCheckMode,
-          PromptCheckThreshold: settings.PromptCheckThreshold,
-          PromptCheckStrictThreshold: settings.PromptCheckStrictThreshold,
-          PromptCheckLogMatchesEnabled: settings.PromptCheckLogMatchesEnabled,
-          PromptCheckMaxTextLength: settings.PromptCheckMaxTextLength,
-          PromptCheckModelScope: settings.PromptCheckModelScope,
-          PromptCheckGroupWhitelist: settings.PromptCheckGroupWhitelist,
-          PromptCheckChannelWhitelist: settings.PromptCheckChannelWhitelist,
-          PromptCheckDisabledRules: settings.PromptCheckDisabledRules,
-          PromptCheckAPIReviewEnabled: settings.PromptCheckAPIReviewEnabled,
-          PromptCheckAPIReviewModel: settings.PromptCheckAPIReviewModel,
-          PromptCheckAPIReviewBaseURL: settings.PromptCheckAPIReviewBaseURL,
-          PromptCheckAPIReviewKey: settings.PromptCheckAPIReviewKey,
-          PromptCheckAPIReviewTimeoutMS: settings.PromptCheckAPIReviewTimeoutMS,
-          PromptCheckAPIReviewFailClosedEnabled:
-            settings.PromptCheckAPIReviewFailClosedEnabled,
         }}
       />
     ),

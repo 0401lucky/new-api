@@ -19,6 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 // Static translation keys that don't get picked up by the t('...') regex.
 // These cover dynamic labels (e.g. constants, configs) that are passed into t at runtime.
 export const STATIC_I18N_KEYS = [
+  'Task usage metadata is unavailable. Pricing details cannot be displayed.',
+  'This expression cannot be expanded into a price table. View the original expression below.',
   // Donation API, validation, and backend permission catalog messages.
   'Campaign names can contain at most 120 characters.',
   'Configure the donation connection, campaigns, and permanent rewards.',
@@ -125,7 +127,7 @@ export const STATIC_I18N_KEYS = [
   'Connect to Jimeng image and video generation services',
   'Connect to Vidu video generation services',
   'Connect to Submodel model services',
-  'Generate Doubao Seedance videos through Volcengine Ark',
+  'Connect to Doubao Seedance video and Seedream image generation through Volcengine Ark',
   'Connect to OpenAI Sora video generation services',
   'Access hosted model predictions through Replicate',
   'Access Codex using ChatGPT subscription credentials',
@@ -133,7 +135,7 @@ export const STATIC_I18N_KEYS = [
   "New API's flexible channel lets you configure upstream addresses and authentication per endpoint, choose native forwarding or supported protocol conversions, and configure model listing and balance queries independently",
   'Flexible integration',
   'Connect to model services through a Sub2API gateway',
-  'Connect to model services from another New API instance',
+  'Connect to New API model services with support for multiple task plugins',
   'SGLang',
   'Connect to self-hosted models served by SGLang',
   'SGLang server address, without /v1',
@@ -150,7 +152,6 @@ export const STATIC_I18N_KEYS = [
   'Realtime pricing must be converted manually.',
   'This OpenRouter Claude price derives cache-write usage from upstream cost and must be converted manually.',
   'Gemini and OpenAI audio prices differ for this model. Use separate billing model names to convert them.',
-  'This model has different image request multipliers across channels. Use separate billing model names to convert them.',
   // Image cache billing and legacy price conversion.
   'Image cache input price',
   'Image Cache',

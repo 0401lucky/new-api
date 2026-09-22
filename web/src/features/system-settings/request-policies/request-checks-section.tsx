@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next'
 import * as z from 'zod'
 
 import { MultiSelect, type Option } from '@/components/multi-select'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -65,6 +66,8 @@ import { useAuthStore } from '@/stores/auth-store'
 
 import { getPromptCheckRules, getUpstreamChannels } from '../api'
 import {
+  SettingsControlChildren,
+  SettingsControlGroup,
   SettingsForm,
   SettingsFormGridItem,
   SettingsSwitchContent,
@@ -74,6 +77,7 @@ import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
 import type { PromptCheckRule } from '../types'
+import { useSavePolicy } from './use-save-policy'
 
 const sensitiveSchema = z.object({
   CheckSensitiveEnabled: z.boolean(),
@@ -98,9 +102,17 @@ const sensitiveSchema = z.object({
 
 type SensitiveFormValues = z.infer<typeof sensitiveSchema>
 
-type SensitiveWordsSectionProps = {
+type RequestChecksSectionProps = {
   defaultValues: SensitiveFormValues
 }
+
+// 这三个键属于请求策略选项，必须走 request_policy 批量接口写入；
+// 其余 PromptCheck* 键不是策略选项，只能走通用选项接口。
+const POLICY_OPTION_KEYS = new Set([
+  'CheckSensitiveEnabled',
+  'CheckSensitiveOnPromptEnabled',
+  'SensitiveWords',
+])
 
 const WHITELIST_VALUE_SEPARATOR = /[\n\r,，;；]+/
 
@@ -435,11 +447,12 @@ function PromptCheckRuleManagementPanel(props: {
   )
 }
 
-export function SensitiveWordsSection({
+export function RequestChecksSection({
   defaultValues,
-}: SensitiveWordsSectionProps) {
+}: RequestChecksSectionProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
+  const savePolicy = useSavePolicy()
   const form = useForm<SensitiveFormValues>({
     resolver: zodResolver(sensitiveSchema),
     defaultValues,
@@ -477,15 +490,21 @@ export function SensitiveWordsSection({
   const groupWhitelistOptions = useMemo(
     () =>
       mergeSelectedOptions(
-        createTextOptions(groupsQuery.data?.data ?? []),
+        // 接口异常返回非数组时降级为空列表，避免整页被错误边界接管。
+        createTextOptions(
+          Array.isArray(groupsQuery.data?.data) ? groupsQuery.data.data : []
+        ),
         selectedGroupWhitelist
       ),
     [groupsQuery.data?.data, selectedGroupWhitelist]
   )
 
   const channelWhitelistOptions = useMemo(() => {
+    const listedChannels = Array.isArray(channelsQuery.data?.data)
+      ? channelsQuery.data.data
+      : []
     const options =
-      channelsQuery.data?.data.map((channel) => {
+      listedChannels.map((channel) => {
         const value = String(channel.id)
         const description = channel.name || channel.base_url
 
@@ -511,14 +530,29 @@ export function SensitiveWordsSection({
       ([key, value]) =>
         value !== defaultValues[key as keyof SensitiveFormValues]
     )
+    if (updates.length === 0) return
 
+    const policyUpdates: Record<string, string> = {}
+    const optionUpdates: Array<[string, string]> = []
     for (const [key, value] of updates) {
-      await updateOption.mutateAsync({ key, value: value ?? '' })
+      const text = value === null || value === undefined ? '' : String(value)
+      if (POLICY_OPTION_KEYS.has(key)) {
+        policyUpdates[key] = text
+      } else {
+        optionUpdates.push([key, text])
+      }
+    }
+
+    if (Object.keys(policyUpdates).length > 0) {
+      await savePolicy.mutateAsync(policyUpdates)
+    }
+    for (const [key, value] of optionUpdates) {
+      await updateOption.mutateAsync({ key, value })
     }
   }
 
   return (
-    <SettingsSection title={t('Prompt Check')}>
+    <SettingsSection title={t('Request checks')}>
       <Tabs defaultValue='overview' className='flex flex-col gap-4'>
         <TabsList className='grid w-full grid-cols-3'>
           <TabsTrigger value='overview'>{t('Overview')}</TabsTrigger>
@@ -554,57 +588,73 @@ export function SensitiveWordsSection({
             <SettingsForm onSubmit={form.handleSubmit(onSubmit)}>
               <SettingsPageFormActions
                 onSave={form.handleSubmit(onSubmit)}
-                isSaving={updateOption.isPending}
-                saveLabel='Save prompt check'
+                isSaving={updateOption.isPending || savePolicy.isPending}
+                saveLabel='Save sensitive words'
               />
+              <Alert>
+                <AlertDescription>
+                  {form.watch('CheckSensitiveEnabled') &&
+                  form.watch('CheckSensitiveOnPromptEnabled') &&
+                  form.watch('SensitiveWords')?.trim()
+                    ? t(
+                        'Prompt text filtering is active with the current form values.'
+                      )
+                    : t(
+                        'Prompt text filtering needs both switches enabled and a non-empty keyword list.'
+                      )}
+                </AlertDescription>
+              </Alert>
               <div className='flex flex-col gap-4'>
-                <FormField
-                  control={form.control}
-                  name='CheckSensitiveEnabled'
-                  render={({ field }) => (
-                    <SettingsSwitchItem>
-                      <SettingsSwitchContent>
-                        <FormLabel>{t('Enable prompt check')}</FormLabel>
-                        <FormDescription>
-                          {t(
-                            'Checks prompts before they reach upstream models to reduce jailbreak, reverse engineering, and NSFW abuse.'
-                          )}
-                        </FormDescription>
-                      </SettingsSwitchContent>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </SettingsSwitchItem>
-                  )}
-                />
+                <SettingsControlGroup>
+                  <FormField
+                    control={form.control}
+                    name='CheckSensitiveEnabled'
+                    render={({ field }) => (
+                      <SettingsSwitchItem>
+                        <SettingsSwitchContent>
+                          <FormLabel>{t('Enable filtering')}</FormLabel>
+                          <FormDescription>
+                            {t(
+                              'Checks prompts before they reach upstream models to reduce jailbreak, reverse engineering, and NSFW abuse.'
+                            )}
+                          </FormDescription>
+                        </SettingsSwitchContent>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </SettingsSwitchItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name='CheckSensitiveOnPromptEnabled'
-                  render={({ field }) => (
-                    <SettingsSwitchItem>
-                      <SettingsSwitchContent>
-                        <FormLabel>
-                          {t('Inspect prompts before relay')}
-                        </FormLabel>
-                        <FormDescription>
-                          {t(
-                            'Keeps the check in the relay preflight stage so blocked requests never reach the provider.'
-                          )}
-                        </FormDescription>
-                      </SettingsSwitchContent>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </SettingsSwitchItem>
-                  )}
-                />
+                  <SettingsControlChildren>
+                    <FormField
+                      control={form.control}
+                      name='CheckSensitiveOnPromptEnabled'
+                      render={({ field }) => (
+                        <SettingsSwitchItem>
+                          <SettingsSwitchContent>
+                            <FormLabel>{t('Inspect user prompts')}</FormLabel>
+                            <FormDescription>
+                              {t(
+                                'Keeps the check in the relay preflight stage so blocked requests never reach the provider.'
+                              )}
+                            </FormDescription>
+                          </SettingsSwitchContent>
+                          <FormControl>
+                            <Switch
+                              disabled={!form.watch('CheckSensitiveEnabled')}
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </SettingsSwitchItem>
+                      )}
+                    />
+                  </SettingsControlChildren>
+                </SettingsControlGroup>
 
                 <FormField
                   control={form.control}

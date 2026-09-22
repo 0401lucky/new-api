@@ -12,6 +12,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/common/limiter"
 	"github.com/QuantumNous/new-api/constant"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting"
 
 	"github.com/gin-gonic/gin"
@@ -299,7 +300,8 @@ func redisRateLimitHandler(duration int64, layers []rateLimitLayer) gin.HandlerF
 
 		c.Next()
 
-		if c.Writer.Status() < 400 {
+		// 5. 如果请求成功，记录成功请求
+		if modelRequestSucceeded(c) {
 			for _, layer := range layers {
 				recordRedisRequest(ctx, rdb, layer.successRedisKey(), layer.successMaxCount)
 			}
@@ -313,9 +315,14 @@ func memoryRateLimitHandler(duration int64, layers []rateLimitLayer) gin.Handler
 
 	return func(c *gin.Context) {
 		releases := make([]concurrencyReleaseFunc, 0, len(layers))
+		reservations := make([]*common.RateLimitReservation, 0, len(layers))
 		defer func() {
 			for i := len(releases) - 1; i >= 0; i-- {
 				releases[i]()
+			}
+			// 成功路径已在 c.Next() 后完成预留，这里是失败/中断路径的兜底释放。
+			for _, reservation := range reservations {
+				reservation.Complete(false)
 			}
 		}()
 
@@ -326,12 +333,14 @@ func memoryRateLimitHandler(duration int64, layers []rateLimitLayer) gin.Handler
 				return
 			}
 
-			// 使用临时 key 检查成功请求限制，避免实际记录
-			checkKey := layer.successMemoryKey() + "_check"
-			if layer.successMaxCount > 0 && !inMemoryRateLimiter.Request(checkKey, layer.successMaxCount, duration) {
-				c.Status(http.StatusTooManyRequests)
-				c.Abort()
-				return
+			// 预留名额，请求结束后再按实际结果决定是否计入成功次数
+			if layer.successMaxCount > 0 {
+				reservation := inMemoryRateLimiter.Reserve(layer.successMemoryKey(), layer.successMaxCount, duration)
+				if reservation == nil {
+					c.AbortWithStatus(http.StatusTooManyRequests)
+					return
+				}
+				reservations = append(reservations, reservation)
 			}
 
 			release, allowed, err := acquireConcurrencySlot(layer.identity, layer.concurrencyMaxCount)
@@ -349,14 +358,16 @@ func memoryRateLimitHandler(duration int64, layers []rateLimitLayer) gin.Handler
 
 		c.Next()
 
-		if c.Writer.Status() < 400 {
-			for _, layer := range layers {
-				if layer.successMaxCount > 0 {
-					inMemoryRateLimiter.Request(layer.successMemoryKey(), layer.successMaxCount, duration)
-				}
-			}
+		// 4. 如果请求成功，记录到实际的成功请求计数中
+		for _, reservation := range reservations {
+			reservation.Complete(modelRequestSucceeded(c))
 		}
 	}
+}
+
+func modelRequestSucceeded(c *gin.Context) bool {
+	status, _ := common.GetContextKeyType[*relaycommon.StreamStatus](c, constant.ContextKeyResponseStreamStatus)
+	return c.Writer.Status() < 400 && !status.ResponseFailed()
 }
 
 // ModelRequestRateLimit 模型请求限流中间件

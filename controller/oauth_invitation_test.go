@@ -30,14 +30,14 @@ func TestLinuxDOExistingUsernameBypassesInvitationCode(t *testing.T) {
 		Status:      common.UserStatusEnabled,
 	}).Error)
 
-	user, err := findOrCreateOAuthUser(nil, &oauth.LinuxDOProvider{}, &oauth.OAuthUser{
+	user, _, err := findOrCreateOAuthUser(nil, &oauth.LinuxDOProvider{}, &oauth.OAuthUser{
 		ProviderUserID: "123456",
 		Username:       "linuxdo-user",
 		DisplayName:    "LinuxDO User",
 		Extra: map[string]any{
 			"trust_level": common.LinuxDOMinimumTrustLevel,
 		},
-	}, "", "")
+	}, nil, "", "")
 
 	require.NoError(t, err)
 	require.Equal(t, 2001, user.Id)
@@ -69,14 +69,14 @@ func TestLinuxDOExistingUsernameMatchIgnoresCaseBypassesInvitationCode(t *testin
 		Status:      common.UserStatusEnabled,
 	}).Error)
 
-	user, err := findOrCreateOAuthUser(nil, &oauth.LinuxDOProvider{}, &oauth.OAuthUser{
+	user, _, err := findOrCreateOAuthUser(nil, &oauth.LinuxDOProvider{}, &oauth.OAuthUser{
 		ProviderUserID: "987654",
 		Username:       "linuxdo-user",
 		DisplayName:    "LinuxDO User",
 		Extra: map[string]any{
 			"trust_level": common.LinuxDOMinimumTrustLevel,
 		},
-	}, "", "")
+	}, nil, "", "")
 
 	require.NoError(t, err)
 	require.Equal(t, 2003, user.Id)
@@ -109,14 +109,14 @@ func TestLinuxDOExistingProviderIDBypassesInvitationCode(t *testing.T) {
 		LinuxDOId:   "654321",
 	}).Error)
 
-	user, err := findOrCreateOAuthUser(nil, &oauth.LinuxDOProvider{}, &oauth.OAuthUser{
+	user, _, err := findOrCreateOAuthUser(nil, &oauth.LinuxDOProvider{}, &oauth.OAuthUser{
 		ProviderUserID: "654321",
 		Username:       "bound-linuxdo-user",
 		DisplayName:    "Bound LinuxDO User",
 		Extra: map[string]any{
 			"trust_level": common.LinuxDOMinimumTrustLevel,
 		},
-	}, "", "")
+	}, nil, "", "")
 
 	require.NoError(t, err)
 	require.Equal(t, 2002, user.Id)
@@ -135,14 +135,14 @@ func TestLinuxDONewUserRequiresInvitationCode(t *testing.T) {
 		common.RegisterEnabled = originalRegisterEnabled
 	})
 
-	user, err := findOrCreateOAuthUser(nil, &oauth.LinuxDOProvider{}, &oauth.OAuthUser{
+	user, _, err := findOrCreateOAuthUser(nil, &oauth.LinuxDOProvider{}, &oauth.OAuthUser{
 		ProviderUserID: "112233",
 		Username:       "new-linuxdo-user",
 		DisplayName:    "New LinuxDO User",
 		Extra: map[string]any{
 			"trust_level": common.LinuxDOMinimumTrustLevel,
 		},
-	}, "", "")
+	}, nil, "", "")
 
 	var requiredErr *OAuthInvitationCodeRequiredError
 	require.ErrorAs(t, err, &requiredErr)
