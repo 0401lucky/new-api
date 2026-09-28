@@ -35,6 +35,7 @@ import {
 } from '@/features/model-pricing/pricing'
 import { api } from '@/lib/api'
 
+import { SyncPriceCell } from '../models/upstream-price-cells'
 import { UpstreamRatioSync } from '../models/upstream-ratio-sync'
 import {
   getSyncPriceLines,
@@ -165,6 +166,85 @@ describe('pricing synchronization', () => {
     )
     expect(copy).toHaveBeenCalledWith(expression)
   })
+
+  it('highlights changed source expression values without altering the copied expression', async () => {
+    const current = 'tier("custom", p * 2 + c * 8) * max(1, param("factor"))'
+    const source = 'tier("custom", p * 3 + c * 8) * max(1, param("factor"))'
+    render(
+      <TableFixture
+        prices={{
+          m: {
+            current: { billing_mode: 'tiered_expr', billing_expr: current },
+            upstreams: {
+              upstream: { billing_mode: 'tiered_expr', billing_expr: source },
+            },
+          },
+        }}
+      />
+    )
+    const cells = within(screen.getByRole('row', { name: /^m / })).getAllByRole(
+      'cell'
+    )
+    expect(within(cells[1]).queryByRole('mark')).not.toBeInTheDocument()
+    expect(within(cells[2]).getAllByRole('mark')).toHaveLength(1)
+    expect(within(cells[2]).getByRole('mark')).toHaveTextContent('3')
+    expect(within(cells[2]).getByRole('code').textContent).toBe(source)
+
+    const user = userEvent.setup()
+    const copy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
+    await user.click(
+      within(cells[2]).getByRole('button', { name: 'Copy billing expression' })
+    )
+    expect(copy).toHaveBeenCalledWith(source)
+  })
+
+  it.each([
+    { name: 'missing', base: undefined },
+    { name: 'identical', base: 'p * max(2, c)' },
+    { name: 'different length', base: 'p + c' },
+  ])(
+    'shows raw expressions without highlighting against a $name baseline',
+    ({ base }) => {
+      const source = 'p * max(2, c)'
+      render(
+        <SyncPriceCell
+          values={{ billing_mode: 'tiered_expr', billing_expr: source }}
+          compareTo={{ billing_mode: 'tiered_expr', billing_expr: base }}
+        />
+      )
+      expect(screen.getByRole('code').textContent).toBe(source)
+      expect(screen.queryByRole('mark')).not.toBeInTheDocument()
+    }
+  )
+
+  it.each([1, 2])(
+    'gives current and source price columns equal widths with %s sources',
+    (sourceCount) => {
+      render(
+        <TableFixture
+          prices={{
+            m: {
+              ...prices.m,
+              upstreams: Object.fromEntries(
+                ['upstream', 'alternative']
+                  .slice(0, sourceCount)
+                  .map((source) => [source, prices.m.upstreams.upstream])
+              ),
+            },
+          }}
+        />
+      )
+      for (const table of screen.getAllByRole('table')) {
+        const columns = [...table.querySelectorAll('col')].slice(1)
+        expect(columns).toHaveLength(sourceCount + 1)
+        const currentWidth = columns[0].style.width
+        expect(currentWidth).not.toBe('')
+        for (const column of columns.slice(1)) {
+          expect(column.style.width).toBe(currentWidth)
+        }
+      }
+    }
+  )
 
   it('shows every parsed tier and falls back to the full expression when pricing cannot be parsed safely', () => {
     const tiered =
