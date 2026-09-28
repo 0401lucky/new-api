@@ -79,7 +79,11 @@ import type {
 } from '@/features/dashboard/types'
 import { formatNumber, formatQuota } from '@/lib/format'
 import { requireServerSuccess } from '@/lib/server-error-message'
-import { getRollingDateRange, type TimeGranularity } from '@/lib/time'
+import {
+  getPresetDateRange,
+  type DateRangePreset,
+  type TimeGranularity,
+} from '@/lib/time'
 import { VCHART_OPTION } from '@/lib/vchart'
 
 let themeManagerPromise: Promise<
@@ -371,7 +375,7 @@ export function UserCharts(props: UserChartsProps) {
   const onFiltersChange = props.onFiltersChange
 
   const timeRange = useMemo(() => {
-    const { start, end } = getRollingDateRange(selectedRange)
+    const { start, end } = getPresetDateRange(selectedRange)
     return {
       start_timestamp: Math.floor(start.getTime() / 1000),
       end_timestamp: Math.floor(end.getTime() / 1000),
@@ -379,10 +383,14 @@ export function UserCharts(props: UserChartsProps) {
   }, [selectedRange])
 
   const handleRangeChange = useCallback(
-    (days: number) => {
-      onFiltersChange({ ...props.filters, selectedRange: days })
+    (days: DateRangePreset) => {
+      onFiltersChange({
+        ...props.filters,
+        selectedRange: days,
+        timeGranularity: days === 'today' ? 'hour' : timeGranularity,
+      })
     },
-    [onFiltersChange, props.filters]
+    [onFiltersChange, props.filters, timeGranularity]
   )
 
   const handleGranularityChange = useCallback(
@@ -475,7 +483,9 @@ export function UserCharts(props: UserChartsProps) {
         <div className='flex items-center gap-1.5 overflow-x-auto pb-1 sm:gap-2'>
           <Tabs
             value={String(selectedRange)}
-            onValueChange={(value) => handleRangeChange(Number(value))}
+            onValueChange={(value) =>
+              handleRangeChange(value === 'today' ? 'today' : Number(value))
+            }
             className='shrink-0'
           >
             <TabsList>

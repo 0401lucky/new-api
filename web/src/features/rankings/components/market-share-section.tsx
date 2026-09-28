@@ -29,7 +29,7 @@ import type { RankingPeriod, VendorRanking, VendorShareSeries } from '../types'
 import { VendorLink } from './entity-links'
 
 const PERIOD_DESCRIPTIONS: Record<RankingPeriod, string> = {
-  today: 'Token share by model author across the last 24 hours',
+  today: 'Token share by model author since local midnight',
   week: 'Token share by model author across the past few weeks',
   month: 'Token share by model author across the past month',
   year: 'Token share by model author across the past year',

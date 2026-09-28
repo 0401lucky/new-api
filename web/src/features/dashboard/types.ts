@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { TimeGranularity } from '@/lib/time'
+import type { DateRangePreset, TimeGranularity } from '@/lib/time'
 
 // ============================================================================
 // Quota & Usage Data Types
@@ -202,6 +202,7 @@ export interface UptimeGroupResult {
 // ============================================================================
 
 export interface DashboardFilters {
+  rangePreset?: DateRangePreset
   start_timestamp?: Date
   end_timestamp?: Date
   time_granularity?: TimeGranularity
@@ -215,7 +216,7 @@ export type ModelAnalyticsChartTab = 'trend' | 'proportion' | 'top'
 export interface DashboardChartPreferences {
   consumptionDistributionChart: ConsumptionDistributionChartType
   modelAnalyticsChart: ModelAnalyticsChartTab
-  defaultTimeRangeDays: number
+  defaultTimeRangeDays: DateRangePreset
   defaultTimeGranularity: TimeGranularity
 }
 
@@ -223,7 +224,7 @@ export interface DashboardChartPreferences {
 // switching between dashboard sub-sections, matching the model/flow filters.
 export interface UserChartsFilters {
   timeGranularity: TimeGranularity
-  selectedRange: number
+  selectedRange: DateRangePreset
   topUserLimit: number
 }
 

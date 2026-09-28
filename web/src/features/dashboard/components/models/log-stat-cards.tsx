@@ -34,13 +34,18 @@ import type {
 } from '@/features/dashboard/types'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatCompactNumber, formatNumber, formatQuota } from '@/lib/format'
+import { requireServerSuccess } from '@/lib/server-error-message'
 import { computeTimeRange } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
 interface LogStatCardsProps {
   filters?: DashboardFilters
-  onDataUpdate?: (data: QuotaDataItem[], loading: boolean) => void
+  onDataUpdate?: (
+    data: QuotaDataItem[],
+    loading: boolean,
+    error?: boolean
+  ) => void
 }
 
 const MAX_INLINE_STAT_CHARS = 9
@@ -94,6 +99,7 @@ export function LogStatCards(props: LogStatCardsProps) {
     void getUserQuotaDates(buildQueryParams(timeRange, filters), isAdmin)
       .then((res) => {
         if (abortController.signal.aborted) return
+        requireServerSuccess(res)
         const data = res?.data || []
         setStats(calculateDashboardStats(data))
         onDataUpdate?.(data, false)
@@ -102,7 +108,7 @@ export function LogStatCards(props: LogStatCardsProps) {
         if (abortController.signal.aborted) return
         setStats(null)
         setError(true)
-        onDataUpdate?.([], false)
+        onDataUpdate?.([], false, true)
       })
       .finally(() => {
         if (!abortController.signal.aborted) {

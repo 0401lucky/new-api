@@ -16,26 +16,21 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useQuery } from '@tanstack/react-query'
+import { expect, it, vi } from 'vitest'
 
-import { requireServerSuccess } from '@/lib/server-error-message'
+import { api } from '@/lib/api'
 
 import { getRankings } from '../api'
-import type { RankingPeriod } from '../types'
 
-export function useRankings(period: RankingPeriod) {
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-  const localDate = new Date().toDateString()
-  return useQuery({
-    queryKey: [
-      'rankings',
-      period,
-      timezone,
-      period === 'today' ? localDate : null,
-    ],
-    queryFn: async () =>
-      requireServerSuccess(await getRankings(period, timezone)),
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: period === 'today' ? 60_000 : false,
+it('sends the browser timezone with the Today ranking request', async () => {
+  const get = vi
+    .spyOn(api, 'get')
+    .mockResolvedValue({ data: { success: true, data: {} } })
+  await getRankings('today')
+  expect(get).toHaveBeenCalledWith('/api/rankings', {
+    params: {
+      period: 'today',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    },
   })
-}
+})

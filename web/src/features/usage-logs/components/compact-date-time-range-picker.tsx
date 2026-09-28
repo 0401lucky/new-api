@@ -28,6 +28,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import dayjs from '@/lib/dayjs'
+import { getPresetDateRange } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
 interface CompactDateTimeRangePickerProps {
@@ -61,8 +62,7 @@ export function CompactDateTimeRangePicker({
   const label = useMemo(() => {
     if (!start && !end) return t('Date Range')
     // The popover's <input type="datetime-local"> only supports minute
-    // precision, so seconds are always 00 (manual pick) or 59 (preset
-    // end-of-day). Hide them in the trigger label to keep the button
+    // precision. Hide seconds in the trigger label to keep the button
     // width compact while still showing the meaningful timestamp.
     const startText = start ? dayjs(start).format('YYYY-MM-DD HH:mm') : '-'
     const endText = end ? dayjs(end).format('YYYY-MM-DD HH:mm') : '-'
@@ -96,10 +96,7 @@ export function CompactDateTimeRangePicker({
   const applyPreset = (kind: 'today' | '7d' | 'week' | '30d' | 'month') => {
     const now = dayjs()
     const presets = {
-      today: {
-        start: now.startOf('day').toDate(),
-        end: now.endOf('day').toDate(),
-      },
+      today: getPresetDateRange('today', now.toDate()),
       '7d': {
         start: now.subtract(6, 'day').startOf('day').toDate(),
         end: now.endOf('day').toDate(),

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"sync"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/QuantumNous/new-api/model"
 )
@@ -108,6 +109,7 @@ type rankingPeriodConfig struct {
 	bucketSize  int64
 	labelLayout string
 	hasPrevious bool
+	location    *time.Location
 }
 
 type rankingCacheItem struct {
@@ -135,15 +137,37 @@ var (
 	rankingCache   = map[string]rankingCacheItem{}
 )
 
-func GetRankingsSnapshot(period string) (*RankingsResponse, error) {
+func GetRankingsSnapshot(period, timezone string) (*RankingsResponse, error) {
 	config, err := rankingConfig(period)
 	if err != nil {
 		return nil, err
 	}
 
-	now := time.Now()
+	config.location = time.Local
+	if config.id == "today" {
+		if timezone == "" {
+			timezone = "UTC"
+		}
+		if len(timezone) > 100 || timezone == "Local" {
+			return nil, fmt.Errorf("invalid ranking timezone")
+		}
+		config.location, err = time.LoadLocation(timezone)
+		if err != nil {
+			return nil, fmt.Errorf("invalid ranking timezone")
+		}
+	}
+	now := time.Now().In(config.location)
+	cacheKey := config.id
+	if config.id == "today" {
+		cacheKey += ":" + config.location.String() + ":" + now.Format("2006-01-02")
+	}
 	rankingCacheMu.Lock()
-	if item, ok := rankingCache[config.id]; ok && now.Before(item.expiresAt) {
+	for key, item := range rankingCache {
+		if !now.Before(item.expiresAt) {
+			delete(rankingCache, key)
+		}
+	}
+	if item, ok := rankingCache[cacheKey]; ok && now.Before(item.expiresAt) {
 		rankingCacheMu.Unlock()
 		return item.data, nil
 	}
@@ -155,7 +179,7 @@ func GetRankingsSnapshot(period string) (*RankingsResponse, error) {
 	}
 
 	rankingCacheMu.Lock()
-	rankingCache[config.id] = rankingCacheItem{
+	rankingCache[cacheKey] = rankingCacheItem{
 		expiresAt: now.Add(rankingCacheTTL),
 		data:      data,
 	}
@@ -192,7 +216,7 @@ func buildRankingsSnapshot(config rankingPeriodConfig, now time.Time) (*Rankings
 
 	var previousTotals []model.RankingQuotaTotal
 	if config.hasPrevious {
-		previousStart, previousEnd := previousRankingTimeRange(config, startTime)
+		previousStart, previousEnd := previousRankingTimeRange(config, now)
 		previousTotals, err = model.GetRankingQuotaTotals(previousStart, previousEnd)
 		if err != nil {
 			return nil, err
@@ -222,13 +246,22 @@ func buildRankingsSnapshot(config rankingPeriodConfig, now time.Time) (*Rankings
 
 func rankingTimeRange(config rankingPeriodConfig, now time.Time) (int64, int64) {
 	endTime := now.Unix()
+	if config.id == "today" {
+		start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		return start.Unix(), endTime
+	}
 	if config.duration <= 0 {
 		return 0, endTime
 	}
 	return now.Add(-config.duration).Unix(), endTime
 }
 
-func previousRankingTimeRange(config rankingPeriodConfig, currentStart int64) (int64, int64) {
+func previousRankingTimeRange(config rankingPeriodConfig, now time.Time) (int64, int64) {
+	if config.id == "today" {
+		// Compare with the same local clock time yesterday, including DST days.
+		return rankingTimeRange(config, now.AddDate(0, 0, -1))
+	}
+	currentStart, _ := rankingTimeRange(config, now)
 	previousEnd := currentStart - 1
 	previousStart := time.Unix(currentStart, 0).Add(-config.duration).Unix()
 	return previousStart, previousEnd
@@ -526,7 +559,11 @@ func rankingBucketTs(bucket int64) string {
 }
 
 func rankingBucketLabel(bucket int64, config rankingPeriodConfig) string {
-	return time.Unix(bucket, 0).Format(config.labelLayout)
+	location := config.location
+	if location == nil {
+		location = time.Local
+	}
+	return time.Unix(bucket, 0).In(location).Format(config.labelLayout)
 }
 
 func rankingRankMap(totals []model.RankingQuotaTotal) map[string]int {

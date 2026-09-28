@@ -44,6 +44,7 @@ export const TIME_GRANULARITY_OPTIONS = [
 ] as const
 
 export const TIME_RANGE_PRESETS = [
+  { label: 'Today', days: 'today' },
   { label: '1 Day', days: 1 },
   { label: '7 Days', days: 7 },
   { label: '14 Days', days: 14 },

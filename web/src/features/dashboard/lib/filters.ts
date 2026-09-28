@@ -31,7 +31,11 @@ import type {
   DashboardFilters,
   ModelAnalyticsChartTab,
 } from '@/features/dashboard/types'
-import { getRollingDateRange, type TimeGranularity } from '@/lib/time'
+import {
+  getPresetDateRange,
+  type DateRangePreset,
+  type TimeGranularity,
+} from '@/lib/time'
 
 function isTimeGranularity(value: unknown): value is TimeGranularity {
   return value === 'hour' || value === 'day' || value === 'week'
@@ -55,7 +59,7 @@ function isModelAnalyticsChartTab(
   return value === 'trend' || value === 'proportion' || value === 'top'
 }
 
-function isTimeRangePresetDays(value: unknown): value is number {
+function isTimeRangePresetDays(value: unknown): value is DateRangePreset {
   return TIME_RANGE_PRESETS.some((preset) => preset.days === value)
 }
 
@@ -135,7 +139,7 @@ export function saveChartPreferences(
   )
 }
 
-export function getDefaultDays(granularity?: TimeGranularity): number {
+export function getDefaultDays(granularity?: TimeGranularity): DateRangePreset {
   if (!granularity) return getSavedChartPreferences().defaultTimeRangeDays
   return TIME_RANGE_BY_GRANULARITY[getSavedGranularity(granularity)]
 }
@@ -143,9 +147,10 @@ export function getDefaultDays(granularity?: TimeGranularity): number {
 export function buildDefaultDashboardFilters(
   preferences: DashboardChartPreferences = getSavedChartPreferences()
 ): DashboardFilters {
-  const { start, end } = getRollingDateRange(preferences.defaultTimeRangeDays)
+  const { start, end } = getPresetDateRange(preferences.defaultTimeRangeDays)
   return {
     ...EMPTY_DASHBOARD_FILTERS,
+    rangePreset: preferences.defaultTimeRangeDays,
     start_timestamp: start,
     end_timestamp: end,
     time_granularity: preferences.defaultTimeGranularity,

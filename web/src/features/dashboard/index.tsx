@@ -89,6 +89,12 @@ const LazyModelCharts = lazy(() =>
   }))
 )
 
+const LazyModelUsageTable = lazy(() =>
+  import('./components/models/model-usage-table').then((m) => ({
+    default: m.ModelUsageTable,
+  }))
+)
+
 const LazyConsumptionDistributionChart = lazy(() =>
   import('./components/models/consumption-distribution-chart').then((m) => ({
     default: m.ConsumptionDistributionChart,
@@ -201,6 +207,7 @@ export function Dashboard() {
 
   const [modelData, setModelData] = useState<QuotaDataItem[]>([])
   const [dataLoading, setDataLoading] = useState(false)
+  const [dataError, setDataError] = useState(false)
   const [chartPreferences, setChartPreferences] =
     useState<DashboardChartPreferences>(() => getSavedChartPreferences())
   const [modelFilters, setModelFilters] = useState<DashboardFilters>(() =>
@@ -227,9 +234,10 @@ export function Dashboard() {
   }, [chartPreferences])
 
   const handleDataUpdate = useCallback(
-    (data: QuotaDataItem[], loading: boolean) => {
+    (data: QuotaDataItem[], loading: boolean, error = false) => {
       setModelData(data)
       setDataLoading(loading)
+      setDataError(error)
     },
     []
   )
@@ -363,6 +371,13 @@ export function Dashboard() {
                   </Suspense>
                 </FadeIn>
               )}
+              <Suspense fallback={<ModelChartsFallback />}>
+                <LazyModelUsageTable
+                  data={modelData}
+                  loading={dataLoading}
+                  error={dataError}
+                />
+              </Suspense>
               <FadeIn delay={0.1}>
                 <Suspense fallback={<ModelChartsFallback />}>
                   <LazyConsumptionDistributionChart

@@ -26,6 +26,19 @@ import dayjs from '@/lib/dayjs'
  */
 export type TimeGranularity = 'hour' | 'day' | 'week'
 
+export type DateRangePreset = number | 'today'
+
+/** Calendar today uses the browser's local timezone, including DST changes. */
+export function getPresetDateRange(
+  preset: DateRangePreset,
+  now: Date = new Date()
+): { start: Date; end: Date } {
+  if (preset === 'today') {
+    return { start: getStartOfDay(now), end: new Date(now) }
+  }
+  return getRollingDateRange(preset, now)
+}
+
 /**
  * Convert Date object to Unix timestamp (seconds)
  */
@@ -106,11 +119,18 @@ export function getRollingDateRange(
  * @returns Object with start_timestamp and end_timestamp in seconds
  */
 export function computeTimeRange(
-  days: number,
+  days: DateRangePreset,
   startDate?: Date,
   endDate?: Date,
   useStartOfDay = false
 ): { start_timestamp: number; end_timestamp: number } {
+  if (days === 'today') {
+    const range = getPresetDateRange('today')
+    return {
+      start_timestamp: dateToUnixTimestamp(startDate ?? range.start),
+      end_timestamp: dateToUnixTimestamp(endDate ?? range.end),
+    }
+  }
   const now = Math.floor(Date.now() / 1000)
 
   if (useStartOfDay) {

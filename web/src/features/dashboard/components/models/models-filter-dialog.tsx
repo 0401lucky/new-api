@@ -46,7 +46,11 @@ import type {
   DashboardChartPreferences,
   DashboardFilters,
 } from '@/features/dashboard/types'
-import { getRollingDateRange, type TimeGranularity } from '@/lib/time'
+import {
+  getPresetDateRange,
+  type DateRangePreset,
+  type TimeGranularity,
+} from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -64,7 +68,8 @@ interface ModelsFilterProps {
 // Quick-range presets imply a sensible granularity (matching the app's
 // range<->granularity pairing), so picking "7 Days" requests daily buckets
 // instead of leaving the granularity on its previous value (e.g. hourly).
-function granularityForRangeDays(days: number): TimeGranularity {
+function granularityForRangeDays(days: DateRangePreset): TimeGranularity {
+  if (days === 'today') return 'hour'
   if (days <= 1) return 'hour'
   if (days >= 29) return 'week'
   return 'day'
@@ -74,11 +79,12 @@ function granularityForRangeDays(days: number): TimeGranularity {
 // exact preset; custom ranges leave every quick button unselected.
 function detectQuickRangeDays(
   filters: DashboardFilters | undefined
-): number | null {
+): DateRangePreset | null {
   const start = filters?.start_timestamp
   const end = filters?.end_timestamp
   if (!start || !end) return null
-  const days = Math.round((end.getTime() - start.getTime()) / 86_400_000)
+  if (filters?.rangePreset === 'today') return 'today'
+  const days = (end.getTime() - start.getTime()) / 86_400_000
   return TIME_RANGE_PRESETS.some((preset) => preset.days === days) ? days : null
 }
 
@@ -107,8 +113,8 @@ export function ModelsFilter(props: ModelsFilterProps) {
     () =>
       props.currentFilters ?? buildDefaultDashboardFilters(props.preferences)
   )
-  const [selectedRange, setSelectedRange] = useState<number | null>(() =>
-    detectQuickRangeDays(props.currentFilters)
+  const [selectedRange, setSelectedRange] = useState<DateRangePreset | null>(
+    () => detectQuickRangeDays(props.currentFilters)
   )
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -124,9 +130,15 @@ export function ModelsFilter(props: ModelsFilterProps) {
   }
 
   const handleApply = () => {
+    const applied = { ...filters }
+    if (selectedRange === 'today') {
+      const { start, end } = getPresetDateRange('today')
+      applied.start_timestamp = start
+      applied.end_timestamp = end
+    }
     props.onFilterChange(
       cleanFilters(
-        filters as unknown as Record<string, unknown>
+        applied as unknown as Record<string, unknown>
       ) as typeof filters
     )
     setOpen(false)
@@ -134,7 +146,7 @@ export function ModelsFilter(props: ModelsFilterProps) {
 
   const handleReset = () => {
     const days = props.preferences.defaultTimeRangeDays
-    const { start, end } = getRollingDateRange(days)
+    const { start, end } = getPresetDateRange(days)
     setFilters({
       ...buildDefaultDashboardFilters(props.preferences),
       start_timestamp: start,
@@ -149,16 +161,23 @@ export function ModelsFilter(props: ModelsFilterProps) {
     field: keyof DashboardFilters,
     value: Date | string | undefined
   ) => {
-    setFilters((prev) => ({ ...prev, [field]: value }))
-    if (field === 'start_timestamp' || field === 'end_timestamp')
+    const isDate = field === 'start_timestamp' || field === 'end_timestamp'
+    setFilters((prev) => ({
+      ...prev,
+      [field]: value,
+      rangePreset: isDate ? undefined : prev.rangePreset,
+    }))
+    if (isDate) {
       setSelectedRange(null)
+    }
   }
 
-  const handleQuickRange = (days: number) => {
-    const { start, end } = getRollingDateRange(days)
+  const handleQuickRange = (days: DateRangePreset) => {
+    const { start, end } = getPresetDateRange(days)
 
     setFilters((prev) => ({
       ...prev,
+      rangePreset: days,
       start_timestamp: start,
       end_timestamp: end,
       time_granularity: granularityForRangeDays(days),
@@ -212,6 +231,7 @@ export function ModelsFilter(props: ModelsFilterProps) {
                   type='button'
                   size='sm'
                   variant={selectedRange === range.days ? 'default' : 'outline'}
+                  aria-pressed={selectedRange === range.days}
                   onClick={() => handleQuickRange(range.days)}
                   className={cn(
                     'flex-1',
@@ -257,12 +277,10 @@ export function ModelsFilter(props: ModelsFilterProps) {
           <div className='grid gap-2'>
             <Label htmlFor='time_granularity'>{t('Time Granularity')}</Label>
             <Select
-              items={[
-                ...TIME_GRANULARITY_OPTIONS.map((option) => ({
-                  value: option.value,
-                  label: t(option.label),
-                })),
-              ]}
+              items={TIME_GRANULARITY_OPTIONS.map((option) => ({
+                value: option.value,
+                label: t(option.label),
+              }))}
               value={filters.time_granularity}
               onValueChange={(value) =>
                 handleChange('time_granularity', value as TimeGranularity)

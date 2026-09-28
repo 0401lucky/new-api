@@ -27,8 +27,9 @@ type RankingsResponse = {
 }
 
 export async function getRankings(
-  period: RankingPeriod
+  period: RankingPeriod,
+  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 ): Promise<RankingsResponse> {
-  const res = await api.get('/api/rankings', { params: { period } })
+  const res = await api.get('/api/rankings', { params: { period, timezone } })
   return res.data
 }
