@@ -25,12 +25,13 @@ import {
   DataTablePagination,
   DataTableToolbar,
   DataTableView,
+  TruncatedCell,
   useDataTable,
 } from '@/components/data-table'
 import { ErrorState } from '@/components/error-state'
 import type { QuotaDataItem } from '@/features/dashboard/types'
 import { toIntlLocale } from '@/i18n/languages'
-import { formatNumber } from '@/lib/format'
+import { formatCompactNumber, formatNumber } from '@/lib/format'
 
 interface ModelUsageRow {
   model: string
@@ -61,6 +62,7 @@ export function ModelUsageTable(props: ModelUsageTableProps) {
     }
     return [...models.values()]
   }, [props.data])
+  // Keep K/M/B units consistent; tooltips format exact values in the UI locale.
   const columns = useMemo<ColumnDef<ModelUsageRow>[]>(
     () => [
       {
@@ -85,9 +87,13 @@ export function ModelUsageTable(props: ModelUsageTableProps) {
           />
         ),
         cell: ({ row }) => (
-          <span className='block text-right tabular-nums'>
-            {formatNumber(row.original.requests, locale)}
-          </span>
+          <TruncatedCell
+            className='text-right tabular-nums'
+            tooltipContent={formatNumber(row.original.requests, locale)}
+            tabIndex={0}
+          >
+            {formatCompactNumber(row.original.requests, 'en-US')}
+          </TruncatedCell>
         ),
         enableGlobalFilter: false,
         enableHiding: false,
@@ -102,9 +108,13 @@ export function ModelUsageTable(props: ModelUsageTableProps) {
           />
         ),
         cell: ({ row }) => (
-          <span className='block text-right tabular-nums'>
-            {formatNumber(row.original.tokens, locale)}
-          </span>
+          <TruncatedCell
+            className='text-right tabular-nums'
+            tooltipContent={formatNumber(row.original.tokens, locale)}
+            tabIndex={0}
+          >
+            {formatCompactNumber(row.original.tokens, 'en-US')}
+          </TruncatedCell>
         ),
         enableGlobalFilter: false,
         enableHiding: false,

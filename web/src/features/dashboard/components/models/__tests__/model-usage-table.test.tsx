@@ -35,8 +35,66 @@ afterEach(async () => {
 })
 
 describe('model usage details', () => {
-  it('updates number formatting when the interface language changes', async () => {
+  it('uses K, M and B for large counts and preserves small values', () => {
+    render(
+      <ModelUsageTable
+        data={[
+          {
+            model_name: 'large',
+            created_at: 1,
+            count: 20300,
+            token_used: 2800000000,
+          },
+          {
+            model_name: 'medium',
+            created_at: 1,
+            count: 2700,
+            token_used: 182100000,
+          },
+          { model_name: 'small', created_at: 1, count: 572, token_used: 999 },
+        ]}
+      />
+    )
+    const rows = within(screen.getByRole('table')).getAllByRole('row')
+    expect(
+      within(rows[1])
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent)
+    ).toEqual(['large', '20.3K', '2.8B'])
+    expect(
+      within(rows[2])
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent)
+    ).toEqual(['medium', '2.7K', '182.1M'])
+    expect(
+      within(rows[3])
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent)
+    ).toEqual(['small', '572', '999'])
+  })
+
+  it('shows the full token count on keyboard focus', async () => {
+    render(
+      <ModelUsageTable
+        data={[
+          {
+            model_name: 'alpha',
+            created_at: 1,
+            count: 20300,
+            token_used: 2800000034,
+          },
+        ]}
+      />
+    )
+    const user = userEvent.setup()
+    // Search, three sortable headers, requests, then tokens.
+    for (let i = 0; i < 6; i++) await user.tab()
+    expect(await screen.findByText('2,800,000,034')).toBeVisible()
+  })
+
+  it('keeps K/M/B notation and localizes the exact value when the interface language changes', async () => {
     render(<ModelUsageTable data={data} />)
+    const user = userEvent.setup()
     for (const [language, expected] of [
       ['zhCN', '1,200,034'],
       ['zhTW', '1,200,034'],
@@ -51,10 +109,18 @@ describe('model usage details', () => {
         await i18next.changeLanguage(language)
       })
       const row = screen.getByRole('row', { name: /^alpha / })
-      expect(within(row).getAllByRole('cell')[2].textContent).toBe(expected)
+      expect(within(row).getAllByRole('cell')[2].textContent).toBe('1.2M')
+      await user.hover(screen.getByText('1.2M'))
+      expect(
+        await screen.findByText(expected, {
+          exact: true,
+          normalizer: (text) => text,
+        })
+      ).toBeVisible()
+      await user.unhover(screen.getByText('1.2M'))
     }
   })
-  it('sums all time buckets per model and shows full counts including zero tokens', () => {
+  it('sums all time buckets per model and shows compact counts including zero tokens', () => {
     render(<ModelUsageTable data={data} />)
     const rows = within(screen.getByRole('table')).getAllByRole('row')
     expect(rows).toHaveLength(4)
@@ -64,7 +130,7 @@ describe('model usage details', () => {
       within(rows[2])
         .getAllByRole('cell')
         .map((cell) => cell.textContent)
-    ).toEqual(['alpha', '7', '1,200,034'])
+    ).toEqual(['alpha', '7', '1.2M'])
     expect(
       within(rows[3])
         .getAllByRole('cell')
@@ -87,7 +153,7 @@ describe('model usage details', () => {
     expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(
       2
     )
-    expect(screen.getByRole('cell', { name: '1,200,034' })).toBeVisible()
+    expect(screen.getByRole('cell', { name: '1.2M' })).toBeVisible()
     await user.clear(screen.getByPlaceholderText('Search models...'))
     await user.type(screen.getByPlaceholderText('Search models...'), 'missing')
     expect(screen.getByText('No Data')).toBeVisible()
