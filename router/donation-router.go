@@ -1,6 +1,8 @@
 package router
 
 import (
+	"net/http"
+
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/service/authz"
@@ -16,17 +18,17 @@ func setDonationRoutes(api *gin.RouterGroup) {
 	self.GET("/batches/:id", controller.GetDonationBatch)
 	self.POST("/batches/:id/retry", controller.RetryDonationBatch)
 	admin := base.Group("/admin", middleware.AdminAuth())
-	admin.GET("/connection", middleware.RequirePermission(authz.DonationConfigRead), controller.GetDonationConnection)
-	admin.PUT("/connection", middleware.RequirePermission(authz.DonationConfigWrite), controller.PutDonationConnection)
-	admin.GET("/group-options", middleware.RequirePermission(authz.DonationConfigRead), controller.GetDonationGroupOptions)
-	admin.GET("/campaigns", middleware.RequirePermission(authz.DonationConfigRead), controller.AdminGetDonationCampaigns)
-	admin.POST("/campaigns", middleware.RequirePermission(authz.DonationConfigWrite), controller.SaveDonationCampaign)
-	admin.PATCH("/campaigns/:id", middleware.RequirePermission(authz.DonationConfigWrite), controller.SaveDonationCampaign)
-	admin.GET("/records", middleware.RequirePermission(authz.DonationRecordsRead), controller.GetDonationRecords)
-	admin.GET("/records/:item_id", middleware.RequirePermission(authz.DonationRecordsRead), controller.GetDonationRecord)
-	admin.GET("/records/:item_id/review-context", middleware.RequirePermission(authz.DonationRecordsRead), controller.GetDonationReviewContext)
-	admin.POST("/records/:item_id/review-actions", middleware.RequirePermission(authz.DonationRecordsRead), middleware.RequirePermission(authz.DonationRecordsReview), controller.PostDonationReviewAction)
-	admin.GET("/records/:item_id/review-actions/:action_id", middleware.RequirePermission(authz.DonationRecordsRead), controller.GetDonationReviewAction)
-	admin.POST("/records/:item_id/tests", middleware.RequirePermission(authz.DonationRecordsRead), middleware.RequirePermission(authz.DonationRecordsTest), controller.PostDonationTest)
-	admin.GET("/records/:item_id/tests/:test_id", middleware.RequirePermission(authz.DonationRecordsRead), controller.GetDonationTest)
+	handlePermissionRoute(admin, http.MethodGet, "/connection", authz.DonationConfigRead, controller.GetDonationConnection)
+	handlePermissionRoute(admin, http.MethodPut, "/connection", authz.DonationConfigWrite, controller.PutDonationConnection)
+	handlePermissionRoute(admin, http.MethodGet, "/group-options", authz.DonationConfigRead, controller.GetDonationGroupOptions)
+	handlePermissionRoute(admin, http.MethodGet, "/campaigns", authz.DonationConfigRead, controller.AdminGetDonationCampaigns)
+	handlePermissionRoute(admin, http.MethodPost, "/campaigns", authz.DonationConfigWrite, controller.SaveDonationCampaign)
+	handlePermissionRoute(admin, http.MethodPatch, "/campaigns/:id", authz.DonationConfigWrite, controller.SaveDonationCampaign)
+	handlePermissionRoute(admin, http.MethodGet, "/records", authz.DonationRecordsRead, controller.GetDonationRecords)
+	handlePermissionRoute(admin, http.MethodGet, "/records/:item_id", authz.DonationRecordsRead, controller.GetDonationRecord)
+	handlePermissionRoute(admin, http.MethodGet, "/records/:item_id/review-context", authz.DonationRecordsRead, controller.GetDonationReviewContext)
+	handlePermissionRoute(admin, http.MethodPost, "/records/:item_id/review-actions", authz.DonationRecordsReview, middleware.RequirePermission(authz.DonationRecordsRead), controller.PostDonationReviewAction)
+	handlePermissionRoute(admin, http.MethodGet, "/records/:item_id/review-actions/:action_id", authz.DonationRecordsRead, controller.GetDonationReviewAction)
+	handlePermissionRoute(admin, http.MethodPost, "/records/:item_id/tests", authz.DonationRecordsTest, middleware.RequirePermission(authz.DonationRecordsRead), controller.PostDonationTest)
+	handlePermissionRoute(admin, http.MethodGet, "/records/:item_id/tests/:test_id", authz.DonationRecordsRead, controller.GetDonationTest)
 }

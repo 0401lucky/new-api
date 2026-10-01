@@ -1,10 +1,11 @@
 package controller
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
@@ -66,16 +67,17 @@ func countUserAuthorizationRules(t *testing.T, db *gorm.DB, userID int) int64 {
 }
 
 func TestManageUserDemoteClearsLegacyAndCasbinPermissions(t *testing.T) {
-	db := setupUserAuthzControllerTest(t)
+	db := setupManageUserTestDB(t)
+	require.NoError(t, authz.Init(db))
 	user := createUserWithAdminPermissions(t, db, "demote-admin", common.RoleAdminUser)
 	require.Positive(t, countUserAuthorizationRules(t, db, user.Id))
 
-	recorder := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(recorder)
-	ctx.Set("role", common.RoleRootUser)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/user/manage", strings.NewReader("{\"id\":"+strconv.Itoa(user.Id)+",\"action\":\"demote\"}"))
-
-	ManageUser(ctx)
+	body := "{\"id\":" + strconv.Itoa(user.Id) + ",\"action\":\"demote\"}"
+	identity, proof := manageUserProof(t, db, service.VerificationOperation{
+		Scope:   service.VerificationScopeAdminUserManage,
+		Context: []byte("{\"user_id\":" + strconv.Itoa(user.Id) + ",\"action\":\"demote\"}"),
+	})
+	recorder := performVerifiedManageUserRequest(t, body, identity, proof)
 
 	assert.Equal(t, http.StatusOK, recorder.Code)
 	var updated model.User
@@ -120,4 +122,58 @@ func TestDeleteSelfClearsCasbinPermissions(t *testing.T) {
 	require.NoError(t, db.Unscoped().First(&deleted, user.Id).Error)
 	assert.True(t, deleted.DeletedAt.Valid)
 	assert.Zero(t, countUserAuthorizationRules(t, db, user.Id))
+}
+
+func TestAdminUserDeletionClearsTokensAndPermissionsAtomically(t *testing.T) {
+	for _, hardDelete := range []bool{false, true} {
+		for _, failTokenDelete := range []bool{false, true} {
+			t.Run(fmt.Sprintf("hard=%v/rollback=%v", hardDelete, failTokenDelete), func(t *testing.T) {
+				_, identity, target := setupAdminUserTest(t)
+				db := model.DB
+				require.NoError(t, db.AutoMigrate(&model.ExternalIdentityClaim{}, &model.Token{}))
+				require.NoError(t, authz.SetUserPermissions(target.Id, authz.PermissionsMap{
+					authz.ResourceChannel: {authz.ActionRead: true},
+				}))
+				raw, token := createScopedAccessToken(t, target.Id, 0, "profile:read")
+				proof := issueSecurityEnrollmentProof(t, identity, service.VerificationOperation{
+					Scope:   service.VerificationScopeAdminUserDelete,
+					Context: []byte(fmt.Sprintf(`{"user_id":%d}`, target.Id)),
+				}, service.VerificationMethodPassword)
+				if failTokenDelete {
+					const callback = "test:reject-access-token-delete"
+					require.NoError(t, db.Callback().Delete().Before("gorm:delete").Register(callback, func(tx *gorm.DB) {
+						if tx.Statement.Table == token.TableName() {
+							tx.AddError(errors.New("token deletion failed"))
+						}
+					}))
+					t.Cleanup(func() { db.Callback().Delete().Remove(callback) })
+				}
+				method, path, handler := http.MethodPost, "/api/user/manage", gin.HandlerFunc(ManageUser)
+				body := fmt.Sprintf(`{"id":%d,"action":"delete"}`, target.Id)
+				var params gin.Params
+				if hardDelete {
+					method, path, handler = http.MethodDelete, "/api/user/:id", DeleteUser
+					params = gin.Params{{Key: "id", Value: strconv.Itoa(target.Id)}}
+				}
+				response := adminUserRequest(method, path, body, proof, identity, common.RoleRootUser, params, handler)
+				var result securityEnrollmentResponse
+				require.NoError(t, common.Unmarshal(response.Body.Bytes(), &result))
+				assert.Equal(t, !failTokenDelete, result.Success, response.Body.String())
+				found, err := model.FindUserAccessTokenByHash(model.AccessTokenFingerprint(raw))
+				require.NoError(t, err)
+				var activeUsers int64
+				require.NoError(t, db.Model(&model.User{}).Where("id = ?", target.Id).Count(&activeUsers).Error)
+				if failTokenDelete {
+					require.NotNil(t, found)
+					assert.Equal(t, token.Id, found.Id)
+					assert.EqualValues(t, 1, activeUsers)
+					assert.Positive(t, countUserAuthorizationRules(t, db, target.Id))
+					return
+				}
+				assert.Nil(t, found)
+				assert.Zero(t, activeUsers)
+				assert.Zero(t, countUserAuthorizationRules(t, db, target.Id))
+			})
+		}
+	}
 }
