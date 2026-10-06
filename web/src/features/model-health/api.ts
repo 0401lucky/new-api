@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
+
 import type {
   ApiEnvelope,
   ModelHealthHourlyStat,
@@ -56,11 +57,15 @@ export async function getEnabledModelNames() {
   return res.data
 }
 
-export async function getPublicModelHealthOverview(period: ModelHealthPeriod) {
+export async function getPublicModelHealthOverview(
+  period: ModelHealthPeriod,
+  signal?: AbortSignal
+) {
   const res = await api.get<ApiEnvelope<ModelHealthOverviewPayload>>(
     '/api/public/model_health/overview',
     {
       params: { period },
+      signal,
       skipErrorHandler: true,
       skipBusinessError: true,
     }

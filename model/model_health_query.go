@@ -35,11 +35,7 @@ func hourStartExprSQLForDialect(dialectName string) string {
 }
 
 func successSliceExprSQL() string {
-	return "CASE WHEN has_success_qualified THEN 1 ELSE 0 END"
-}
-
-func successRateExprSQL() string {
-	return "CASE WHEN SUM(total_requests) = 0 THEN 0 ELSE (1.0 * SUM(success_qualified_requests)) / SUM(total_requests) END"
+	return "CASE WHEN total_requests > error_requests THEN 1 ELSE 0 END"
 }
 
 func GetModelHealthHourlyStats(db *gorm.DB, modelName string, startHourTs int64, endHourTs int64) ([]ModelHealthHourlyStat, error) {
@@ -60,12 +56,11 @@ model_name as model_name,
 %s as hour_start_ts,
 SUM(%s) as success_slices,
 COUNT(*) as total_slices,
-%s as success_rate,
 SUM(total_requests) as total_requests,
 SUM(error_requests) as error_requests,
 SUM(total_requests) - SUM(error_requests) as success_requests,
 SUM(success_qualified_requests) as qualified_success_requests,
-SUM(success_tokens) as success_tokens`, hourStartExprSQL(db), successSliceExprSQL(), successRateExprSQL())).
+SUM(success_tokens) as success_tokens`, hourStartExprSQL(db), successSliceExprSQL())).
 		Where("model_name = ?", modelName).
 		Where("slice_start_ts >= ? AND slice_start_ts < ?", startHourTs, endHourTs).
 		Group("model_name, hour_start_ts").
@@ -73,6 +68,12 @@ SUM(success_tokens) as success_tokens`, hourStartExprSQL(db), successSliceExprSQ
 		Scan(&rows).Error
 	if err != nil {
 		return nil, err
+	}
+	// Keep threshold decisions independent of each dialect's division scale.
+	for i := range rows {
+		if rows[i].TotalRequests > 0 {
+			rows[i].SuccessRate = float64(rows[i].SuccessRequests) / float64(rows[i].TotalRequests)
+		}
 	}
 	return rows, nil
 }
@@ -92,12 +93,11 @@ model_name as model_name,
 %s as hour_start_ts,
 SUM(%s) as success_slices,
 COUNT(*) as total_slices,
-%s as success_rate,
 SUM(total_requests) as total_requests,
 SUM(error_requests) as error_requests,
 SUM(total_requests) - SUM(error_requests) as success_requests,
 SUM(success_qualified_requests) as qualified_success_requests,
-SUM(success_tokens) as success_tokens`, hourStartExprSQL(db), successSliceExprSQL(), successRateExprSQL())).
+SUM(success_tokens) as success_tokens`, hourStartExprSQL(db), successSliceExprSQL())).
 		Where("slice_start_ts >= ? AND slice_start_ts < ?", startHourTs, endHourTs).
 		Group("model_name, hour_start_ts").
 		Order("model_name ASC, hour_start_ts ASC").
@@ -105,12 +105,18 @@ SUM(success_tokens) as success_tokens`, hourStartExprSQL(db), successSliceExprSQ
 	if err != nil {
 		return nil, err
 	}
+	for i := range rows {
+		if rows[i].TotalRequests > 0 {
+			rows[i].SuccessRate = float64(rows[i].SuccessRequests) / float64(rows[i].TotalRequests)
+		}
+	}
 	return rows, nil
 }
 
 type ModelHealthTotals struct {
 	ModelName                string `json:"model_name"`
 	TotalRequests            int64  `json:"total_requests"`
+	SuccessRequests          int64  `json:"success_requests"`
 	QualifiedSuccessRequests int64  `json:"qualified_success_requests"`
 }
 
@@ -127,7 +133,7 @@ func GetAllModelsHealthTotals(db *gorm.DB, startTs int64, endTs int64) ([]ModelH
 
 	var rows []ModelHealthTotals
 	err := db.Table((&ModelHealthSlice5m{}).TableName()).
-		Select("model_name as model_name, SUM(total_requests) as total_requests, SUM(success_qualified_requests) as qualified_success_requests").
+		Select("model_name as model_name, SUM(total_requests) as total_requests, SUM(total_requests) - SUM(error_requests) as success_requests, SUM(success_qualified_requests) as qualified_success_requests").
 		Where("slice_start_ts >= ? AND slice_start_ts < ?", startTs, endTs).
 		Group("model_name").
 		Scan(&rows).Error

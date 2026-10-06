@@ -286,7 +286,7 @@ func RecordTopupLog(userId int, content string, callerIp string, paymentMethod s
 // 这类拒绝不是上游模型故障，因此不计入模型健康度统计。
 func RecordGatewayErrorLog(c *gin.Context, userId int, channelId int, modelName string, tokenName string, content string, tokenId int, useTimeSeconds int,
 	isStream bool, group string, other *LogOther) {
-	recordErrorLog(c, userId, channelId, modelName, tokenName, content, tokenId, useTimeSeconds, isStream, group, other, false)
+	recordErrorLog(c, userId, channelId, modelName, tokenName, content, tokenId, useTimeSeconds, isStream, group, other)
 }
 
 // maxLoggedUserAgentLen bounds the client-controlled User-Agent header before it
@@ -320,14 +320,15 @@ func otherWithRequestUserAgent(c *gin.Context, other *LogOther) *LogOther {
 	return merged
 }
 
-// RecordErrorLog 记录渠道/上游错误日志，并将该次失败计入模型健康度统计。
+// RecordErrorLog records a channel attempt for auditing. Model health is
+// sampled separately when the complete client request finishes.
 func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string, tokenName string, content string, tokenId int, useTimeSeconds int,
 	isStream bool, group string, other *LogOther) {
-	recordErrorLog(c, userId, channelId, modelName, tokenName, content, tokenId, useTimeSeconds, isStream, group, other, true)
+	recordErrorLog(c, userId, channelId, modelName, tokenName, content, tokenId, useTimeSeconds, isStream, group, other)
 }
 
 func recordErrorLog(c *gin.Context, userId int, channelId int, modelName string, tokenName string, content string, tokenId int, useTimeSeconds int,
-	isStream bool, group string, other *LogOther, countModelHealth bool) {
+	isStream bool, group string, other *LogOther) {
 	logger.LogInfo(c, fmt.Sprintf("record error log: userId=%d, channelId=%d, modelName=%s, tokenName=%s, content=%s", userId, channelId, modelName, tokenName, common.LocalLogPreview(content)))
 	username := c.GetString("username")
 	requestId := c.GetString(common.RequestIdKey)
@@ -370,13 +371,6 @@ func recordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 	if err != nil {
 		logger.LogError(c, "failed to record log: "+err.Error())
 	}
-	if countModelHealth && modelName != "" {
-		RecordModelHealthEventAsync(&ModelHealthEvent{
-			ModelName: modelName,
-			CreatedAt: log.CreatedAt,
-			IsError:   true,
-		})
-	}
 	recordActiveTaskSlotSafe(c, userId, username, modelName)
 }
 
@@ -396,9 +390,16 @@ type RecordConsumeLogParams struct {
 }
 
 func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams) {
+	// Consumption is not proof that the response completed successfully. Keep
+	// usage on this request until its final outcome is classified.
+	if c != nil {
+		usage, _ := c.Get(modelHealthUsageKey)
+		event, _ := usage.(ModelHealthEvent)
+		event.CompletionTokens += max(0, params.CompletionTokens)
+		event.SuccessTokens += max(0, params.PromptTokens) + max(0, params.CompletionTokens)
+		c.Set(modelHealthUsageKey, event)
+	}
 	if !common.LogConsumeEnabled {
-		createdAt := common.GetTimestamp()
-		recordModelHealthSuccessEvent(c, params, createdAt)
 		recordActiveTaskSlotSafe(c, userId, c.GetString("username"), params.ModelName)
 		return
 	}
@@ -459,29 +460,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 			NodeName:  common.NodeName,
 		})
 	}
-	recordModelHealthSuccessEvent(c, params, log.CreatedAt)
 	recordActiveTaskSlotSafe(c, userId, username, params.ModelName)
-}
-
-func recordModelHealthSuccessEvent(c *gin.Context, params RecordConsumeLogParams, createdAt int64) {
-	if params.ModelName == "" {
-		return
-	}
-	responseBytes := 0
-	assistantChars := 0
-	if c != nil {
-		responseBytes = c.GetInt("response_bytes")
-		assistantChars = c.GetInt("assistant_content_chars")
-	}
-	RecordModelHealthEventAsync(&ModelHealthEvent{
-		ModelName:        params.ModelName,
-		CreatedAt:        createdAt,
-		IsError:          false,
-		ResponseBytes:    responseBytes,
-		CompletionTokens: params.CompletionTokens,
-		SuccessTokens:    params.PromptTokens + params.CompletionTokens,
-		AssistantChars:   assistantChars,
-	})
 }
 
 type RecordTaskBillingLogParams struct {

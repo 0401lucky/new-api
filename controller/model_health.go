@@ -2,7 +2,6 @@ package controller
 
 import (
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,7 +14,7 @@ import (
 )
 
 const (
-	publicModelHealthCacheKey = "public_model_health:hourly_last24h:v4"
+	publicModelHealthCacheKey = "public_model_health:hourly_last24h:v5"
 	publicModelHealthCacheTTL = 30 * time.Second
 )
 
@@ -59,13 +58,6 @@ type publicModelHealthPayload struct {
 	StartHour int64                                     `json:"start_hour"`
 	EndHour   int64                                     `json:"end_hour"`
 	Rows      []publicModelsHealthHourlyLast24hRespItem `json:"rows"`
-}
-
-type modelHealthQuotaAggRow struct {
-	ModelName       string `gorm:"column:model_name"`
-	HourStartTs     int64  `gorm:"column:hour_start_ts"`
-	SuccessRequests int64  `gorm:"column:success_requests"`
-	SuccessTokens   int64  `gorm:"column:success_tokens"`
 }
 
 func GetModelHealthHourlyStatsAPI(c *gin.Context) {
@@ -116,8 +108,6 @@ func GetModelHealthHourlyStatsAPI(c *gin.Context) {
 		rowMap[r.HourStartTs] = r
 	}
 
-	quotaMap := getModelHealthQuotaAggMap(startHourTs, endHourTs, modelName)
-
 	var wantHours []int64
 	if hasHours {
 		wantHours = hours
@@ -131,17 +121,7 @@ func GetModelHealthHourlyStatsAPI(c *gin.Context) {
 
 	resp := make([]modelHealthHourlyRespItem, 0, len(wantHours))
 	for _, h := range wantHours {
-		var quotaRow modelHealthQuotaAggRow
-		hasQuota := false
-		if q, ok := quotaMap[h]; ok {
-			quotaRow = q
-			hasQuota = q.SuccessRequests > 0 || q.SuccessTokens > 0
-		}
 		if stat, ok := rowMap[h]; ok {
-			successTokens := stat.SuccessTokens
-			if successTokens == 0 && hasQuota {
-				successTokens = quotaRow.SuccessTokens
-			}
 			resp = append(resp, modelHealthHourlyRespItem{
 				ModelName:                stat.ModelName,
 				HourStartTs:              stat.HourStartTs,
@@ -152,22 +132,7 @@ func GetModelHealthHourlyStatsAPI(c *gin.Context) {
 				ErrorRequests:            stat.ErrorRequests,
 				SuccessRequests:          stat.SuccessRequests,
 				QualifiedSuccessRequests: stat.QualifiedSuccessRequests,
-				SuccessTokens:            successTokens,
-			})
-			continue
-		}
-		if hasQuota {
-			resp = append(resp, modelHealthHourlyRespItem{
-				ModelName:                modelName,
-				HourStartTs:              h,
-				SuccessSlices:            0,
-				TotalSlices:              0,
-				SuccessRate:              0,
-				TotalRequests:            0,
-				ErrorRequests:            0,
-				SuccessRequests:          0,
-				QualifiedSuccessRequests: 0,
-				SuccessTokens:            quotaRow.SuccessTokens,
+				SuccessTokens:            stat.SuccessTokens,
 			})
 			continue
 		}
@@ -203,19 +168,6 @@ func GetPublicModelsHealthHourlyLast24hAPI(c *gin.Context) {
 		return
 	}
 
-	quotaRows := getModelHealthQuotaAggRows(startHourTs, endHourTs, "")
-
-	quotaMap := make(map[string]map[int64]modelHealthQuotaAggRow, 128)
-	for _, r := range quotaRows {
-		if r.ModelName == "" {
-			continue
-		}
-		if _, ok := quotaMap[r.ModelName]; !ok {
-			quotaMap[r.ModelName] = make(map[int64]modelHealthQuotaAggRow, 32)
-		}
-		quotaMap[r.ModelName][r.HourStartTs] = r
-	}
-
 	wantHours := make([]int64, 0, 24)
 	for h := startHourTs; h < endHourTs; h += 3600 {
 		wantHours = append(wantHours, h)
@@ -231,49 +183,11 @@ func GetPublicModelsHealthHourlyLast24hAPI(c *gin.Context) {
 		grouped[r.ModelName][r.HourStartTs] = r
 	}
 
-	quotaOnlyModels := make([]string, 0)
-	for modelName := range quotaMap {
-		if _, ok := grouped[modelName]; ok {
-			continue
-		}
-		grouped[modelName] = make(map[int64]model.ModelHealthHourlyStat)
-		quotaOnlyModels = append(quotaOnlyModels, modelName)
-	}
-	sort.Strings(quotaOnlyModels)
-	modelOrder = append(modelOrder, quotaOnlyModels...)
-
 	resp := make([]publicModelsHealthHourlyLast24hRespItem, 0, len(modelOrder)*len(wantHours))
 	for _, modelName := range modelOrder {
 		hourMap := grouped[modelName]
-		modelQuota := quotaMap[modelName]
 		for _, h := range wantHours {
-			fallbackSuccessTokens := int64(0)
-			if modelQuota != nil {
-				if q, ok := modelQuota[h]; ok {
-					fallbackSuccessTokens = q.SuccessTokens
-					if _, hasHealthStat := hourMap[h]; !hasHealthStat && (q.SuccessRequests > 0 || q.SuccessTokens > 0) {
-						resp = append(resp, publicModelsHealthHourlyLast24hRespItem{
-							ModelName:                modelName,
-							HourStartTs:              h,
-							SuccessSlices:            0,
-							TotalSlices:              0,
-							SuccessRate:              0,
-							TotalRequests:            0,
-							ErrorRequests:            0,
-							SuccessRequests:          0,
-							QualifiedSuccessRequests: 0,
-							SuccessTokens:            q.SuccessTokens,
-						})
-						continue
-					}
-				}
-			}
-
 			if stat, ok := hourMap[h]; ok {
-				successTokens := stat.SuccessTokens
-				if successTokens == 0 {
-					successTokens = fallbackSuccessTokens
-				}
 				resp = append(resp, publicModelsHealthHourlyLast24hRespItem{
 					ModelName:                stat.ModelName,
 					HourStartTs:              stat.HourStartTs,
@@ -284,7 +198,7 @@ func GetPublicModelsHealthHourlyLast24hAPI(c *gin.Context) {
 					ErrorRequests:            stat.ErrorRequests,
 					SuccessRequests:          stat.SuccessRequests,
 					QualifiedSuccessRequests: stat.QualifiedSuccessRequests,
-					SuccessTokens:            successTokens,
+					SuccessTokens:            stat.SuccessTokens,
 				})
 				continue
 			}
@@ -298,7 +212,7 @@ func GetPublicModelsHealthHourlyLast24hAPI(c *gin.Context) {
 				ErrorRequests:            0,
 				SuccessRequests:          0,
 				QualifiedSuccessRequests: 0,
-				SuccessTokens:            fallbackSuccessTokens,
+				SuccessTokens:            0,
 			})
 		}
 	}
@@ -310,27 +224,6 @@ func GetPublicModelsHealthHourlyLast24hAPI(c *gin.Context) {
 	}
 	setPublicModelHealthCache(result)
 	common.ApiSuccess(c, result)
-}
-
-func getModelHealthQuotaAggRows(startHourTs int64, endHourTs int64, modelName string) []modelHealthQuotaAggRow {
-	var rows []modelHealthQuotaAggRow
-	query := model.DB.Table("quota_data").
-		Select("model_name, created_at as hour_start_ts, SUM(count) as success_requests, SUM(token_used) as success_tokens").
-		Where("created_at >= ? AND created_at < ?", startHourTs, endHourTs)
-	if modelName != "" {
-		query = query.Where("model_name = ?", modelName)
-	}
-	_ = query.Group("model_name, created_at").Scan(&rows).Error
-	return rows
-}
-
-func getModelHealthQuotaAggMap(startHourTs int64, endHourTs int64, modelName string) map[int64]modelHealthQuotaAggRow {
-	rows := getModelHealthQuotaAggRows(startHourTs, endHourTs, modelName)
-	result := make(map[int64]modelHealthQuotaAggRow, len(rows))
-	for _, row := range rows {
-		result[row.HourStartTs] = row
-	}
-	return result
 }
 
 func getPublicModelHealthCache() (publicModelHealthPayload, bool) {

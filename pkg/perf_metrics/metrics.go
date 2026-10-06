@@ -69,7 +69,7 @@ func RecordRelayResult(ctx context.Context, info *relaycommon.RelayInfo, apiErr 
 // task duration (second resolution, unlike the ms-resolution relay samples);
 // throughput is only present when the provider reports tokens.
 func RecordTaskResult(task *model.Task, result *relaycommon.TaskInfo) {
-	if task == nil {
+	if task == nil || (task.Status != model.TaskStatusSuccess && task.Status != model.TaskStatusFailure) {
 		return
 	}
 	modelName := task.Properties.OriginModelName
@@ -95,6 +95,14 @@ func RecordTaskResult(task *model.Task, result *relaycommon.TaskInfo) {
 			sample.OutputTokens = tokens
 			sample.GenerationMs = (endTs - genStart) * 1000
 		}
+	}
+	health := &model.ModelHealthEvent{ModelName: modelName, CreatedAt: endTs, IsError: !sample.Success}
+	if result != nil && sample.Success {
+		health.CompletionTokens = max(0, result.CompletionTokens)
+		health.SuccessTokens = max(0, cmp.Or(result.TotalTokens, result.CompletionTokens))
+	}
+	if modelName != "" {
+		model.RecordModelHealthEventAsync(health)
 	}
 	Record(sample)
 }

@@ -1,12 +1,72 @@
 package controller
 
 import (
+	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/gin-gonic/gin"
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
+
+func TestModelHealthOverviewAPIReportsAvailableHistory(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&model.ModelHealthSlice5m{}, &model.PerfMetric{}))
+	previousDB, previousRedis := model.DB, common.RedisEnabled
+	model.DB, common.RedisEnabled = db, false
+	modelHealthOverviewMemCacheLock.Lock()
+	previousCache := modelHealthOverviewMemCache
+	modelHealthOverviewMemCache = map[string]*modelHealthOverviewCacheEntry{}
+	modelHealthOverviewMemCacheLock.Unlock()
+	t.Cleanup(func() {
+		model.DB, common.RedisEnabled = previousDB, previousRedis
+		modelHealthOverviewMemCacheLock.Lock()
+		modelHealthOverviewMemCache = previousCache
+		modelHealthOverviewMemCacheLock.Unlock()
+		sqlDB, err := db.DB()
+		require.NoError(t, err)
+		require.NoError(t, sqlDB.Close())
+	})
+	engine := gin.New()
+	engine.GET("/health", GetPublicModelHealthOverviewAPI)
+	for _, populated := range []bool{false, true} {
+		period := "7d"
+		start := model.AlignSliceStartTs(time.Now().Unix())
+		if populated {
+			period = "15d"
+			require.NoError(t, db.Create(&model.ModelHealthSlice5m{SliceStartTs: start, ModelName: "short-replies", TotalRequests: 22, SuccessQualifiedRequests: 19, SuccessTokens: 409007}).Error)
+		}
+		response := httptest.NewRecorder()
+		engine.ServeHTTP(response, httptest.NewRequest("GET", "/health?period="+period, nil))
+		require.Equal(t, 200, response.Code)
+		var body struct {
+			Success bool
+			Data    modelHealthOverviewPayload
+		}
+		require.NoError(t, common.Unmarshal(response.Body.Bytes(), &body))
+		require.True(t, body.Success, response.Body.String())
+		if !populated {
+			assert.Nil(t, body.Data.ObservedSince)
+			assert.Empty(t, body.Data.Models)
+			assert.Equal(t, modelHealthStatusNoData, body.Data.GlobalStatus)
+			continue
+		}
+		require.NotNil(t, body.Data.ObservedSince)
+		assert.Equal(t, start, *body.Data.ObservedSince)
+		require.Len(t, body.Data.Models, 1)
+		assert.Equal(t, modelHealthStatusOperational, body.Data.GlobalStatus)
+		assert.Equal(t, 1.0, body.Data.Stats.OverallRate24h)
+		require.NotNil(t, body.Data.Models[0].Availability)
+		assert.Equal(t, 1.0, *body.Data.Models[0].Availability)
+		assert.Equal(t, int64(22), body.Data.Models[0].AvailabilitySuccess)
+	}
+}
 
 func TestParseOverviewPeriodDays(t *testing.T) {
 	tests := []struct {
@@ -62,22 +122,19 @@ func TestBuildModelHealthOverview(t *testing.T) {
 		UpdatedAt: 10000,
 		WantHours: wantHours,
 		HourlyRows: []model.ModelHealthHourlyStat{
-			{ModelName: "gpt-a", HourStartTs: 3600, SuccessRate: 1, TotalRequests: 10, ErrorRequests: 0, QualifiedSuccessRequests: 10, SuccessTokens: 100},
-			{ModelName: "gpt-b", HourStartTs: 7200, SuccessRate: 0.5, TotalRequests: 4, ErrorRequests: 2, QualifiedSuccessRequests: 2, SuccessTokens: 40},
+			{ModelName: "gpt-a", HourStartTs: 3600, SuccessRate: 1, TotalRequests: 10, ErrorRequests: 0, SuccessRequests: 10, QualifiedSuccessRequests: 7, SuccessTokens: 100},
+			{ModelName: "gpt-b", HourStartTs: 7200, SuccessRate: 0.5, TotalRequests: 4, ErrorRequests: 2, SuccessRequests: 2, QualifiedSuccessRequests: 2, SuccessTokens: 40},
 		},
 		PeriodTotals: []model.ModelHealthTotals{
-			{ModelName: "gpt-a", TotalRequests: 100, QualifiedSuccessRequests: 99},
-			{ModelName: "gpt-b", TotalRequests: 50, QualifiedSuccessRequests: 20},
+			{ModelName: "gpt-a", TotalRequests: 100, SuccessRequests: 99, QualifiedSuccessRequests: 50},
+			{ModelName: "gpt-b", TotalRequests: 50, SuccessRequests: 20, QualifiedSuccessRequests: 10},
 		},
 		RecentTotals: []model.ModelHealthTotals{
-			{ModelName: "gpt-a", TotalRequests: 10, QualifiedSuccessRequests: 10},
-			{ModelName: "gpt-b", TotalRequests: 4, QualifiedSuccessRequests: 2},
+			{ModelName: "gpt-a", TotalRequests: 10, SuccessRequests: 10, QualifiedSuccessRequests: 7},
+			{ModelName: "gpt-b", TotalRequests: 4, SuccessRequests: 2, QualifiedSuccessRequests: 1},
 		},
 		PerfLatency: map[string]modelHealthLatency{
 			"gpt-a": {AvgLatencyMs: 1200, AvgTtftMs: 300},
-		},
-		QuotaRows: []modelHealthQuotaAggRow{
-			{ModelName: "gpt-c", HourStartTs: 3600, SuccessRequests: 3, SuccessTokens: 30},
 		},
 	}
 
@@ -88,11 +145,10 @@ func TestBuildModelHealthOverview(t *testing.T) {
 	// gpt-b 最近 60 分钟成功率 0.5 → outage，全局取最差
 	assert.Equal(t, modelHealthStatusOutage, payload.GlobalStatus)
 
-	require.Len(t, payload.Models, 3)
-	// 24h Token 降序：gpt-a(100) > gpt-b(40) > gpt-c(30)
+	require.Len(t, payload.Models, 2)
+	// Sort by tokens from successful final requests.
 	assert.Equal(t, "gpt-a", payload.Models[0].ModelName)
 	assert.Equal(t, "gpt-b", payload.Models[1].ModelName)
-	assert.Equal(t, "gpt-c", payload.Models[2].ModelName)
 
 	a := payload.Models[0]
 	assert.Equal(t, modelHealthStatusOperational, a.Status)
@@ -118,18 +174,10 @@ func TestBuildModelHealthOverview(t *testing.T) {
 	assert.Nil(t, b.AvgLatencyMs)
 	assert.Nil(t, b.AvgTtftMs)
 
-	// gpt-c 仅出现在 quota_data：无健康数据 → no_data + 可用性 null + token 兜底
-	cModel := payload.Models[2]
-	assert.Equal(t, modelHealthStatusNoData, cModel.Status)
-	assert.Nil(t, cModel.Availability)
-	assert.Equal(t, int64(30), cModel.SuccessTokens24h)
-	assert.Equal(t, int64(30), cModel.Timeline[0].SuccessTokens)
-
-	// stats：gpt-c 无健康请求不计入 overall 分母
-	assert.Equal(t, 3, payload.Stats.TotalModels)
+	assert.Equal(t, 2, payload.Stats.TotalModels)
 	assert.Equal(t, 1, payload.Stats.HealthyModels)
 	assert.InDelta(t, float64(12)/float64(14), payload.Stats.OverallRate24h, 1e-9)
-	assert.Equal(t, int64(170), payload.Stats.TotalTokens24h)
+	assert.Equal(t, int64(140), payload.Stats.TotalTokens24h)
 }
 
 func TestGlobalModelHealthStatusPriority(t *testing.T) {
@@ -140,7 +188,8 @@ func TestGlobalModelHealthStatusPriority(t *testing.T) {
 		}
 		return models
 	}
-	assert.Equal(t, modelHealthStatusOperational, globalModelHealthStatus(mk()))
+	assert.Equal(t, modelHealthStatusNoData, globalModelHealthStatus(mk()))
+	assert.Equal(t, modelHealthStatusNoData, globalModelHealthStatus(mk(modelHealthStatusNoData)))
 	assert.Equal(t, modelHealthStatusOperational, globalModelHealthStatus(mk(modelHealthStatusOperational, modelHealthStatusNoData)))
 	assert.Equal(t, modelHealthStatusDegraded, globalModelHealthStatus(mk(modelHealthStatusOperational, modelHealthStatusDegraded)))
 	assert.Equal(t, modelHealthStatusOutage, globalModelHealthStatus(mk(modelHealthStatusDegraded, modelHealthStatusOutage, modelHealthStatusOperational)))

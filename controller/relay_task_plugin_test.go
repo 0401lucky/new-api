@@ -654,6 +654,20 @@ export function buildQueryRequest(){throw new Error("completed submissions must 
 			outcome, taskErr := executeTaskSubmission(c, info)
 			require.Nil(t, taskErr)
 			require.NotNil(t, outcome)
+			require.NoError(t, model.FlushModelHealthEvents(context.Background()))
+			health, err := model.GetModelHealthHourlyStats(db, "document-model", 1, time.Now().Unix()+3600)
+			require.NoError(t, err)
+			var requests, failures int64
+			for _, row := range health {
+				requests += row.TotalRequests
+				failures += row.ErrorRequests
+			}
+			assert.Equal(t, int64(index+1), requests, "each terminal task contributes once")
+			if tc.status == "FAILURE" {
+				assert.Equal(t, int64(1), failures)
+			} else {
+				assert.Zero(t, failures)
+			}
 			want := common.QuotaRound(tc.count * 0.01 * common.QuotaPerUnit)
 			assert.Equal(t, want, outcome.Result.Quota)
 			assert.Equal(t, want, info.PriceData.Quota)
@@ -691,6 +705,45 @@ export function buildQueryRequest(){throw new Error("completed submissions must 
 func TestAcceptedSubmitStreamNeverRetries(t *testing.T) {
 	c := taskSubmissionTestContext()
 	assert.Equal(t, service.PolicyDecision{Action: "stop", Reason: "task_accepted", Source: "system"}, decideTaskRetry(c, &dto.TaskError{StatusCode: 502, LocalError: true, NoRetry: true}, 3))
+}
+
+func TestTaskSubmissionHealthUsesFinalFailureFacts(t *testing.T) {
+	previousRetries, previousErrors := common.RetryTimes, constant.ErrorLogEnabled
+	common.RetryTimes, constant.ErrorLogEnabled = 0, false
+	t.Cleanup(func() { common.RetryTimes, constant.ErrorLogEnabled = previousRetries, previousErrors })
+	for _, tc := range []struct {
+		name, code string
+		status     int
+		local      bool
+		failures   int64
+	}{
+		{"malformed upstream response", "plugin_submit_response_invalid", 502, true, 1},
+		{"local input rejection", "plugin_request_invalid", 400, true, 0},
+		{"no available channel", "get_channel_failed", 403, true, 1},
+		{"upstream context limit", "context_length_exceeded", 500, false, 0},
+		{"upstream capacity", "rate_limit_exceeded", 429, false, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			events := []string{}
+			db := setupTaskSubmissionDatabase(t, true, &events)
+			c := taskSubmissionTestContext()
+			outcome, taskErr := executeTaskSubmissionWith(c, taskSubmissionRelayInfo(nil), func(*gin.Context, *relaycommon.RelayInfo) (*relay.TaskSubmitResult, *dto.TaskError) {
+				return nil, &dto.TaskError{Code: tc.code, StatusCode: tc.status, LocalError: tc.local, NoRetry: true, Message: "fixture failure"}
+			})
+			assert.Nil(t, outcome)
+			require.NotNil(t, taskErr)
+			require.NoError(t, model.FlushModelHealthEvents(context.Background()))
+			rows, err := model.GetModelHealthHourlyStats(db, "plugin-model", 1, time.Now().Unix()+3600)
+			require.NoError(t, err)
+			var requests, failures int64
+			for _, row := range rows {
+				requests += row.TotalRequests
+				failures += row.ErrorRequests
+			}
+			assert.Equal(t, tc.failures, requests)
+			assert.Equal(t, tc.failures, failures)
+		})
+	}
 }
 
 // Local task rejections carry a message but no cause; the response and the

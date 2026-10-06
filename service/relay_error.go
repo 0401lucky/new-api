@@ -8,6 +8,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
+	perfmetrics "github.com/QuantumNous/new-api/pkg/perf_metrics"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
@@ -80,13 +81,6 @@ func ProcessChannelError(c *gin.Context, channelError types.ChannelError, err *t
 	tokenId := c.GetInt("token_id")
 	userGroup := c.GetString("group")
 	shouldRecordErrorLog := constant.ErrorLogEnabled && types.IsRecordErrorLog(err)
-	if !shouldRecordErrorLog && modelName != "" {
-		model.RecordModelHealthEventAsync(&model.ModelHealthEvent{
-			ModelName: modelName,
-			CreatedAt: common.GetTimestamp(),
-			IsError:   true,
-		})
-	}
 
 	if shouldRecordErrorLog {
 		other := model.NewLogOther()
@@ -106,4 +100,17 @@ func ProcessChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		useTimeSeconds := int(time.Since(startTime).Seconds())
 		model.RecordErrorLog(c, userId, channelError.ChannelId, modelName, tokenName, err.MaskSensitiveErrorWithStatusCode(), tokenId, useTimeSeconds, common.GetContextKeyBool(c, constant.ContextKeyIsStream), userGroup, other)
 	}
+}
+
+// RecordModelHealthResult shares the performance sampler's final-outcome
+// classification, independently of consume/error logging and metrics settings.
+func RecordModelHealthResult(c *gin.Context, info *relaycommon.RelayInfo, apiErr *types.NewAPIError) {
+	if c == nil || c.Request == nil || info == nil || info.IsChannelTest {
+		return
+	}
+	outcome := perfmetrics.ClassifyRelayOutcome(c.Request.Context(), info, apiErr)
+	if outcome == perfmetrics.OutcomeIgnored {
+		return
+	}
+	model.RecordModelHealthResult(c, info.OriginModelName, outcome == perfmetrics.OutcomeFailure)
 }

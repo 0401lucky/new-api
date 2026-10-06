@@ -52,7 +52,7 @@ export type ModelHealthStatus =
   | 'outage'
   | 'no_data'
 
-export type ModelHealthGlobalStatus = 'operational' | 'degraded' | 'outage'
+export type ModelHealthGlobalStatus = ModelHealthStatus
 
 export type ModelHealthPeriod = '7d' | '15d' | '30d'
 
@@ -61,6 +61,8 @@ export type ModelHealthOverviewTimelineItem = {
   success_rate: number
   total_requests: number
   error_requests: number
+  success_requests: number
+  qualified_success_requests: number
   success_tokens: number
 }
 
@@ -85,6 +87,7 @@ export type ModelHealthOverviewStats = {
 
 export type ModelHealthOverviewPayload = {
   updated_at: number
+  observed_since: number | null
   period: ModelHealthPeriod
   global_status: ModelHealthGlobalStatus
   stats: ModelHealthOverviewStats

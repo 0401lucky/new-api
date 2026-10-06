@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
@@ -48,6 +49,68 @@ func TestGetAllModelsHealthTotals(t *testing.T) {
 	require.Error(t, err)
 	_, err = GetAllModelsHealthTotals(nil, 3600, 7200)
 	require.Error(t, err)
+}
+
+func TestModelHealthSuccessRateIncludesShortResponses(t *testing.T) {
+	db := newModelHealthTestDB(t)
+	for _, event := range []*ModelHealthEvent{
+		{ModelName: "short-answer", CreatedAt: 3601, CompletionTokens: 1, SuccessTokens: 11},
+		{ModelName: "short-answer", CreatedAt: 3902, CompletionTokens: 20, SuccessTokens: 30},
+	} {
+		require.NoError(t, UpsertModelHealthSlice5m(context.Background(), db, event))
+	}
+	rows, err := GetAllModelsHealthHourlyStats(db, 3600, 7200)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, int64(2), rows[0].SuccessRequests)
+	assert.Equal(t, int64(0), rows[0].ErrorRequests)
+	assert.Equal(t, int64(1), rows[0].QualifiedSuccessRequests)
+	assert.Equal(t, int64(2), rows[0].SuccessSlices)
+	assert.Equal(t, int64(2), rows[0].TotalSlices)
+	assert.Equal(t, 1.0, rows[0].SuccessRate, "a valid short answer is a successful request")
+}
+
+func TestModelHealthFlushCancellationPreservesAcceptedEvent(t *testing.T) {
+	db := newModelHealthTestDB(t)
+	previousDB := DB
+	DB = db
+	entered, release := make(chan struct{}), make(chan struct{})
+	require.NoError(t, db.Callback().Create().Before("gorm:create").Register("health_test_block_write", func(*gorm.DB) {
+		close(entered)
+		<-release
+	}))
+	t.Cleanup(func() {
+		require.NoError(t, FlushModelHealthEvents(context.Background()))
+		DB = previousDB
+	})
+	defer close(release)
+	event := &ModelHealthEvent{ModelName: "accepted", CreatedAt: 3601, CompletionTokens: 1, SuccessTokens: 11}
+	RecordModelHealthEventAsync(event)
+	event.ModelName = "reused"
+	select {
+	case <-entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("queued write did not start")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	result := make(chan error, 1)
+	go func() { result <- FlushModelHealthEvents(ctx) }()
+	cancel()
+	select {
+	case err := <-result:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(3 * time.Second):
+		t.Fatal("shutdown wait ignored cancellation")
+	}
+	// Verify after the deferred release, before the fixture restores DB.
+	t.Cleanup(func() {
+		require.NoError(t, FlushModelHealthEvents(context.Background()))
+		rows, err := GetAllModelsHealthHourlyStats(db, 3600, 7200)
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		assert.Equal(t, "accepted", rows[0].ModelName)
+		assert.Equal(t, int64(11), rows[0].SuccessTokens)
+	})
 }
 
 func TestDeleteModelHealthSlicesBefore(t *testing.T) {

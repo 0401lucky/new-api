@@ -2,208 +2,138 @@ package model
 
 import (
 	"context"
-	"strings"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/glebarez/sqlite"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-func TestConflictValueExprForDialect(t *testing.T) {
-	tests := []struct {
-		name    string
-		dialect string
-		column  string
-		want    string
-	}{
-		{name: "postgres", dialect: "postgres", column: "total_requests", want: "EXCLUDED.total_requests"},
-		{name: "mysql", dialect: "mysql", column: "total_requests", want: "VALUES(total_requests)"},
-		{name: "sqlite", dialect: "sqlite", column: "total_requests", want: "excluded.total_requests"},
-	}
+// The pre-fix schema is preserved verbatim to exercise rolling upgrades.
+type legacyModelHealthSlice5m struct {
+	SliceStartTs             int64     `json:"slice_start_ts" gorm:"primaryKey;autoIncrement:false;index:idx_model_health_slice_start;index:idx_model_health_slice_model,priority:1;comment:slice start unix seconds, aligned to 300s"`
+	ModelName                string    `json:"model_name" gorm:"size:128;primaryKey;autoIncrement:false;default:'';index:idx_model_health_slice_model,priority:2;comment:model name used in consume/error logs"`
+	TotalRequests            int64     `json:"total_requests" gorm:"not null;default:0;comment:events observed in this slice for this model"`
+	ErrorRequests            int64     `json:"error_requests" gorm:"not null;default:0;comment:events considered failure in this slice for this model"`
+	SuccessQualifiedRequests int64     `json:"success_qualified_requests" gorm:"not null;default:0;comment:successful requests meeting threshold"`
+	SuccessTokens            int64     `json:"success_tokens" gorm:"not null;default:0;comment:total prompt and completion tokens from successful requests"`
+	HasSuccessQualified      bool      `json:"has_success_qualified" gorm:"not null;default:false;comment:1 if any qualified success in slice"`
+	MaxResponseBytes         int       `json:"max_response_bytes" gorm:"not null;default:0;comment:max response bytes observed in slice"`
+	MaxCompletionTokens      int       `json:"max_completion_tokens" gorm:"not null;default:0;comment:max completion tokens observed in slice"`
+	MaxAssistantChars        int       `json:"max_assistant_chars" gorm:"not null;default:0;comment:max assistant content char length observed in slice"`
+	UpdatedAt                time.Time `json:"updated_at"`
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := conflictValueExprForDialect(tt.dialect, tt.column); got != tt.want {
-				t.Fatalf("conflictValueExprForDialect(%q, %q) = %q, want %q", tt.dialect, tt.column, got, tt.want)
+func (legacyModelHealthSlice5m) TableName() string { return "model_health_slice_5m" }
+
+func TestModelHealthDatabaseCompatibility(t *testing.T) {
+	for _, dialect := range []string{"sqlite", "mysql", "postgres"} {
+		t.Run(dialect, func(t *testing.T) {
+			var driver gorm.Dialector
+			switch dialect {
+			case "sqlite":
+				driver = sqlite.Open(":memory:")
+			case "mysql":
+				dsn := os.Getenv("TEST_HEALTH_MYSQL_DSN")
+				if dsn == "" {
+					t.Skip("TEST_HEALTH_MYSQL_DSN is not configured")
+				}
+				driver = mysql.Open(dsn)
+			case "postgres":
+				dsn := os.Getenv("TEST_HEALTH_POSTGRES_DSN")
+				if dsn == "" {
+					t.Skip("TEST_HEALTH_POSTGRES_DSN is not configured")
+				}
+				driver = postgres.New(postgres.Config{DSN: dsn, PreferSimpleProtocol: true})
 			}
-		})
-	}
-}
-
-func TestMaxMetricExprForDialect(t *testing.T) {
-	tests := []struct {
-		name    string
-		dialect string
-		column  string
-		want    string
-	}{
-		{name: "postgres", dialect: "postgres", column: "max_response_bytes", want: "GREATEST(max_response_bytes, EXCLUDED.max_response_bytes)"},
-		{name: "mysql", dialect: "mysql", column: "max_response_bytes", want: "GREATEST(max_response_bytes, VALUES(max_response_bytes))"},
-		{name: "sqlite", dialect: "sqlite", column: "max_response_bytes", want: "MAX(max_response_bytes, excluded.max_response_bytes)"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := maxMetricExprForDialect(tt.dialect, tt.column); got != tt.want {
-				t.Fatalf("maxMetricExprForDialect(%q, %q) = %q, want %q", tt.dialect, tt.column, got, tt.want)
+			db, err := gorm.Open(driver, &gorm.Config{})
+			require.NoError(t, err)
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			sqlDB.SetMaxOpenConns(1)
+			t.Cleanup(func() { require.NoError(t, sqlDB.Close()) })
+			var version string
+			query := "SELECT version()"
+			if dialect == "sqlite" {
+				query = "SELECT sqlite_version()"
 			}
-		})
-	}
-}
+			require.NoError(t, db.Raw(query).Scan(&version).Error)
+			t.Logf("%s version: %s", dialect, version)
 
-func TestHourStartExprSQLForDialect(t *testing.T) {
-	tests := []struct {
-		name    string
-		dialect string
-		want    string
-	}{
-		{name: "postgres", dialect: "postgres", want: "((slice_start_ts / 3600) * 3600)"},
-		{name: "mysql", dialect: "mysql", want: "((slice_start_ts DIV 3600) * 3600)"},
-		{name: "sqlite", dialect: "sqlite", want: "(CAST((slice_start_ts / 3600) AS INTEGER) * 3600)"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := hourStartExprSQLForDialect(tt.dialect); got != tt.want {
-				t.Fatalf("hourStartExprSQLForDialect(%q) = %q, want %q", tt.dialect, got, tt.want)
+			for _, upgrade := range []bool{false, true} {
+				name := "fresh"
+				if upgrade {
+					name = "upgrade"
+				}
+				t.Run(name, func(t *testing.T) {
+					require.NoError(t, db.Migrator().DropTable(&ModelHealthSlice5m{}, &legacyModelHealthSlice5m{}))
+					if upgrade {
+						require.NoError(t, db.AutoMigrate(&legacyModelHealthSlice5m{}))
+						require.NoError(t, db.Create(&legacyModelHealthSlice5m{
+							SliceStartTs: 3600, ModelName: "sample", TotalRequests: 22,
+							SuccessQualifiedRequests: 19, SuccessTokens: 409007,
+						}).Error)
+					}
+					// A restart must preserve the legacy table and current counters.
+					for range 2 {
+						require.NoError(t, db.AutoMigrate(&ModelHealthSlice5m{}))
+					}
+					rows, err := GetAllModelsHealthHourlyStats(db, 3600, 7200)
+					require.NoError(t, err)
+					assert.Empty(t, rows, "legacy attempts must not become final outcomes")
+					for _, event := range []*ModelHealthEvent{
+						{ModelName: "sample", CreatedAt: 3601, ResponseBytes: 2048, CompletionTokens: 8, SuccessTokens: 42},
+						{ModelName: "sample", CreatedAt: 3602, CompletionTokens: 1, SuccessTokens: 11},
+						{ModelName: "sample", CreatedAt: 3603, IsError: true, SuccessTokens: 999},
+					} {
+						require.NoError(t, UpsertModelHealthSlice5m(context.Background(), db, event))
+					}
+					for range 2 {
+						require.NoError(t, db.AutoMigrate(&ModelHealthSlice5m{}))
+					}
+					rows, err = GetAllModelsHealthHourlyStats(db, 3600, 7200)
+					require.NoError(t, err)
+					require.Len(t, rows, 1)
+					assert.Equal(t, int64(3), rows[0].TotalRequests)
+					assert.Equal(t, int64(1), rows[0].ErrorRequests)
+					assert.Equal(t, int64(2), rows[0].SuccessRequests)
+					assert.Equal(t, int64(1), rows[0].QualifiedSuccessRequests)
+					assert.Equal(t, int64(53), rows[0].SuccessTokens)
+					assert.InDelta(t, 2.0/3, rows[0].SuccessRate, 0.00001)
+					totals, err := GetAllModelsHealthTotals(db, 3600, 7200)
+					require.NoError(t, err)
+					require.Len(t, totals, 1)
+					assert.Equal(t, int64(2), totals[0].SuccessRequests)
+					var slice ModelHealthSlice5m
+					require.NoError(t, db.First(&slice).Error)
+					assert.Equal(t, 2048, slice.MaxResponseBytes)
+					assert.Equal(t, 8, slice.MaxCompletionTokens)
+					assert.True(t, slice.HasSuccessQualified)
+					assert.True(t, db.Migrator().HasIndex(&ModelHealthSlice5m{}, "idx_model_health_request_start"))
+					assert.True(t, db.Migrator().HasIndex(&ModelHealthSlice5m{}, "idx_model_health_request_model"))
+					assert.Error(t, db.Create(&ModelHealthSlice5m{SliceStartTs: 3600, ModelName: "sample"}).Error, "the model/slice key remains unique")
+					require.NoError(t, db.Create(&ModelHealthSlice5m{SliceStartTs: 3600, ModelName: "threshold", TotalRequests: 1000000, ErrorRequests: 50001}).Error)
+					boundary, err := GetModelHealthHourlyStats(db, "threshold", 3600, 7200)
+					require.NoError(t, err)
+					require.Len(t, boundary, 1)
+					assert.Less(t, boundary[0].SuccessRate, 0.95, "SQL rounding must not turn a degraded model green")
+					assert.InDelta(t, 0.949999, boundary[0].SuccessRate, 1e-12)
+					if upgrade {
+						var old legacyModelHealthSlice5m
+						require.NoError(t, db.First(&old).Error)
+						assert.Equal(t, int64(22), old.TotalRequests)
+						assert.Equal(t, int64(19), old.SuccessQualifiedRequests)
+						assert.Equal(t, int64(409007), old.SuccessTokens)
+						assert.True(t, db.Migrator().HasIndex(&legacyModelHealthSlice5m{}, "idx_model_health_slice_model"))
+					}
+				})
 			}
+			require.NoError(t, db.Migrator().DropTable(&ModelHealthSlice5m{}, &legacyModelHealthSlice5m{}))
 		})
-	}
-}
-
-func TestSuccessRateExprSQLUsesRequestCounters(t *testing.T) {
-	expr := successRateExprSQL()
-	if !strings.Contains(expr, "SUM(success_qualified_requests)") {
-		t.Fatalf("successRateExprSQL should use qualified success requests, got %q", expr)
-	}
-	if !strings.Contains(expr, "SUM(total_requests)") {
-		t.Fatalf("successRateExprSQL should use total requests as denominator, got %q", expr)
-	}
-	if strings.Contains(expr, "COUNT(*)") {
-		t.Fatalf("successRateExprSQL should not use slice count as denominator, got %q", expr)
-	}
-}
-
-func TestModelHealthSuccessTokensAggregated(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("failed to open sqlite db: %v", err)
-	}
-	if err := db.AutoMigrate(&ModelHealthSlice5m{}); err != nil {
-		t.Fatalf("failed to migrate model health table: %v", err)
-	}
-
-	successEvent := &ModelHealthEvent{
-		ModelName:        "gpt-test",
-		CreatedAt:        3601,
-		IsError:          false,
-		ResponseBytes:    2048,
-		CompletionTokens: 8,
-		SuccessTokens:    42,
-	}
-	if err := UpsertModelHealthSlice5m(context.Background(), db, successEvent); err != nil {
-		t.Fatalf("failed to upsert success event: %v", err)
-	}
-
-	errorEvent := &ModelHealthEvent{
-		ModelName:     "gpt-test",
-		CreatedAt:     3610,
-		IsError:       true,
-		SuccessTokens: 99,
-	}
-	if err := UpsertModelHealthSlice5m(context.Background(), db, errorEvent); err != nil {
-		t.Fatalf("failed to upsert error event: %v", err)
-	}
-
-	rows, err := GetAllModelsHealthHourlyStats(db, 3600, 7200)
-	if err != nil {
-		t.Fatalf("failed to query hourly stats: %v", err)
-	}
-	if len(rows) != 1 {
-		t.Fatalf("expected one row, got %d", len(rows))
-	}
-	if rows[0].SuccessTokens != 42 {
-		t.Fatalf("expected success tokens 42, got %d", rows[0].SuccessTokens)
-	}
-	if rows[0].QualifiedSuccessRequests != 1 {
-		t.Fatalf("expected qualified success requests 1, got %d", rows[0].QualifiedSuccessRequests)
-	}
-	if rows[0].SuccessRate != 0.5 {
-		t.Fatalf("expected request-level success rate 0.5, got %f", rows[0].SuccessRate)
-	}
-	if rows[0].TotalRequests != 2 || rows[0].ErrorRequests != 1 {
-		t.Fatalf("unexpected request counters: total=%d error=%d", rows[0].TotalRequests, rows[0].ErrorRequests)
-	}
-}
-
-func TestBackfillModelHealthSlicesFromLogs(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("failed to open sqlite db: %v", err)
-	}
-	if err := db.AutoMigrate(&ModelHealthSlice5m{}, &Log{}); err != nil {
-		t.Fatalf("failed to migrate tables: %v", err)
-	}
-
-	logs := []Log{
-		{
-			CreatedAt:        3601,
-			Type:             LogTypeConsume,
-			ModelName:        "gpt-backfill",
-			PromptTokens:     10,
-			CompletionTokens: 3,
-		},
-		{
-			CreatedAt:        3610,
-			Type:             LogTypeError,
-			ModelName:        "gpt-backfill",
-			PromptTokens:     9,
-			CompletionTokens: 0,
-		},
-	}
-	if err := db.Create(&logs).Error; err != nil {
-		t.Fatalf("failed to create logs: %v", err)
-	}
-
-	if err := BackfillModelHealthSlicesFromLogs(context.Background(), db, db, 3600, 3900); err != nil {
-		t.Fatalf("failed to backfill health slices: %v", err)
-	}
-	if err := BackfillModelHealthSlicesFromLogs(context.Background(), db, db, 3600, 3900); err != nil {
-		t.Fatalf("failed to backfill health slices again: %v", err)
-	}
-
-	var count int64
-	if err := db.Model(&ModelHealthSlice5m{}).Count(&count).Error; err != nil {
-		t.Fatalf("failed to count health slices: %v", err)
-	}
-	if count != 1 {
-		t.Fatalf("expected one health slice after repeated backfill, got %d", count)
-	}
-
-	var slice ModelHealthSlice5m
-	if err := db.First(&slice, "model_name = ? AND slice_start_ts = ?", "gpt-backfill", int64(3600)).Error; err != nil {
-		t.Fatalf("failed to query health slice: %v", err)
-	}
-	if slice.TotalRequests != 2 || slice.ErrorRequests != 1 || slice.SuccessQualifiedRequests != 1 {
-		t.Fatalf(
-			"unexpected request counters: total=%d error=%d qualified=%d",
-			slice.TotalRequests,
-			slice.ErrorRequests,
-			slice.SuccessQualifiedRequests,
-		)
-	}
-	if slice.SuccessTokens != 13 || slice.MaxCompletionTokens != 3 {
-		t.Fatalf("unexpected token metrics: success_tokens=%d max_completion_tokens=%d", slice.SuccessTokens, slice.MaxCompletionTokens)
-	}
-
-	rows, err := GetAllModelsHealthHourlyStats(db, 3600, 3900)
-	if err != nil {
-		t.Fatalf("failed to query backfilled hourly stats: %v", err)
-	}
-	if len(rows) != 1 {
-		t.Fatalf("expected one backfilled hourly row, got %d", len(rows))
-	}
-	if rows[0].SuccessRate != 0.5 {
-		t.Fatalf("expected backfilled request-level success rate 0.5, got %f", rows[0].SuccessRate)
 	}
 }

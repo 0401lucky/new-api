@@ -145,6 +145,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		if relayFormat != types.RelayFormatOpenAIRealtime {
 			perfmetrics.RecordRelayResult(c.Request.Context(), relayInfo, resultErr)
 		}
+		service.RecordModelHealthResult(c, relayInfo, resultErr)
 		if recovered != nil {
 			panic(recovered)
 		}
@@ -588,6 +589,24 @@ func executeTaskSubmissionWith(
 			diagnostics.refund(stage)
 			relayInfo.Billing.Refund(c)
 		}
+		if !durable && taskErr != nil {
+			// A rejected submission has no task terminal callback. Count its
+			// final upstream result once, while local validation/billing rejects
+			// remain outside model availability.
+			apiErr := types.InitOpenAIError(types.ErrorCode(taskErr.Code), taskErr.StatusCode)
+			if taskErr.LocalError {
+				code := types.ErrorCode(taskErr.Code)
+				if taskErr.StatusCode >= 400 && taskErr.StatusCode < 500 && code != types.ErrorCodeGetChannelFailed {
+					code = types.ErrorCodeInvalidRequest
+				}
+				cause := taskErr.Error
+				if cause == nil {
+					cause = errors.New(taskErr.Message)
+				}
+				apiErr = types.NewErrorWithStatusCode(cause, code, taskErr.StatusCode)
+			}
+			service.RecordModelHealthResult(c, relayInfo, apiErr)
+		}
 	}()
 	stage = "before_attempt"
 	if requestErr := c.Request.Context().Err(); requestErr != nil {
@@ -808,6 +827,9 @@ func executeTaskSubmissionWith(
 		return nil, taskErr
 	}
 	durable = true
+	if immediateTerminal {
+		perfmetrics.RecordTaskResult(task, result.Immediate)
+	}
 	stage = "settle"
 	diagnostics.durable(task)
 	diagnostics.settleStart(task, result.Quota)

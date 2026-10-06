@@ -60,6 +60,7 @@ export const GLOBAL_STATUS_META: Record<
   ModelHealthGlobalStatus,
   { labelKey: string; dotClass: string; badgeClass: string }
 > = {
+  no_data: STATUS_META.no_data,
   operational: {
     labelKey: 'All systems operational',
     dotClass: 'bg-emerald-500',

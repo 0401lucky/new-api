@@ -153,7 +153,7 @@ func (asyncTaskPollHandler) Run(ctx context.Context, task *model.SystemTask, run
 	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, summary, nil)
 }
 
-// modelHealthCleanupHandler prunes model_health_slice_5m rows past the
+// modelHealthCleanupHandler prunes final request health counters past the
 // retention window so the table stops growing unbounded. 35 days keeps the
 // 30-day availability view fully covered with margin.
 const modelHealthSliceRetentionDays = 35

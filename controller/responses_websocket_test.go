@@ -73,6 +73,7 @@ func setupResponsesWSRequestTest(t *testing.T) (*model.User, *model.Token) {
 	}
 	setting.ModelRequestRateLimitEnabled = false
 	t.Cleanup(func() {
+		require.NoError(t, model.FlushModelHealthEvents(context.Background()))
 		model.DB = previousDB
 		model.LOG_DB = previousLogDB
 		common.SetDatabaseTypes(previousType, previousLogType)
@@ -88,7 +89,8 @@ func setupResponsesWSRequestTest(t *testing.T) (*model.User, *model.Token) {
 		setting.ModelRequestRateLimitMutex.Unlock()
 		require.NoError(t, sqlDB.Close())
 	})
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.BlackroomBan{}, &model.Checkin{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.BlackroomBan{}, &model.Checkin{}, &model.ModelHealthSlice5m{}))
+	require.NoError(t, db.Where("1 = 1").Delete(&model.ModelHealthSlice5m{}).Error)
 	// The shared in-memory limiter outlives each database fixture. Give every
 	// user a separate quota bucket, including when the tests run with -count.
 	user := &model.User{Id: 5062000 + int(responsesWSTestUserSequence.Add(1)), Username: "responses-ws-user", Status: common.UserStatusEnabled, Group: "default", Quota: 1000, AuthVersion: 1}
@@ -300,8 +302,25 @@ func (fixture *responsesWSBillingTest) closeAndWait(t *testing.T) {
 			t.Error("upstream connection was not closed")
 		}
 	}
-	// Health classification is synchronous at the request boundary; only the
-	// Redis write is asynchronous, see waitPerfCounters.
+	require.NoError(t, model.FlushModelHealthEvents(context.Background()))
+}
+
+func assertResponsesModelHealth(t *testing.T, requests, successes int64) {
+	t.Helper()
+	require.NoError(t, model.FlushModelHealthEvents(context.Background()))
+	rows, err := model.GetModelHealthHourlyStats(model.DB, "ws-billing", time.Now().Add(-2*time.Hour).Unix(), time.Now().Unix()+3600)
+	require.NoError(t, err)
+	var total, successful, failed int64
+	for _, row := range rows {
+		total += row.TotalRequests
+		successful += row.SuccessRequests
+		failed += row.ErrorRequests
+		assert.LessOrEqual(t, row.QualifiedSuccessRequests, row.SuccessRequests)
+		assert.InDelta(t, float64(row.SuccessRequests)/float64(row.TotalRequests), row.SuccessRate, 0.00001)
+	}
+	assert.Equal(t, requests, total)
+	assert.Equal(t, successes, successful)
+	assert.Equal(t, requests-successes, failed)
 }
 
 // waitPerfCounters waits for the asynchronous health samples of the fixture
@@ -485,6 +504,7 @@ func TestResponsesInterruptedStreamHealth(t *testing.T) {
 			fixture.closeAndWait(t)
 			assertResponsesWSAccounting(t, fixture, []int{1000})
 			if scenario == "sse client cancel" {
+				assertResponsesModelHealth(t, 0, 0)
 				keys, err := common.RDB.Keys(context.Background(), "perf:ws-billing:*").Result()
 				require.NoError(t, err)
 				assert.Empty(t, keys, "client cancellation must not affect model health")
@@ -493,6 +513,7 @@ func TestResponsesInterruptedStreamHealth(t *testing.T) {
 			requests, successes := waitPerfCounters(t, 1)
 			assert.Equal(t, int64(1), requests)
 			assert.Zero(t, successes)
+			assertResponsesModelHealth(t, 1, 0)
 		})
 	}
 }
@@ -988,6 +1009,7 @@ func TestResponsesStreamOutcomesPreserveAccounting(t *testing.T) {
 				requests, successes := waitPerfCounters(t, expectedRequests)
 				assert.Equal(t, expectedRequests, requests)
 				assert.Equal(t, int64(1), successes)
+				assertResponsesModelHealth(t, expectedRequests, 1)
 			})
 		}
 	}
@@ -999,13 +1021,21 @@ func TestResponsesHTTPHealthCountsFinalResult(t *testing.T) {
 		firstStatus, attempts int
 		success               bool
 		ignored               bool
+		loggingDisabled       bool
 	}{
-		{"business rejection", "context_length_exceeded", 400, 1, false, true},
-		{"credentials rejected as 400", "invalid_api_key", 400, 1, false, false},
-		{"retry succeeds", "server_error", 500, 2, true, false},
+		{"business rejection", "context_length_exceeded", 400, 1, false, true, false},
+		{"credentials rejected as 400", "invalid_api_key", 400, 1, false, false, false},
+		{"retry succeeds", "server_error", 500, 2, true, false, false},
+		{"retry succeeds with logging and performance disabled", "server_error", 500, 2, true, false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			fixture := newResponsesWSBillingTest(t, `tier("request", fixed(0.002))`, func(*websocket.Conn, *http.Request) {})
+			if tc.loggingDisabled {
+				previousErrors := constant.ErrorLogEnabled
+				constant.ErrorLogEnabled, common.LogConsumeEnabled = false, false
+				t.Cleanup(func() { constant.ErrorLogEnabled = previousErrors })
+				require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{"perf_metrics_setting.enabled": "false"}))
+			}
 			oldRetries := common.RetryTimes
 			common.RetryTimes = 1
 			t.Cleanup(func() { common.RetryTimes = oldRetries })
@@ -1043,17 +1073,28 @@ func TestResponsesHTTPHealthCountsFinalResult(t *testing.T) {
 				assert.Equal(t, http.StatusOK, response.StatusCode)
 			}
 			if tc.ignored {
+				assertResponsesModelHealth(t, 0, 0)
 				keys, err := common.RDB.Keys(context.Background(), "perf:ws-billing:*").Result()
 				require.NoError(t, err)
 				assert.Empty(t, keys)
+				return
+			}
+			if tc.loggingDisabled {
+				assertResponsesModelHealth(t, 1, 1)
+				rows, err := model.GetModelHealthHourlyStats(model.DB, "ws-billing", 1, time.Now().Unix()+3600)
+				require.NoError(t, err)
+				require.Len(t, rows, 1)
+				assert.Equal(t, int64(1001), rows[0].SuccessTokens)
 				return
 			}
 			requests, successes := waitPerfCounters(t, 1)
 			assert.Equal(t, int64(1), requests)
 			if tc.success {
 				assert.Equal(t, int64(1), successes)
+				assertResponsesModelHealth(t, 1, 1)
 			} else {
 				assert.Zero(t, successes)
+				assertResponsesModelHealth(t, 1, 0)
 			}
 		})
 	}

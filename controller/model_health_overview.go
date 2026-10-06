@@ -21,7 +21,7 @@ const (
 	modelHealthStatusOutage      = "outage"
 	modelHealthStatusNoData      = "no_data"
 
-	modelHealthOverviewCacheKeyPrefix = "public_model_health:overview:v1:"
+	modelHealthOverviewCacheKeyPrefix = "public_model_health:overview:v2:"
 	modelHealthOverviewCacheTTL       = 30 * time.Second
 )
 
@@ -36,11 +36,13 @@ type modelHealthOverviewCacheEntry struct {
 }
 
 type modelHealthOverviewTimelineItem struct {
-	HourStartTs   int64   `json:"hour_start_ts"`
-	SuccessRate   float64 `json:"success_rate"`
-	TotalRequests int64   `json:"total_requests"`
-	ErrorRequests int64   `json:"error_requests"`
-	SuccessTokens int64   `json:"success_tokens"`
+	HourStartTs              int64   `json:"hour_start_ts"`
+	SuccessRate              float64 `json:"success_rate"`
+	TotalRequests            int64   `json:"total_requests"`
+	ErrorRequests            int64   `json:"error_requests"`
+	SuccessRequests          int64   `json:"success_requests"`
+	QualifiedSuccessRequests int64   `json:"qualified_success_requests"`
+	SuccessTokens            int64   `json:"success_tokens"`
 }
 
 type modelHealthOverviewModel struct {
@@ -63,11 +65,12 @@ type modelHealthOverviewStats struct {
 }
 
 type modelHealthOverviewPayload struct {
-	UpdatedAt    int64                      `json:"updated_at"`
-	Period       string                     `json:"period"`
-	GlobalStatus string                     `json:"global_status"`
-	Stats        modelHealthOverviewStats   `json:"stats"`
-	Models       []modelHealthOverviewModel `json:"models"`
+	UpdatedAt     int64                      `json:"updated_at"`
+	ObservedSince *int64                     `json:"observed_since"`
+	Period        string                     `json:"period"`
+	GlobalStatus  string                     `json:"global_status"`
+	Stats         modelHealthOverviewStats   `json:"stats"`
+	Models        []modelHealthOverviewModel `json:"models"`
 }
 
 type modelHealthLatency struct {
@@ -78,14 +81,14 @@ type modelHealthLatency struct {
 // modelHealthOverviewInput carries every pre-fetched data source needed to
 // assemble the overview payload, keeping the assembly itself a pure function.
 type modelHealthOverviewInput struct {
-	Period       string
-	UpdatedAt    int64
-	WantHours    []int64
-	HourlyRows   []model.ModelHealthHourlyStat
-	PeriodTotals []model.ModelHealthTotals
-	RecentTotals []model.ModelHealthTotals
-	PerfLatency  map[string]modelHealthLatency
-	QuotaRows    []modelHealthQuotaAggRow
+	Period        string
+	UpdatedAt     int64
+	ObservedSince *int64
+	WantHours     []int64
+	HourlyRows    []model.ModelHealthHourlyStat
+	PeriodTotals  []model.ModelHealthTotals
+	RecentTotals  []model.ModelHealthTotals
+	PerfLatency   map[string]modelHealthLatency
 }
 
 func parseOverviewPeriodDays(raw string) (int, string, error) {
@@ -101,11 +104,11 @@ func parseOverviewPeriodDays(raw string) (int, string, error) {
 	}
 }
 
-func modelHealthStatusFromCounts(totalRequests int64, qualifiedRequests int64) string {
+func modelHealthStatusFromCounts(totalRequests int64, successRequests int64) string {
 	if totalRequests <= 0 {
 		return modelHealthStatusNoData
 	}
-	rate := float64(qualifiedRequests) / float64(totalRequests)
+	rate := float64(successRequests) / float64(totalRequests)
 	if rate >= 0.95 {
 		return modelHealthStatusOperational
 	}
@@ -116,13 +119,15 @@ func modelHealthStatusFromCounts(totalRequests int64, qualifiedRequests int64) s
 }
 
 func globalModelHealthStatus(models []modelHealthOverviewModel) string {
-	result := modelHealthStatusOperational
+	result := modelHealthStatusNoData
 	for _, m := range models {
 		if m.Status == modelHealthStatusOutage {
 			return modelHealthStatusOutage
 		}
 		if m.Status == modelHealthStatusDegraded {
 			result = modelHealthStatusDegraded
+		} else if m.Status == modelHealthStatusOperational && result == modelHealthStatusNoData {
+			result = modelHealthStatusOperational
 		}
 	}
 	return result
@@ -140,17 +145,6 @@ func buildModelHealthOverview(in modelHealthOverviewInput) modelHealthOverviewPa
 		hourlyByModel[row.ModelName][row.HourStartTs] = row
 	}
 
-	quotaByModel := make(map[string]map[int64]modelHealthQuotaAggRow)
-	for _, row := range in.QuotaRows {
-		if row.ModelName == "" {
-			continue
-		}
-		if _, ok := quotaByModel[row.ModelName]; !ok {
-			quotaByModel[row.ModelName] = make(map[int64]modelHealthQuotaAggRow, len(in.WantHours))
-		}
-		quotaByModel[row.ModelName][row.HourStartTs] = row
-	}
-
 	periodByModel := make(map[string]model.ModelHealthTotals, len(in.PeriodTotals))
 	for _, row := range in.PeriodTotals {
 		periodByModel[row.ModelName] = row
@@ -160,27 +154,18 @@ func buildModelHealthOverview(in modelHealthOverviewInput) modelHealthOverviewPa
 		recentByModel[row.ModelName] = row
 	}
 
-	modelNames := make([]string, 0, len(hourlyByModel)+len(quotaByModel))
-	seen := make(map[string]struct{}, len(hourlyByModel)+len(quotaByModel))
+	modelNames := make([]string, 0, len(hourlyByModel))
 	for name := range hourlyByModel {
-		seen[name] = struct{}{}
 		modelNames = append(modelNames, name)
-	}
-	for name := range quotaByModel {
-		if _, ok := seen[name]; !ok {
-			seen[name] = struct{}{}
-			modelNames = append(modelNames, name)
-		}
 	}
 
 	stats := modelHealthOverviewStats{}
 	var overallTotal24h int64
-	var overallQualified24h int64
+	var overallSuccess24h int64
 
 	models := make([]modelHealthOverviewModel, 0, len(modelNames))
 	for _, name := range modelNames {
 		hourMap := hourlyByModel[name]
-		quotaMap := quotaByModel[name]
 
 		var tokens24h int64
 		timeline := make([]modelHealthOverviewTimelineItem, 0, len(in.WantHours))
@@ -190,21 +175,18 @@ func buildModelHealthOverview(in modelHealthOverviewInput) modelHealthOverviewPa
 				item.SuccessRate = stat.SuccessRate
 				item.TotalRequests = stat.TotalRequests
 				item.ErrorRequests = stat.ErrorRequests
+				item.SuccessRequests = stat.SuccessRequests
+				item.QualifiedSuccessRequests = stat.QualifiedSuccessRequests
 				item.SuccessTokens = stat.SuccessTokens
 				overallTotal24h += stat.TotalRequests
-				overallQualified24h += stat.QualifiedSuccessRequests
-			}
-			if item.SuccessTokens == 0 && quotaMap != nil {
-				if q, ok := quotaMap[h]; ok {
-					item.SuccessTokens = q.SuccessTokens
-				}
+				overallSuccess24h += stat.SuccessRequests
 			}
 			tokens24h += item.SuccessTokens
 			timeline = append(timeline, item)
 		}
 
 		recent := recentByModel[name]
-		status := modelHealthStatusFromCounts(recent.TotalRequests, recent.QualifiedSuccessRequests)
+		status := modelHealthStatusFromCounts(recent.TotalRequests, recent.SuccessRequests)
 
 		entry := modelHealthOverviewModel{
 			ModelName:        name,
@@ -214,9 +196,9 @@ func buildModelHealthOverview(in modelHealthOverviewInput) modelHealthOverviewPa
 		}
 
 		if period, ok := periodByModel[name]; ok && period.TotalRequests > 0 {
-			availability := float64(period.QualifiedSuccessRequests) / float64(period.TotalRequests)
+			availability := float64(period.SuccessRequests) / float64(period.TotalRequests)
 			entry.Availability = &availability
-			entry.AvailabilitySuccess = period.QualifiedSuccessRequests
+			entry.AvailabilitySuccess = period.SuccessRequests
 			entry.AvailabilityTotal = period.TotalRequests
 		}
 
@@ -246,18 +228,19 @@ func buildModelHealthOverview(in modelHealthOverviewInput) modelHealthOverviewPa
 
 	stats.TotalModels = len(models)
 	if overallTotal24h > 0 {
-		stats.OverallRate24h = float64(overallQualified24h) / float64(overallTotal24h)
+		stats.OverallRate24h = float64(overallSuccess24h) / float64(overallTotal24h)
 	}
 	for _, m := range models {
 		stats.TotalTokens24h += m.SuccessTokens24h
 	}
 
 	return modelHealthOverviewPayload{
-		UpdatedAt:    in.UpdatedAt,
-		Period:       in.Period,
-		GlobalStatus: globalModelHealthStatus(models),
-		Stats:        stats,
-		Models:       models,
+		UpdatedAt:     in.UpdatedAt,
+		ObservedSince: in.ObservedSince,
+		Period:        in.Period,
+		GlobalStatus:  globalModelHealthStatus(models),
+		Stats:         stats,
+		Models:        models,
 	}
 }
 
@@ -277,7 +260,7 @@ func GetPublicModelHealthOverviewAPI(c *gin.Context) {
 	endHourTs := now - (now % 3600) + 3600
 	start24hTs := endHourTs - 24*3600
 	periodStartTs := endHourTs - int64(days)*24*3600
-	recentStartTs := now - 3600
+	recentStartTs := model.AlignSliceStartTs(now) - 3600
 
 	wantHours := make([]int64, 0, 24)
 	for h := start24hTs; h < endHourTs; h += 3600 {
@@ -301,6 +284,11 @@ func GetPublicModelHealthOverviewAPI(c *gin.Context) {
 	}
 
 	perfLatency := map[string]modelHealthLatency{}
+	var history struct{ First *int64 }
+	if err := model.DB.Model(&model.ModelHealthSlice5m{}).Select("MIN(slice_start_ts) AS first").Scan(&history).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	if summary, perfErr := perfmetrics.QuerySummaryAll(24, nil); perfErr != nil {
 		common.SysLog("model health overview perf summary failed: " + perfErr.Error())
 	} else {
@@ -313,14 +301,14 @@ func GetPublicModelHealthOverviewAPI(c *gin.Context) {
 	}
 
 	payload := buildModelHealthOverview(modelHealthOverviewInput{
-		Period:       period,
-		UpdatedAt:    now,
-		WantHours:    wantHours,
-		HourlyRows:   hourlyRows,
-		PeriodTotals: periodTotals,
-		RecentTotals: recentTotals,
-		PerfLatency:  perfLatency,
-		QuotaRows:    getModelHealthQuotaAggRows(start24hTs, endHourTs, ""),
+		Period:        period,
+		UpdatedAt:     now,
+		ObservedSince: history.First,
+		WantHours:     wantHours,
+		HourlyRows:    hourlyRows,
+		PeriodTotals:  periodTotals,
+		RecentTotals:  recentTotals,
+		PerfLatency:   perfLatency,
 	})
 
 	setModelHealthOverviewCache(period, payload)

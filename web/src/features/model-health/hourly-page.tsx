@@ -16,7 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { VChart as VChartCore } from '@visactor/vchart'
 import {
   Activity,
@@ -25,10 +24,11 @@ import {
   Clock,
   Search,
 } from 'lucide-react'
+
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { useChartTheme } from '@/lib/use-chart-theme'
-import { VCHART_OPTION } from '@/lib/vchart'
+
 import { Button } from '@/components/ui/button'
 import { Combobox } from '@/components/ui/combobox'
 import { Spinner } from '@/components/ui/spinner'
@@ -40,6 +40,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useChartTheme } from '@/lib/use-chart-theme'
+import { VCHART_OPTION } from '@/lib/vchart'
+
 import {
   getEnabledModelNames,
   getModelHealthHourly,
@@ -54,6 +57,7 @@ import {
   formatRate,
   getDefaultHourRangeLast24h,
   getHourRange,
+  summarizeModelHealth,
   timestamp2string,
   toDateTimeLocalValue,
 } from './utils'
@@ -153,7 +157,7 @@ function normalizeModelList(data: unknown): string[] {
     if (Array.isArray(record.models)) return normalizeModelList(record.models)
     if (Array.isArray(record.data)) return normalizeModelList(record.data)
     const flattened = Object.values(record).filter(Array.isArray).flat()
-    const unique = Array.from(new Set(flattened)).filter(
+    const unique = [...new Set(flattened)].filter(
       (m): m is string => typeof m === 'string' && Boolean(m.trim())
     )
     unique.sort((a, b) => a.localeCompare(b))
@@ -175,7 +179,7 @@ function pickActiveModel(rows: PublicModelHealthHourlyStat[]) {
     byModel.set(modelName, (byModel.get(modelName) || 0) + activity)
   }
 
-  return Array.from(byModel.entries())
+  return [...byModel.entries()]
     .filter(([, activity]) => activity > 0)
     .sort((a, b) => b[1] - a[1])[0]?.[0]
 }
@@ -226,59 +230,7 @@ export function ModelHealthHourlyPage() {
     [modelOptions]
   )
 
-  const stats = useMemo(() => {
-    if (!Array.isArray(rows) || rows.length === 0) {
-      return {
-        avgRate: 0,
-        totalSuccess: 0,
-        totalSlices: 0,
-        minRate: 0,
-        maxRate: 0,
-        totalRequests: 0,
-        errorRequests: 0,
-        successRequests: 0,
-      }
-    }
-
-    let totalSuccess = 0
-    let totalSlices = 0
-    let qualifiedSuccessRequests = 0
-    let minRate = 1
-    let maxRate = 0
-    let totalRequests = 0
-    let errorRequests = 0
-    let successRequests = 0
-    let hasRateSample = false
-
-    for (const row of rows) {
-      totalSuccess += Number(row.success_slices) || 0
-      totalSlices += Number(row.total_slices) || 0
-      qualifiedSuccessRequests +=
-        Number(row.qualified_success_requests) || 0
-      if ((Number(row.total_requests) || 0) > 0) {
-        const rate = Number(row.success_rate) || 0
-        if (rate < minRate) minRate = rate
-        if (rate > maxRate) maxRate = rate
-        hasRateSample = true
-      }
-      totalRequests += Number(row.total_requests) || 0
-      errorRequests += Number(row.error_requests) || 0
-      successRequests += Number(row.success_requests) || 0
-    }
-
-    const avgRate =
-      totalRequests > 0 ? qualifiedSuccessRequests / totalRequests : 0
-    return {
-      avgRate,
-      totalSuccess,
-      totalSlices,
-      minRate: hasRateSample ? minRate : 0,
-      maxRate: hasRateSample ? maxRate : 0,
-      totalRequests,
-      errorRequests,
-      successRequests,
-    }
-  }, [rows])
+  const stats = useMemo(() => summarizeModelHealth(rows), [rows])
 
   const detailRows = useMemo(
     () =>
@@ -773,11 +725,11 @@ export function ModelHealthHourlyPage() {
                   </TableHeader>
                   <TableBody>
                     {detailRows.length > 0 ? (
-                      detailRows.map((row, idx) => {
+                      detailRows.map((row) => {
                         const rate = Number(row.success_rate) || 0
                         const { color, bg, text } = getRateLevel(rate)
                         return (
-                          <TableRow key={`${row.hour_start_ts}-${idx}`}>
+                          <TableRow key={row.hour_start_ts}>
                             <TableCell>
                               <div className='flex items-center gap-2'>
                                 <Clock className='size-4 text-gray-400' />

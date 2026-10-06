@@ -166,24 +166,8 @@ func main() {
 		return a
 	}
 
-	// Backfill model health slices from logs once at startup (last 35 days, in
-	// 5-day segments to bound query cost). Replaces the old per-request backfill
-	// on the model health APIs. Insert-only on missing slices, so concurrent
-	// multi-node startup is safe.
-	gopool.Go(func() {
-		const segmentSeconds = int64(5 * 24 * 3600)
-		endTs := time.Now().Unix()
-		startTs := endTs - 35*24*3600
-		for segStart := startTs; segStart < endTs; segStart += segmentSeconds {
-			segEnd := segStart + segmentSeconds
-			if segEnd > endTs {
-				segEnd = endTs
-			}
-			if err := model.BackfillModelHealthSlicesFromLogs(context.Background(), model.DB, model.LOG_DB, segStart, segEnd); err != nil {
-				common.SysLog(fmt.Sprintf("model health startup backfill failed for segment [%d, %d): %s", segStart, segEnd, err.Error()))
-			}
-		}
-	})
+	// Model health records final outcomes in its own versioned table. Legacy
+	// consume/error logs lack final outcomes and cannot safely rebuild it.
 
 	// Register the periodic channel test, upstream model update, and async task
 	// polling (Midjourney / Suno / video) jobs as scheduled system tasks
@@ -272,6 +256,8 @@ func main() {
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		common.SysError(fmt.Sprintf("server forced to shutdown: %v", err))
+	} else if err := model.FlushModelHealthEvents(ctx); err != nil {
+		common.SysError("model health shutdown flush: " + err.Error())
 	}
 	// 内存中的看板数据保存入库，避免重启丢失未落库数据 (issue #5679)
 	if common.DataExportEnabled {

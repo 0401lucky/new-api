@@ -13,8 +13,8 @@ import (
 const modelHealthSliceSeconds = int64(300)
 
 type ModelHealthSlice5m struct {
-	SliceStartTs             int64     `json:"slice_start_ts" gorm:"primaryKey;autoIncrement:false;index:idx_model_health_slice_start;index:idx_model_health_slice_model,priority:1;comment:slice start unix seconds, aligned to 300s"`
-	ModelName                string    `json:"model_name" gorm:"size:128;primaryKey;autoIncrement:false;default:'';index:idx_model_health_slice_model,priority:2;comment:model name used in consume/error logs"`
+	SliceStartTs             int64     `json:"slice_start_ts" gorm:"primaryKey;autoIncrement:false;index:idx_model_health_request_start;index:idx_model_health_request_model,priority:1;comment:slice start unix seconds, aligned to 300s"`
+	ModelName                string    `json:"model_name" gorm:"size:128;primaryKey;autoIncrement:false;default:'';index:idx_model_health_request_model,priority:2;comment:client requested model name"`
 	TotalRequests            int64     `json:"total_requests" gorm:"not null;default:0;comment:events observed in this slice for this model"`
 	ErrorRequests            int64     `json:"error_requests" gorm:"not null;default:0;comment:events considered failure in this slice for this model"`
 	SuccessQualifiedRequests int64     `json:"success_qualified_requests" gorm:"not null;default:0;comment:successful requests meeting threshold"`
@@ -27,7 +27,9 @@ type ModelHealthSlice5m struct {
 }
 
 func (ModelHealthSlice5m) TableName() string {
-	return "model_health_slice_5m"
+	// Keep the legacy attempt/consume-log counters intact for rollback. They
+	// cannot be converted into final request outcomes without missing facts.
+	return "model_health_request_5m"
 }
 
 type ModelHealthEvent struct {
@@ -90,9 +92,9 @@ func UpsertModelHealthSlice5m(ctx context.Context, db *gorm.DB, event *ModelHeal
 		SuccessQualifiedRequests: 0,
 		SuccessTokens:            int64(event.SuccessTokens),
 		HasSuccessQualified:      event.SuccessIsQualified,
-		MaxResponseBytes:         maxInt(0, event.ResponseBytes),
-		MaxCompletionTokens:      maxInt(0, event.CompletionTokens),
-		MaxAssistantChars:        maxInt(0, event.AssistantChars),
+		MaxResponseBytes:         event.ResponseBytes,
+		MaxCompletionTokens:      event.CompletionTokens,
+		MaxAssistantChars:        event.AssistantChars,
 	}
 
 	if event.IsError {
@@ -102,16 +104,18 @@ func UpsertModelHealthSlice5m(ctx context.Context, db *gorm.DB, event *ModelHeal
 		row.SuccessQualifiedRequests = 1
 	}
 
-	dialectName := dbDialectName(db)
+	table := row.TableName()
 	updates := map[string]any{
-		"total_requests":             gorm.Expr(fmt.Sprintf("total_requests + %s", conflictValueExprForDialect(dialectName, "total_requests"))),
-		"error_requests":             gorm.Expr(fmt.Sprintf("error_requests + %s", conflictValueExprForDialect(dialectName, "error_requests"))),
-		"success_qualified_requests": gorm.Expr(fmt.Sprintf("success_qualified_requests + %s", conflictValueExprForDialect(dialectName, "success_qualified_requests"))),
-		"success_tokens":             gorm.Expr(fmt.Sprintf("success_tokens + %s", conflictValueExprForDialect(dialectName, "success_tokens"))),
-		"has_success_qualified":      gorm.Expr(fmt.Sprintf("has_success_qualified OR %s", conflictValueExprForDialect(dialectName, "has_success_qualified"))),
-		"max_response_bytes":         gorm.Expr(maxMetricExprForDialect(dialectName, "max_response_bytes")),
-		"max_completion_tokens":      gorm.Expr(maxMetricExprForDialect(dialectName, "max_completion_tokens")),
-		"max_assistant_chars":        gorm.Expr(maxMetricExprForDialect(dialectName, "max_assistant_chars")),
+		"total_requests":             gorm.Expr(table+".total_requests + ?", row.TotalRequests),
+		"error_requests":             gorm.Expr(table+".error_requests + ?", row.ErrorRequests),
+		"success_qualified_requests": gorm.Expr(table+".success_qualified_requests + ?", row.SuccessQualifiedRequests),
+		"success_tokens":             gorm.Expr(table+".success_tokens + ?", row.SuccessTokens),
+		"has_success_qualified":      gorm.Expr(table+".has_success_qualified OR ?", row.HasSuccessQualified),
+	}
+	for column, value := range map[string]int{
+		"max_response_bytes": row.MaxResponseBytes, "max_completion_tokens": row.MaxCompletionTokens, "max_assistant_chars": row.MaxAssistantChars,
+	} {
+		updates[column] = gorm.Expr(fmt.Sprintf("CASE WHEN %s.%s > ? THEN %s.%s ELSE ? END", table, column, table, column), value, value)
 	}
 
 	return db.WithContext(ctx).Clauses(clause.OnConflict{
@@ -121,30 +125,4 @@ func UpsertModelHealthSlice5m(ctx context.Context, db *gorm.DB, event *ModelHeal
 		},
 		DoUpdates: clause.Assignments(updates),
 	}).Create(row).Error
-}
-
-func conflictValueExprForDialect(dialectName string, column string) string {
-	switch dialectName {
-	case "postgres":
-		return fmt.Sprintf("EXCLUDED.%s", column)
-	case "sqlite":
-		return fmt.Sprintf("excluded.%s", column)
-	default:
-		return fmt.Sprintf("VALUES(%s)", column)
-	}
-}
-
-func maxMetricExprForDialect(dialectName string, column string) string {
-	newValue := conflictValueExprForDialect(dialectName, column)
-	if dialectName == "sqlite" {
-		return fmt.Sprintf("MAX(%s, %s)", column, newValue)
-	}
-	return fmt.Sprintf("GREATEST(%s, %s)", column, newValue)
-}
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

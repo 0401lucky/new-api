@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   Activity,
   HeartPulse,
@@ -27,19 +27,26 @@ import {
   Sigma,
   X,
 } from 'lucide-react'
+
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
+
+import { PublicLayout } from '@/components/layout'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { PublicLayout } from '@/components/layout'
+import {
+  getServerErrorMessage,
+  requireServerSuccess,
+} from '@/lib/server-error-message'
 import { cn } from '@/lib/utils'
+
 import { getPublicModelHealthOverview } from './api'
 import { ModelHealthCard } from './components/model-health-card'
 import { StatCard, StatCardSkeleton } from './components/stat-card'
 import { GLOBAL_STATUS_META } from './status'
-import type { ModelHealthOverviewPayload, ModelHealthPeriod } from './types'
+import type { ModelHealthPeriod } from './types'
 import { formatRate, formatTokens, timestamp2string } from './utils'
 
 const REFRESH_INTERVAL_MS = 30_000
@@ -67,67 +74,28 @@ function LoadingOverlay() {
 
 export function ModelHealthPublicPage() {
   const { t } = useTranslation()
-  const [loading, setLoading] = useState(false)
-  const [errorText, setErrorText] = useState('')
-  const [payload, setPayload] = useState<ModelHealthOverviewPayload | null>(
-    null
-  )
   const [searchText, setSearchText] = useState('')
   const [period, setPeriod] = useState<ModelHealthPeriod>('7d')
-  const [nextRefreshAt, setNextRefreshAt] = useState(
-    () => Date.now() + REFRESH_INTERVAL_MS
-  )
   const [countdown, setCountdown] = useState(REFRESH_INTERVAL_MS / 1000)
-
-  const load = useCallback(
-    async (options: { silent?: boolean } = {}) => {
-      const silent = Boolean(options.silent)
-      if (!silent) {
-        setLoading(true)
-        setErrorText('')
+  const query = useQuery({
+    queryKey: ['model-health', 'overview', period],
+    queryFn: async ({ signal }) => {
+      const response = requireServerSuccess(
+        await getPublicModelHealthOverview(period, signal)
+      )
+      if (!response?.data || !Array.isArray(response.data.models)) {
+        throw new Error(t('Unexpected API response'))
       }
-      try {
-        const res = await getPublicModelHealthOverview(period)
-        const { success, message, data } = res || {}
-        if (!success) {
-          const errMsg = message || t('Load failed')
-          if (!silent) {
-            setErrorText(errMsg)
-            toast.error(errMsg)
-          }
-          return
-        }
-        if (!data || typeof data !== 'object') {
-          const errMsg = t('Unexpected API response')
-          if (!silent) {
-            setErrorText(errMsg)
-            toast.error(errMsg)
-          }
-          return
-        }
-        setPayload(data)
-        setNextRefreshAt(Date.now() + REFRESH_INTERVAL_MS)
-      } catch (error) {
-        const errMsg = error instanceof Error ? error.message : t('Load failed')
-        if (!silent) {
-          setErrorText(t('Load failed'))
-          toast.error(errMsg)
-        }
-      } finally {
-        if (!silent) setLoading(false)
-      }
+      return response.data
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [period]
-  )
-
-  useEffect(() => {
-    load().catch(() => undefined)
-    const timer = window.setInterval(() => {
-      load({ silent: true }).catch(() => undefined)
-    }, REFRESH_INTERVAL_MS)
-    return () => window.clearInterval(timer)
-  }, [load])
+    refetchInterval: REFRESH_INTERVAL_MS,
+  })
+  const payload = query.data
+  const loading = query.isFetching
+  const errorText = query.error
+    ? getServerErrorMessage(query.error, t('Load failed'))
+    : ''
+  const nextRefreshAt = query.dataUpdatedAt + REFRESH_INTERVAL_MS
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -195,7 +163,9 @@ export function ModelHealthPublicPage() {
                   </span>
                 )}
                 <span className='opacity-60'>·</span>
-                <span>{t('Refresh in {{seconds}}s', { seconds: countdown })}</span>
+                <span>
+                  {t('Refresh in {{seconds}}s', { seconds: countdown })}
+                </span>
               </div>
             </div>
           </div>
@@ -205,6 +175,21 @@ export function ModelHealthPublicPage() {
               {errorText}
             </div>
           )}
+
+          <div className='text-muted-foreground mb-6 space-y-1 text-xs'>
+            <p>
+              {t(
+                'Success rates count final request outcomes. Retries count once; client cancellations and policy rejections are excluded.'
+              )}
+            </p>
+            {payload?.observed_since != null && (
+              <p>
+                {t('Data available since {{time}}', {
+                  time: timestamp2string(payload.observed_since),
+                })}
+              </p>
+            )}
+          </div>
 
           {showSpin && <LoadingOverlay />}
 
@@ -245,7 +230,11 @@ export function ModelHealthPublicPage() {
                 <StatCard
                   title={t('Overall success rate')}
                   icon={<Percent className='size-3.5' />}
-                  value={formatRate(stats.overall_rate_24h)}
+                  value={
+                    stats.total_models > 0
+                      ? formatRate(stats.overall_rate_24h)
+                      : '—'
+                  }
                   subtitle={t('Past 24 hours')}
                 />
                 <StatCard

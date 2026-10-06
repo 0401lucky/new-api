@@ -17,12 +17,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useTranslation } from 'react-i18next'
+
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { toIntlLocale } from '@/i18n/languages'
+import { formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
+
 import { STATUS_META, timelineStatusFromRate } from '../status'
 import type { ModelHealthOverviewTimelineItem } from '../types'
 import { formatRate, formatTokens, hourLabel } from '../utils'
@@ -30,7 +34,8 @@ import { formatRate, formatTokens, hourLabel } from '../utils'
 export function HealthTimeline(props: {
   items: ModelHealthOverviewTimelineItem[]
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
 
   return (
     <div className='space-y-1.5'>
@@ -45,19 +50,15 @@ export function HealthTimeline(props: {
           return (
             <Tooltip key={item.hour_start_ts}>
               <TooltipTrigger
-                render={
-                  <div
-                    className={cn(
-                      'min-w-0 flex-1 cursor-pointer rounded-[2px] transition-transform duration-150 hover:scale-y-110 hover:opacity-80',
-                      meta.barClass
-                    )}
-                    aria-label={`${hourLabel(item.hour_start_ts)} ${
-                      hasData ? formatRate(item.success_rate) : t('No data')
-                    }`}
-                  />
-                }
+                className={cn(
+                  'min-w-0 flex-1 cursor-pointer rounded-[2px] transition-transform duration-150 hover:scale-y-110 hover:opacity-80',
+                  meta.barClass
+                )}
+                aria-label={`${hourLabel(item.hour_start_ts)} ${
+                  hasData ? formatRate(item.success_rate) : t('No data')
+                }`}
               />
-              <TooltipContent className='p-3 text-xs'>
+              <TooltipContent role='tooltip' className='block p-3 text-xs'>
                 <div className='mb-1.5 text-sm font-semibold'>
                   {hourLabel(item.hour_start_ts)}
                 </div>
@@ -71,11 +72,27 @@ export function HealthTimeline(props: {
                     </div>
                     <div>
                       {t('Total requests')}:{' '}
-                      <span className='font-medium'>{item.total_requests}</span>
+                      <span className='font-medium'>
+                        {formatNumber(item.total_requests, locale)}
+                      </span>
+                    </div>
+                    <div>
+                      {t('Successful requests')}:{' '}
+                      <span className='font-medium'>
+                        {formatNumber(item.success_requests, locale)}
+                      </span>
                     </div>
                     <div>
                       {t('Error requests')}:{' '}
-                      <span className='font-medium'>{item.error_requests}</span>
+                      <span className='font-medium'>
+                        {formatNumber(item.error_requests, locale)}
+                      </span>
+                    </div>
+                    <div>
+                      {t('Content threshold met')}:{' '}
+                      <span className='font-medium'>
+                        {formatNumber(item.qualified_success_requests, locale)}
+                      </span>
                     </div>
                     <div>
                       {t('Total tokens')}:{' '}
@@ -83,6 +100,11 @@ export function HealthTimeline(props: {
                         {formatTokens(item.success_tokens)}
                       </span>
                     </div>
+                    <p className='max-w-56 border-t border-current/20 pt-2 opacity-80'>
+                      {t(
+                        'Content thresholds do not affect success rates. Valid short replies count as successful requests.'
+                      )}
+                    </p>
                   </div>
                 ) : (
                   <div className='text-muted-foreground italic'>
