@@ -252,6 +252,55 @@ docker compose logs -f new-api
 
 后端使用 Go 和 Gin；控制台使用 React 19、TypeScript、Rsbuild、TanStack 与 Tailwind CSS 4。前端依赖和脚本使用 Bun；Go 语言基线见 [go.mod](./go.mod)，容器构建工具链见 [Dockerfile](./Dockerfile)。
 
+<a id="local-docker-testing"></a>
+
+### Docker Desktop 本地测试
+
+当前 Windows 工作区后续的页面检查、前后端联调和本地验收，默认复用 [docker-compose.local.yml](./docker-compose.local.yml) 中的 `new-api-local` 项目。该环境包含从当前源码构建的完整前后端、SQLite 和 Redis。
+
+| 项目 | 当前配置 |
+| --- | --- |
+| 访问地址 | [http://127.0.0.1:3001](http://127.0.0.1:3001)，仅本机访问 |
+| 限流用量页面 | [常规 → 限流用量](http://127.0.0.1:3001/rate-limit) |
+| 本地管理员 | `admin`，沿用已设置的本地密码 |
+| 数据目录 | `D:\Docker\new-api-local\data`；数据库为其中的 `one-api.db`，应用日志位于 `logs/` |
+| 运行密钥文件 | `D:\Docker\new-api-local\runtime.env`，已在本机配置，密钥值不提交到仓库 |
+| Docker 镜像与构建缓存 | 实际位于 `D:\Docker\wsl`；当前 C: 下的 Docker `wsl` 路径为指向该目录的链接 |
+
+先启动 Docker Desktop，再在仓库根目录执行以下 PowerShell 命令：
+
+```powershell
+# 启动已有镜像并等待服务就绪
+docker compose -f docker-compose.local.yml up -d --wait
+
+# 修改 Go 或前端代码后，重新构建并更新容器
+docker compose -f docker-compose.local.yml up -d --build --wait
+
+# 查看健康状态与最近日志
+docker compose -f docker-compose.local.yml ps
+docker compose -f docker-compose.local.yml logs --tail 100 new-api
+Invoke-RestMethod http://127.0.0.1:3001/api/status
+
+# 暂停或移除本项目容器；绑定在 D: 的应用数据仍保留
+docker compose -f docker-compose.local.yml stop
+docker compose -f docker-compose.local.yml down
+```
+
+镜像内嵌前端和 Go 可执行文件，单纯 `restart` 不会加载源码改动。更新后应确认两个服务均为 `healthy`、`/api/status` 返回 `success: true`，再检查本次改动涉及的页面与接口；涉及持久化时还应验证容器重启后数据仍可使用。该环境补充定向自动化测试，数据库相关改动仍须执行 SQLite、MySQL、PostgreSQL 验证矩阵，RelayKit 相关改动仍须独立构建。
+
+需要前端热更新时，保留 Docker 后端，并在另一个 PowerShell 终端的 `web/` 目录执行：
+
+```powershell
+$env:VITE_REACT_APP_SERVER_URL = 'http://127.0.0.1:3001'
+bun run dev -- --port 5173
+```
+
+此时访问 [http://localhost:5173](http://localhost:5173)。本机 3000 端口属于其他应用，前端代理应使用 3001。
+
+日常测试直接复用 Docker 数据目录，不要用仓库根目录或 `tmp/rate-limit-preview/` 下的旧数据库覆盖它。Compose 支持通过 `NEW_API_LOCAL_HOME`、`NEW_API_LOCAL_PORT` 调整应用数据根目录和访问端口；数据根目录需要预先存在 `data/` 和 `runtime.env`。这些变量不会改变 Docker 引擎的镜像存储位置，重装或调整 Docker Desktop 后应再次确认镜像、缓存和数据仍落在非 C: 盘。清理镜像和构建缓存释放的是 Docker 内部空间，虚拟磁盘文件可能需要单独压缩才会向宿主机归还空间。
+
+### 原生进程开发
+
 后端会嵌入 `web/dist`，首次启动前先构建前端：
 
 ```bash

@@ -73,6 +73,31 @@ function sidebarFor(admin?: object, user?: object, canConfigure = true) {
   return result
 }
 
+describe('rate limit sidebar entry', () => {
+  it('shows rate limit usage under General for ordinary users', () => {
+    const { result } = sidebarFor()
+    expect(
+      result.current.find((group) => group.id === 'general')?.items
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: 'Rate limit usage',
+          url: '/rate-limit',
+        }),
+      ])
+    )
+  })
+
+  it('respects the existing overview visibility setting', () => {
+    const { result } = sidebarFor({ console: { enabled: true, detail: false } })
+    expect(
+      result.current
+        .flatMap((group) => group.items)
+        .some((item) => item.title === 'Rate limit usage')
+    ).toBe(false)
+  })
+})
+
 describe('security sidebar visibility', () => {
   it('old configurations show Security & Access immediately after Profile and keep API Keys', () => {
     const { result } = sidebarFor(

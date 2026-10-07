@@ -23,6 +23,15 @@ This is an AI API gateway/proxy built with Go. It aggregates 40+ upstream AI pro
 - JavaScript task plugins live in `plugins/tasks/`, run through `pkg/jsplugin/`, and integrate with host task polling and settlement.
 - `web/` is the React frontend (see `web/AGENTS.md`); `electron/` is the desktop wrapper.
 
+## Local Test Environment (This Windows Workspace)
+
+- Use the existing Docker Desktop stack in `docker-compose.local.yml` as the default environment for manual checks, frontend/backend integration, and local acceptance testing. The Compose project is `new-api-local`; the application is at `http://127.0.0.1:3001` (rate-limit page: `/rate-limit`).
+- Start Docker Desktop first. From the repository root, use `docker compose -f docker-compose.local.yml up -d --wait`; after source changes, use `docker compose -f docker-compose.local.yml up -d --build --wait`. A container restart alone does not rebuild the embedded frontend or Go binary.
+- Keep builds and persistent data off C:. On this machine Docker's image/cache storage is physically at `D:\Docker\wsl`; its apparent C: path is a junction. Application data is at `D:\Docker\new-api-local\data`, and persistent runtime secrets are in `D:\Docker\new-api-local\runtime.env`. Verify Docker's actual storage location again after reinstalling or reconfiguring Docker Desktop.
+- Reuse the existing local database and credentials. The repository-root `one-api.db` and `tmp/rate-limit-preview/one-api.db` are separate from the Docker instance; do not overwrite the Docker database with either copy during routine testing. The service on port 3000 belongs to another local application.
+- Check container health, the affected user flow, and relevant logs. This SQLite + Redis instance complements focused automated tests; it does not replace the mandatory SQLite/MySQL/PostgreSQL matrix or independent RelayKit build when applicable.
+- For frontend hot reload, point `VITE_REACT_APP_SERVER_URL` at `http://127.0.0.1:3001`. Detailed commands and storage notes are in [README.zh_CN.md — Docker Desktop 本地测试](README.zh_CN.md#local-docker-testing).
+
 ## Internationalization (i18n)
 
 ### Backend (`i18n/`)

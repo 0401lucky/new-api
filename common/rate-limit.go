@@ -173,6 +173,20 @@ type RateLimitReservation struct {
 	once    sync.Once
 }
 
+// Usage returns the current admission count without recording a request or
+// extending the bucket's lifetime. Pending success reservations also occupy it.
+func (l *InMemoryRateLimiter) Usage(key string, duration int64) int64 {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	count := l.reservations[key]
+	if entry := l.store[key]; entry != nil {
+		entry.requests.removeExpired(time.Now().Unix(), duration)
+		count += entry.requests.length
+	}
+	return int64(count)
+}
+
 // Reserve admits a request when the key's accepted requests plus its in-flight
 // reservations stay below maxRequests. It returns nil when the key is saturated.
 func (l *InMemoryRateLimiter) Reserve(key string, maxRequests int, duration int64) *RateLimitReservation {

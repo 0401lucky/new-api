@@ -25,6 +25,7 @@ import {
   FileText,
   Fingerprint,
   FlaskConical,
+  Gauge,
   HeartPulse,
   Key,
   MailPlus,
@@ -92,6 +93,11 @@ export function useSidebarData(): SidebarData {
             title: t('API Keys'),
             url: '/keys',
             icon: Key,
+          },
+          {
+            title: t('Rate limit usage'),
+            url: '/rate-limit',
+            icon: Gauge,
           },
           {
             title: t('Usage Logs'),

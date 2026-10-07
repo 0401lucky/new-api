@@ -57,6 +57,7 @@ import { Route as AuthenticatedModelsIndexRouteImport } from './routes/_authenti
 import { Route as AuthenticatedModelsSectionRouteImport } from './routes/_authenticated/models/$section'
 import { Route as AuthenticatedPlaygroundIndexRouteImport } from './routes/_authenticated/playground/index'
 import { Route as AuthenticatedProfileIndexRouteImport } from './routes/_authenticated/profile/index'
+import { Route as AuthenticatedRateLimitIndexRouteImport } from './routes/_authenticated/rate-limit/index'
 import { Route as AuthenticatedRecentCallsIndexRouteImport } from './routes/_authenticated/recent-calls/index'
 import { Route as AuthenticatedRedemptionCodesIndexRouteImport } from './routes/_authenticated/redemption-codes/index'
 import { Route as AuthenticatedSecurityIndexRouteImport } from './routes/_authenticated/security/index'
@@ -344,6 +345,12 @@ const AuthenticatedProfileIndexRoute =
     path: '/profile/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedRateLimitIndexRoute =
+  AuthenticatedRateLimitIndexRouteImport.update({
+    id: '/rate-limit/',
+    path: '/rate-limit/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedRecentCallsIndexRoute =
   AuthenticatedRecentCallsIndexRouteImport.update({
     id: '/recent-calls/',
@@ -566,6 +573,7 @@ export interface FileRoutesByFullPath {
   '/models/': typeof AuthenticatedModelsIndexRoute
   '/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/profile/': typeof AuthenticatedProfileIndexRoute
+  '/rate-limit/': typeof AuthenticatedRateLimitIndexRoute
   '/recent-calls/': typeof AuthenticatedRecentCallsIndexRoute
   '/redemption-codes/': typeof AuthenticatedRedemptionCodesIndexRoute
   '/security/': typeof AuthenticatedSecurityIndexRoute
@@ -642,6 +650,7 @@ export interface FileRoutesByTo {
   '/models': typeof AuthenticatedModelsIndexRoute
   '/playground': typeof AuthenticatedPlaygroundIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
+  '/rate-limit': typeof AuthenticatedRateLimitIndexRoute
   '/recent-calls': typeof AuthenticatedRecentCallsIndexRoute
   '/redemption-codes': typeof AuthenticatedRedemptionCodesIndexRoute
   '/security': typeof AuthenticatedSecurityIndexRoute
@@ -722,6 +731,7 @@ export interface FileRoutesById {
   '/_authenticated/models/': typeof AuthenticatedModelsIndexRoute
   '/_authenticated/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/_authenticated/profile/': typeof AuthenticatedProfileIndexRoute
+  '/_authenticated/rate-limit/': typeof AuthenticatedRateLimitIndexRoute
   '/_authenticated/recent-calls/': typeof AuthenticatedRecentCallsIndexRoute
   '/_authenticated/redemption-codes/': typeof AuthenticatedRedemptionCodesIndexRoute
   '/_authenticated/security/': typeof AuthenticatedSecurityIndexRoute
@@ -801,6 +811,7 @@ export interface FileRouteTypes {
     | '/models/'
     | '/playground/'
     | '/profile/'
+    | '/rate-limit/'
     | '/recent-calls/'
     | '/redemption-codes/'
     | '/security/'
@@ -877,6 +888,7 @@ export interface FileRouteTypes {
     | '/models'
     | '/playground'
     | '/profile'
+    | '/rate-limit'
     | '/recent-calls'
     | '/redemption-codes'
     | '/security'
@@ -956,6 +968,7 @@ export interface FileRouteTypes {
     | '/_authenticated/models/'
     | '/_authenticated/playground/'
     | '/_authenticated/profile/'
+    | '/_authenticated/rate-limit/'
     | '/_authenticated/recent-calls/'
     | '/_authenticated/redemption-codes/'
     | '/_authenticated/security/'
@@ -1346,6 +1359,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProfileIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/rate-limit/': {
+      id: '/_authenticated/rate-limit/'
+      path: '/rate-limit'
+      fullPath: '/rate-limit/'
+      preLoaderRoute: typeof AuthenticatedRateLimitIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/recent-calls/': {
       id: '/_authenticated/recent-calls/'
       path: '/recent-calls'
@@ -1665,6 +1685,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedModelsIndexRoute: typeof AuthenticatedModelsIndexRoute
   AuthenticatedPlaygroundIndexRoute: typeof AuthenticatedPlaygroundIndexRoute
   AuthenticatedProfileIndexRoute: typeof AuthenticatedProfileIndexRoute
+  AuthenticatedRateLimitIndexRoute: typeof AuthenticatedRateLimitIndexRoute
   AuthenticatedRecentCallsIndexRoute: typeof AuthenticatedRecentCallsIndexRoute
   AuthenticatedRedemptionCodesIndexRoute: typeof AuthenticatedRedemptionCodesIndexRoute
   AuthenticatedSecurityIndexRoute: typeof AuthenticatedSecurityIndexRoute
@@ -1702,6 +1723,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedModelsIndexRoute: AuthenticatedModelsIndexRoute,
   AuthenticatedPlaygroundIndexRoute: AuthenticatedPlaygroundIndexRoute,
   AuthenticatedProfileIndexRoute: AuthenticatedProfileIndexRoute,
+  AuthenticatedRateLimitIndexRoute: AuthenticatedRateLimitIndexRoute,
   AuthenticatedRecentCallsIndexRoute: AuthenticatedRecentCallsIndexRoute,
   AuthenticatedRedemptionCodesIndexRoute:
     AuthenticatedRedemptionCodesIndexRoute,

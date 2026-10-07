@@ -1,0 +1,63 @@
+# Docker Desktop local build and persistent data on D:.
+# Start/rebuild: docker compose -f docker-compose.local.yml up -d --build
+# Stop: docker compose -f docker-compose.local.yml down
+# NEW_API_LOCAL_HOME and NEW_API_LOCAL_PORT can override the local defaults.
+name: new-api-local
+
+services:
+  new-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: new-api-local:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${NEW_API_LOCAL_PORT:-3001}:3000"
+    env_file:
+      - ${NEW_API_LOCAL_HOME:-D:/Docker/new-api-local}/runtime.env
+    environment:
+      SQL_DSN: ""
+      LOG_SQL_DSN: ""
+      SQLITE_PATH: /data/one-api.db
+      REDIS_CONN_STRING: redis://redis:6379/0
+      TZ: Asia/Shanghai
+      SESSION_COOKIE_SECURE: "false"
+      TRUSTED_PROXIES: none
+    volumes:
+      - type: bind
+        source: ${NEW_API_LOCAL_HOME:-D:/Docker/new-api-local}/data
+        target: /data
+        bind:
+          create_host_path: false
+    command: ["--log-dir", "/data/logs"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --output-document=/dev/null http://127.0.0.1:3000/api/status || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "noeviction"]
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
