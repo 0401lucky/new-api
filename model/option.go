@@ -255,6 +255,10 @@ func SyncOptions(frequency int) {
 }
 
 func validateOptionValue(key string, value string) error {
+	if key == GroupMultiplierPoliciesOption {
+		_, err := parseGroupMultiplierPolicies(value)
+		return err
+	}
 	if key == legacyAccessTokenRetireAtKey {
 		return errLegacyRetireAtReadOnly
 	}
@@ -397,6 +401,11 @@ func UpdateOptionsBulkDBOnly(values map[string]string) error {
 }
 
 func updateOptionMap(key string, value string) (err error) {
+	if key == GroupMultiplierPoliciesOption {
+		if err := loadGroupMultiplierPolicies(value); err != nil {
+			return err
+		}
+	}
 	if key == retiredThemeOptionKey || key == legacyAccessTokenRetireAtKey {
 		common.OptionMapRWMutex.Lock()
 		delete(common.OptionMap, key)

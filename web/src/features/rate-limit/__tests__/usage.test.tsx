@@ -62,6 +62,8 @@ let client: QueryClient
 
 beforeEach(() => {
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  client.setQueryDefaults(['group-multipliers'], { staleTime: Infinity })
+  client.setQueryData(['group-multipliers', false, 42], [])
   useAuthStore.getState().auth.setUser({ id: 42, username: 'alice', role: 1 })
 })
 

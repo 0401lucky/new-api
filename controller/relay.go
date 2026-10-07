@@ -135,6 +135,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		newAPIError = types.NewError(err, types.ErrorCodeGenRelayInfoFailed)
 		return
 	}
+	defer func() { relayInfo.GroupLoadLease.Close() }()
 
 	defer func() {
 		recovered := recover()
@@ -364,7 +365,11 @@ func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service
 		return nil, types.NewError(fmt.Errorf("分组 %s 下模型 %s 的可用渠道不存在（retry）", selectGroup, info.OriginModelName), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
 	}
 
-	info.PriceData.GroupRatioInfo = helper.HandleGroupRatio(c, info)
+	groupRatioInfo, groupErr := helper.HandleGroupRatio(c, info)
+	if groupErr != nil {
+		return nil, types.NewErrorWithStatusCode(groupErr, types.ErrorCodeModelPriceError, http.StatusServiceUnavailable, types.ErrOptionWithSkipRetry())
+	}
+	info.PriceData.GroupRatioInfo = groupRatioInfo
 
 	service.RequestPolicy(c).BeginAttempt(channel, selectGroup)
 	newAPIError := middleware.SetupContextForSelectedChannel(c, channel, info.OriginModelName)
@@ -416,6 +421,7 @@ func RelayMidjourney(c *gin.Context) {
 		})
 		return
 	}
+	defer func() { relayInfo.GroupLoadLease.Close() }()
 
 	var mjErr *taskdto.MidjourneyResponse
 	switch relayInfo.RelayMode {
@@ -577,6 +583,7 @@ func executeTaskSubmissionWith(
 	relayInfo *relaycommon.RelayInfo,
 	submit taskSubmitAttempt,
 ) (*taskSubmissionOutcome, *taskdto.TaskError) {
+	defer func() { relayInfo.GroupLoadLease.Close() }()
 	policy := service.RequestPolicy(c)
 	diagnostics := newTaskPluginSubmitDiagnostics(c)
 	diagnostics.start(relayInfo)
@@ -758,6 +765,7 @@ func executeTaskSubmissionWith(
 		}
 	}
 	task.PrivateData.BillingContext = &model.TaskBillingContext{
+		MultiplierSnapshot:          relayInfo.PriceData.GroupRatioInfo.MultiplierSnapshot,
 		ModelPrice:                  relayInfo.PriceData.ModelPrice,
 		GroupRatio:                  relayInfo.PriceData.GroupRatioInfo.GroupRatio,
 		ModelRatio:                  relayInfo.PriceData.ModelRatio,
@@ -770,6 +778,9 @@ func executeTaskSubmissionWith(
 		DynamicRatioBalanceQuota:    relayInfo.PriceData.GroupRatioInfo.DynamicRatioBalanceQuota,
 		DynamicRatioBalanceMinQuota: relayInfo.PriceData.GroupRatioInfo.DynamicRatioBalanceMinQuota,
 		DynamicRatioBalanceMaxQuota: relayInfo.PriceData.GroupRatioInfo.DynamicRatioBalanceMaxQuota,
+	}
+	if relayInfo.GroupLoadLease != nil {
+		task.PrivateData.BillingContext.GroupLoadSlot = relayInfo.GroupLoadLease.Slot
 	}
 	task.Quota = result.Quota
 	task.Data = result.TaskData
@@ -827,6 +838,11 @@ func executeTaskSubmissionWith(
 		return nil, taskErr
 	}
 	durable = true
+	if !immediateTerminal && relayInfo.GroupLoadLease != nil {
+		if err := relayInfo.GroupLoadLease.Transfer(120 * time.Second); err != nil {
+			common.SysError("transfer task group load: " + err.Error())
+		}
+	}
 	if immediateTerminal {
 		perfmetrics.RecordTaskResult(task, result.Immediate)
 	}

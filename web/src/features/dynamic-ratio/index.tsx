@@ -16,7 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertCircle,
@@ -27,16 +26,11 @@ import {
   RefreshCw,
   Trash2,
 } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { useAuthStore } from '@/stores/auth-store'
-import {
-  formatQuota,
-  parseQuotaFromDollars,
-  quotaUnitsToDollars,
-} from '@/lib/format'
-import { ROLE } from '@/lib/roles'
-import { cn } from '@/lib/utils'
+
+import { SectionPageLayout } from '@/components/layout'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   AlertDialog,
@@ -98,8 +92,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { SectionPageLayout } from '@/components/layout'
 import { getGroups } from '@/features/users/api'
+import {
+  formatQuota,
+  parseQuotaFromDollars,
+  quotaUnitsToDollars,
+} from '@/lib/format'
+import { ROLE } from '@/lib/roles'
+import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/auth-store'
+
 import {
   createDynamicRatioRule,
   deleteDynamicRatioRule,
@@ -109,6 +111,7 @@ import {
   setDynamicRatioEnabled,
   updateDynamicRatioRule,
 } from './api'
+import { GroupMultiplierPanel } from './group-multiplier-panel'
 import type { DynamicRatioRule, DynamicRatioRulePayload } from './types'
 
 type RuleFormState = {
@@ -345,10 +348,11 @@ function formatBalanceRange(
   unlimitedLabel: string
 ): string {
   if (min == null && max == null) return unlimitedLabel
-  if (min != null && max != null)
+  if (min != null && max != null) {
     return `${formatQuota(min)} - ${formatQuota(max)}`
+  }
   if (min != null) return `${formatQuota(min)}+`
-  return `< ${formatQuota(max!)}`
+  return `< ${formatQuota(max ?? 0)}`
 }
 
 function ratioVariant(ratio: number) {
@@ -500,8 +504,9 @@ export function DynamicRatio() {
   })
 
   const error = rulesQuery.error || statusQuery.error || groupsQuery.error
-  const errorMessage =
-    error instanceof Error ? error.message : error ? t('Request failed') : ''
+  let errorMessage = ''
+  if (error instanceof Error) errorMessage = error.message
+  else if (error) errorMessage = t('Request failed')
 
   const openCreateDialog = () => {
     setEditingRule(null)
@@ -552,7 +557,9 @@ export function DynamicRatio() {
         <SectionPageLayout.Title>{t('Dynamic Ratio')}</SectionPageLayout.Title>
         <SectionPageLayout.Actions>
           <div className='flex items-center gap-2 rounded-lg border px-2.5 py-1.5'>
-            <span className='text-muted-foreground text-sm'>{t('Global')}</span>
+            <span className='text-muted-foreground text-sm'>
+              {t('Default balance mode')}
+            </span>
             <Switch
               checked={globalEnabled}
               disabled={
@@ -575,6 +582,12 @@ export function DynamicRatio() {
 
         <SectionPageLayout.Content>
           <div className='flex flex-col gap-4'>
+            <GroupMultiplierPanel admin />
+            <p className='text-muted-foreground text-sm'>
+              {t(
+                'The default switch applies only to groups without a saved mode. Existing rules apply only in balance mode.'
+              )}
+            </p>
             {errorMessage ? (
               <Alert variant='destructive'>
                 <AlertCircle />
@@ -653,13 +666,14 @@ export function DynamicRatio() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {rulesQuery.isLoading ? (
+                      {rulesQuery.isLoading && (
                         <TableRow>
                           <TableCell colSpan={10} className='h-32 text-center'>
                             {t('Loading')}
                           </TableCell>
                         </TableRow>
-                      ) : rules.length === 0 ? (
+                      )}
+                      {!rulesQuery.isLoading && rules.length === 0 && (
                         <TableRow>
                           <TableCell colSpan={10}>
                             <Empty className='min-h-32 border-0'>
@@ -674,7 +688,9 @@ export function DynamicRatio() {
                             </Empty>
                           </TableCell>
                         </TableRow>
-                      ) : (
+                      )}
+                      {!rulesQuery.isLoading &&
+                        rules.length > 0 &&
                         rules.map((rule, index) => (
                           <TableRow key={rule.id}>
                             <TableCell>
@@ -789,8 +805,7 @@ export function DynamicRatio() {
                               </div>
                             </TableCell>
                           </TableRow>
-                        ))
-                      )}
+                        ))}
                     </TableBody>
                   </Table>
                 </div>

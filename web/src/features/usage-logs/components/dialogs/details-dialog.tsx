@@ -16,7 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { TFunction } from 'i18next'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -35,6 +34,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { TFunction } from 'i18next'
 import {
   Copy,
   Check,
@@ -56,6 +56,7 @@ import { Dialog } from '@/components/dialog'
 import { StatusBadge, type StatusBadgeProps } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { multiplierModeLabel } from '@/features/dynamic-ratio/group-policy'
 import { DynamicPricingBreakdown } from '@/features/pricing/components/dynamic-pricing-breakdown'
 import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 import { BILLING_PRICING_VARS } from '@/features/pricing/lib/billing-expr'
@@ -242,6 +243,26 @@ function BillingBreakdown(props: {
   }
 
   const userGR = other.user_group_ratio
+  if (other.group_multiplier) {
+    rows.push({
+      label: t('Multiplier mode'),
+      value: multiplierModeLabel(other.group_multiplier.mode, t),
+    })
+    if (other.group_multiplier.mode === 'concurrency') {
+      rows.push({
+        label: t('Concurrency at admission'),
+        value: formatTokens(other.group_multiplier.concurrency),
+      })
+      rows.push({
+        label: t('Concurrency threshold'),
+        value: `≥${formatTokens(other.group_multiplier.minimum)}`,
+      })
+      rows.push({
+        label: t('Locked multiplier'),
+        value: `${formatRatio(other.group_multiplier.factor)}x`,
+      })
+    }
+  }
   const isUserGR = userGR != null && Number.isFinite(userGR) && userGR !== -1
   const effectiveGR = isUserGR ? userGR : other.group_ratio
   if (effectiveGR != null && Number.isFinite(effectiveGR)) {

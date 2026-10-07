@@ -10,10 +10,12 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/common/groupload"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	commonRelay "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
+	hosttypes "github.com/QuantumNous/new-api/types"
 	"gorm.io/gorm"
 )
 
@@ -170,18 +172,20 @@ type TaskPluginAuthorSnapshot struct {
 
 // TaskBillingContext 记录任务提交时的计费参数，以便轮询阶段可以重新计算额度。
 type TaskBillingContext struct {
-	ModelPrice                  float64                      `json:"model_price,omitempty"`       // 模型单价
-	GroupRatio                  float64                      `json:"group_ratio,omitempty"`       // 分组倍率
-	ModelRatio                  float64                      `json:"model_ratio,omitempty"`       // 模型倍率
-	OtherRatios                 map[string]float64           `json:"other_ratios,omitempty"`      // 附加倍率（时长、分辨率等）
-	OriginModelName             string                       `json:"origin_model_name,omitempty"` // 模型名称，必须为OriginModelName
-	PerCallBilling              bool                         `json:"per_call_billing,omitempty"`  // 按次计费：跳过轮询阶段的差额结算
-	DynamicRatio                float64                      `json:"dynamic_ratio,omitempty"`
-	DynamicRatioRuleId          int64                        `json:"dynamic_ratio_rule_id,omitempty"`
-	DynamicRatioBalanceQuota    int64                        `json:"dynamic_ratio_balance_quota,omitempty"`
-	DynamicRatioBalanceMinQuota *int64                       `json:"dynamic_ratio_balance_min_quota,omitempty"`
-	DynamicRatioBalanceMaxQuota *int64                       `json:"dynamic_ratio_balance_max_quota,omitempty"`
-	TieredSnapshot              *billingexpr.BillingSnapshot `json:"tiered_snapshot,omitempty"`
+	MultiplierSnapshot          *hosttypes.GroupMultiplierSnapshot `json:"group_multiplier,omitempty"`
+	GroupLoadSlot               string                             `json:"group_load_slot,omitempty"`
+	ModelPrice                  float64                            `json:"model_price,omitempty"`       // 模型单价
+	GroupRatio                  float64                            `json:"group_ratio,omitempty"`       // 分组倍率
+	ModelRatio                  float64                            `json:"model_ratio,omitempty"`       // 模型倍率
+	OtherRatios                 map[string]float64                 `json:"other_ratios,omitempty"`      // 附加倍率（时长、分辨率等）
+	OriginModelName             string                             `json:"origin_model_name,omitempty"` // 模型名称，必须为OriginModelName
+	PerCallBilling              bool                               `json:"per_call_billing,omitempty"`  // 按次计费：跳过轮询阶段的差额结算
+	DynamicRatio                float64                            `json:"dynamic_ratio,omitempty"`
+	DynamicRatioRuleId          int64                              `json:"dynamic_ratio_rule_id,omitempty"`
+	DynamicRatioBalanceQuota    int64                              `json:"dynamic_ratio_balance_quota,omitempty"`
+	DynamicRatioBalanceMinQuota *int64                             `json:"dynamic_ratio_balance_min_quota,omitempty"`
+	DynamicRatioBalanceMaxQuota *int64                             `json:"dynamic_ratio_balance_max_quota,omitempty"`
+	TieredSnapshot              *billingexpr.BillingSnapshot       `json:"tiered_snapshot,omitempty"`
 }
 
 // ResultRetrievable reports whether retrieval surfaces (native query routes,
@@ -738,6 +742,11 @@ func (t *Task) UpdateWithStatus(fromStatus TaskStatus) (bool, error) {
 	result := DB.Model(t).Where("status = ?", fromStatus).Select("*").Updates(t)
 	if result.Error != nil {
 		return false, result.Error
+	}
+	if result.RowsAffected > 0 && (t.Status == TaskStatusSuccess || t.Status == TaskStatusFailure) {
+		if err := groupload.Release(t.Group, t.GroupLoadSlot()); err != nil {
+			common.SysError("release task group load: " + err.Error())
+		}
 	}
 	return result.RowsAffected > 0, nil
 }

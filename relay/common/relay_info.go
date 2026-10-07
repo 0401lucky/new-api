@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/common/groupload"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
@@ -82,16 +83,19 @@ type TokenCountMeta struct {
 }
 
 type RelayInfo struct {
-	TokenId           int
-	TokenKey          string
-	TokenGroup        string
-	UserId            int
-	UsingGroup        string // 使用的分组，当auto跨分组重试时，会变动
-	UserGroup         string // 用户所在分组
-	TokenUnlimited    bool
-	StartTime         time.Time
-	FirstResponseTime time.Time
-	isFirstResponse   bool
+	GroupLoadLease           *groupload.Lease
+	GroupMultiplierSnapshots map[string]hosttypes.GroupRatioInfo
+	ReservationBeforeGroup   float64
+	TokenId                  int
+	TokenKey                 string
+	TokenGroup               string
+	UserId                   int
+	UsingGroup               string // 使用的分组，当auto跨分组重试时，会变动
+	UserGroup                string // 用户所在分组
+	TokenUnlimited           bool
+	StartTime                time.Time
+	FirstResponseTime        time.Time
+	isFirstResponse          bool
 	//SendLastReasoningResponse bool
 	IsStream               bool
 	IsGeminiBatchEmbedding bool

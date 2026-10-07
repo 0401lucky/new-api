@@ -17,12 +17,42 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
+import { requireServerSuccess } from '@/lib/server-error-message'
+
+import type {
+  GroupMultiplierPolicy,
+  GroupMultiplierStatus,
+} from './group-policy'
 import type {
   ApiResponse,
   DynamicRatioRule,
   DynamicRatioRulePayload,
   DynamicRatioStatus,
 } from './types'
+
+export async function getGroupMultipliers(
+  admin: boolean,
+  signal?: AbortSignal
+): Promise<GroupMultiplierStatus[]> {
+  const response = await api.get<ApiResponse<GroupMultiplierStatus[]>>(
+    `/api/dynamic_ratio/${admin ? 'policies' : 'groups'}`,
+    { signal }
+  )
+  return requireServerSuccess(response.data).data ?? []
+}
+
+export async function saveGroupMultiplier(
+  group: string,
+  policy: GroupMultiplierPolicy,
+  version: string
+): Promise<void> {
+  const response = await api.put('/api/dynamic_ratio/policies', {
+    group,
+    policy,
+    expected_version: version,
+  })
+  requireServerSuccess(response.data)
+}
 
 function unwrap<T>(res: ApiResponse<T>, fallbackMessage: string): T {
   if (!res.success) {

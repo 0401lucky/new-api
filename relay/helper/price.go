@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/common/groupload"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
@@ -40,7 +41,7 @@ func modelPriceNotConfiguredError(modelName string, userId int) error {
 const claudeCacheCreation1hMultiplier = 6 / 3.75
 
 // HandleGroupRatio checks for "auto_group" in the context and updates the group ratio and relayInfo.UsingGroup if present
-func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) hosttypes.GroupRatioInfo {
+func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) (hosttypes.GroupRatioInfo, error) {
 	groupRatioInfo := hosttypes.GroupRatioInfo{
 		GroupRatio:        1.0, // default ratio
 		GroupSpecialRatio: -1,
@@ -51,6 +52,27 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) hostty
 	if exists {
 		logger.LogDebug(ctx, "final group: %s", autoGroup)
 		relayInfo.UsingGroup = autoGroup.(string)
+	}
+	policy, version := model.GetGroupMultiplierPolicy(relayInfo.UsingGroup)
+	if policy.Mode == model.MultiplierConcurrency && relayInfo.RelayFormat == types.RelayFormatMjProxy {
+		return groupRatioInfo, fmt.Errorf("legacy Midjourney tasks do not retain their billing group; use a fixed or balance multiplier group")
+	}
+	var concurrency int64
+	if relayInfo.GroupLoadLease == nil || relayInfo.GroupLoadLease.Group != relayInfo.UsingGroup {
+		lease, count, err := groupload.Acquire(relayInfo.UsingGroup)
+		if err != nil {
+			if policy.Mode == model.MultiplierConcurrency {
+				return groupRatioInfo, fmt.Errorf("%w: %v", groupload.ErrUnavailable, err)
+			}
+			logger.LogWarn(ctx, "group load unavailable: "+err.Error())
+		} else {
+			relayInfo.GroupLoadLease.Close()
+			relayInfo.GroupLoadLease = lease
+			concurrency = count
+		}
+	}
+	if snapshot, exists := relayInfo.GroupMultiplierSnapshots[relayInfo.UsingGroup]; exists {
+		return snapshot, nil
 	}
 
 	// check user group special ratio
@@ -67,7 +89,7 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) hostty
 
 	originalGroupRatio := groupRatioInfo.GroupRatio
 	balanceQuota := int64(relayInfo.UserQuota)
-	if balanceQuota == 0 && relayInfo.UserId > 0 {
+	if policy.Mode == model.MultiplierBalance && balanceQuota == 0 && relayInfo.UserId > 0 {
 		if quota, err := model.GetUserQuota(relayInfo.UserId, false); err == nil {
 			balanceQuota = int64(quota)
 			relayInfo.UserQuota = quota
@@ -75,8 +97,18 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) hostty
 			logger.LogDebug(ctx, "dynamic ratio balance query failed: %s", err.Error())
 		}
 	}
-	dynamicMatch := model.GetMatchedDynamicRatioMatch(relayInfo.UsingGroup, relayInfo.OriginModelName, balanceQuota)
+	dynamicMatch := model.DynamicRatioMatch{}
+	if policy.Mode == model.MultiplierBalance {
+		dynamicMatch = model.GetMatchedDynamicRatioMatch(relayInfo.UsingGroup, relayInfo.OriginModelName, balanceQuota)
+	}
+	factor, minimum := 1.0, int64(0)
+	if policy.Mode == model.MultiplierConcurrency {
+		tier := policy.TierAt(concurrency)
+		factor, minimum = tier.Multiplier, tier.Minimum
+		dynamicMatch.Ratio = factor
+	}
 	if dynamicMatch.Ratio > 0 {
+		factor = dynamicMatch.Ratio
 		groupRatioInfo.GroupRatio = originalGroupRatio * dynamicMatch.Ratio
 		groupRatioInfo.DynamicRatio = dynamicMatch.Ratio
 		groupRatioInfo.DynamicRatioRuleId = dynamicMatch.RuleId
@@ -84,8 +116,12 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) hostty
 		groupRatioInfo.DynamicRatioBalanceMinQuota = dynamicMatch.BalanceMinQuota
 		groupRatioInfo.DynamicRatioBalanceMaxQuota = dynamicMatch.BalanceMaxQuota
 	}
-
-	return groupRatioInfo
+	groupRatioInfo.MultiplierSnapshot = &hosttypes.GroupMultiplierSnapshot{Mode: policy.Mode, Version: version, Group: relayInfo.UsingGroup, BaseRatio: originalGroupRatio, Factor: factor, Concurrency: concurrency, Minimum: minimum}
+	if relayInfo.GroupMultiplierSnapshots == nil {
+		relayInfo.GroupMultiplierSnapshots = make(map[string]hosttypes.GroupRatioInfo)
+	}
+	relayInfo.GroupMultiplierSnapshots[relayInfo.UsingGroup] = groupRatioInfo
+	return groupRatioInfo, nil
 }
 
 func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens int, meta *types.TokenCountMeta) (hosttypes.PriceData, error) {
@@ -97,7 +133,10 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 	billingModelName := info.GetBillingModelName()
 	modelPrice, usePrice := ratio_setting.GetModelPrice(billingModelName, false)
 
-	groupRatioInfo := HandleGroupRatio(c, info)
+	groupRatioInfo, groupErr := HandleGroupRatio(c, info)
+	if groupErr != nil {
+		return hosttypes.PriceData{}, groupErr
+	}
 
 	// Check if this model uses tiered_expr billing
 	if billing_setting.GetBillingMode(billingModelName) == billing_setting.BillingModeTieredExpr {
@@ -143,6 +182,7 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		audioRatio = ratio_setting.GetAudioRatio(billingModelName)
 		audioCompletionRatio = ratio_setting.GetAudioCompletionRatio(billingModelName)
 		ratio := modelRatio * groupRatioInfo.GroupRatio
+		info.ReservationBeforeGroup = preConsumedTokens * modelRatio
 		quota, err := common.QuotaFromFloatStrict(preConsumedTokens * ratio)
 		if err != nil {
 			return hosttypes.PriceData{}, err
@@ -218,6 +258,7 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 	}
 	if usePrice {
 		quotaToPreConsume := priceData.ApplyOtherRatiosToFloat(modelPrice * common.QuotaPerUnit * groupRatioInfo.GroupRatio)
+		info.ReservationBeforeGroup = priceData.ApplyOtherRatiosToFloat(modelPrice * common.QuotaPerUnit)
 		quota, err := common.QuotaFromFloatStrict(quotaToPreConsume)
 		if err != nil {
 			return hosttypes.PriceData{}, err
@@ -234,7 +275,10 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 
 // ModelPriceHelperPerCall 按次/按量计费的 PriceHelper (MJ、Task)
 func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (hosttypes.PriceData, error) {
-	groupRatioInfo := HandleGroupRatio(c, info)
+	groupRatioInfo, groupErr := HandleGroupRatio(c, info)
+	if groupErr != nil {
+		return hosttypes.PriceData{}, groupErr
+	}
 
 	modelPrice, success := ratio_setting.GetModelPrice(info.OriginModelName, true)
 	usePrice := success

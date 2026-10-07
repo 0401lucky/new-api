@@ -81,6 +81,9 @@ func SetApiRouter(router *gin.Engine) {
 		dynamicRatioRoute := apiRouter.Group("/dynamic_ratio")
 		{
 			dynamicRatioRoute.GET("/status", middleware.UserAuth(), controller.GetDynamicRatioStatus)
+			dynamicRatioRoute.GET("/groups", middleware.UserAuth(), controller.GetGroupMultiplierStatuses)
+			dynamicRatioRoute.GET("/policies", middleware.AdminAuth(), controller.GetGroupMultiplierPolicies)
+			dynamicRatioRoute.PUT("/policies", middleware.RootAuth(), controller.UpdateGroupMultiplierPolicy)
 			dynamicRatioRoute.GET("/rules", middleware.AdminAuth(), controller.GetDynamicRatioRules)
 			dynamicRatioRoute.POST("/rules", middleware.RootAuth(), controller.CreateDynamicRatioRule)
 			dynamicRatioRoute.PUT("/rules", middleware.RootAuth(), controller.UpdateDynamicRatioRule)

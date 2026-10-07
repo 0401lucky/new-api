@@ -142,6 +142,10 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 		groupRatioInfo.DynamicRatioBalanceMinQuota = dynamicMatch.BalanceMinQuota
 		groupRatioInfo.DynamicRatioBalanceMaxQuota = dynamicMatch.BalanceMaxQuota
 	}
+	if frozen, exists := relayInfo.GroupMultiplierSnapshots[relayInfo.UsingGroup]; exists {
+		groupRatioInfo = frozen
+		actualGroupRatio = frozen.GroupRatio
+	}
 	relayInfo.PriceData.GroupRatioInfo = groupRatioInfo
 
 	quotaInfo := QuotaInfo{

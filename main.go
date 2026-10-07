@@ -374,6 +374,10 @@ func InitResources() error {
 	if err != nil {
 		return err
 	}
+	if err := model.RestoreTaskGroupLoads(); err != nil {
+		common.SysError("restore task group load: " + err.Error())
+	}
+	go model.SyncTaskGroupLoads()
 
 	perfmetrics.Init()
 

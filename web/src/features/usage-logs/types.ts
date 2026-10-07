@@ -194,6 +194,15 @@ export interface LogOtherData {
   model_price?: number
   group_ratio?: number
   dynamic_ratio?: number
+  group_multiplier?: {
+    mode: 'fixed' | 'balance' | 'concurrency'
+    version: string
+    group: string
+    base_ratio: number
+    factor: number
+    concurrency: number
+    minimum: number
+  }
   dynamic_ratio_rule_id?: number
   dynamic_ratio_balance_quota?: number
   dynamic_ratio_balance_min_quota?: number

@@ -229,6 +229,11 @@ func (s *responsesWSSession) runCall(c *gin.Context, state *responsesWSCallState
 	modelName := create.Request.Model
 	started := time.Now()
 	var info *relaycommon.RelayInfo
+	defer func() {
+		if info != nil {
+			info.GroupLoadLease.Close()
+		}
+	}()
 	billingPrepared := false
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -298,7 +303,11 @@ func (s *responsesWSSession) runCall(c *gin.Context, state *responsesWSCallState
 				}
 				billingPrepared = true
 			} else {
-				info.PriceData.GroupRatioInfo = helper.HandleGroupRatio(c, info)
+				groupRatioInfo, groupErr := helper.HandleGroupRatio(c, info)
+				if groupErr != nil {
+					return types.NewErrorWithStatusCode(groupErr, types.ErrorCodeModelPriceError, http.StatusServiceUnavailable, types.ErrOptionWithSkipRetry())
+				}
+				info.PriceData.GroupRatioInfo = groupRatioInfo
 				if apiErr = service.PrepareTieredBillingForSelectedGroup(c, info); apiErr != nil {
 					return apiErr
 				}

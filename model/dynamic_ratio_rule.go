@@ -291,7 +291,8 @@ func GetMatchedDynamicRatio(group string, modelName string) float64 {
 }
 
 func GetMatchedDynamicRatioMatch(group string, modelName string, balanceQuota int64) DynamicRatioMatch {
-	if !common.DynamicRatioEnabled {
+	policy, _ := GetGroupMultiplierPolicy(group)
+	if policy.Mode != MultiplierBalance {
 		return DynamicRatioMatch{}
 	}
 

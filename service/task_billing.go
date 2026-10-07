@@ -48,6 +48,9 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo, task *model
 		}
 	}
 	other := model.NewLogOther()
+	if info.PriceData.GroupRatioInfo.MultiplierSnapshot != nil {
+		other.SetPublic("group_multiplier", info.PriceData.GroupRatioInfo.MultiplierSnapshot)
+	}
 	other.SetPublic("is_task", true)
 	other.SetPublic("request_path", c.Request.URL.Path)
 	if taskDeliveredInline(c, task) {
@@ -190,6 +193,9 @@ func taskAdjustTokenQuota(ctx context.Context, task *model.Task, delta int) {
 func taskBillingOther(task *model.Task) *model.LogOther {
 	other := model.NewLogOther()
 	if bc := task.PrivateData.BillingContext; bc != nil {
+		if bc.MultiplierSnapshot != nil {
+			other.SetPublic("group_multiplier", bc.MultiplierSnapshot)
+		}
 		other.SetPublic("model_price", bc.ModelPrice)
 		if bc.ModelRatio > 0 {
 			other.SetPublic("model_ratio", bc.ModelRatio)
@@ -199,6 +205,7 @@ func taskBillingOther(task *model.Task) *model.LogOther {
 			other.SetPublic("dynamic_ratio", bc.DynamicRatio)
 			other.SetPublic("group_ratio", bc.GroupRatio/bc.DynamicRatio)
 			appendDynamicRatioMatchInfo(other, types.GroupRatioInfo{
+				MultiplierSnapshot:          bc.MultiplierSnapshot,
 				DynamicRatio:                bc.DynamicRatio,
 				DynamicRatioRuleId:          bc.DynamicRatioRuleId,
 				DynamicRatioBalanceQuota:    bc.DynamicRatioBalanceQuota,

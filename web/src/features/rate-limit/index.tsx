@@ -34,6 +34,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Progress, ProgressLabel } from '@/components/ui/progress'
+import { GroupMultiplierPanel } from '@/features/dynamic-ratio/group-multiplier-panel'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -214,7 +215,12 @@ export function RateLimitUsage() {
           {t('Refresh')}
         </Button>
       </SectionPageLayout.Actions>
-      <SectionPageLayout.Content>{content}</SectionPageLayout.Content>
+      <SectionPageLayout.Content>
+        <div className='space-y-8'>
+          <GroupMultiplierPanel />
+          {content}
+        </div>
+      </SectionPageLayout.Content>
     </SectionPageLayout>
   )
 }

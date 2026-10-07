@@ -8,6 +8,7 @@ import (
 )
 
 type GroupRatioInfo struct {
+	MultiplierSnapshot          *GroupMultiplierSnapshot
 	GroupRatio                  float64
 	GroupSpecialRatio           float64
 	HasSpecialRatio             bool
@@ -16,6 +17,18 @@ type GroupRatioInfo struct {
 	DynamicRatioBalanceQuota    int64
 	DynamicRatioBalanceMinQuota *int64
 	DynamicRatioBalanceMaxQuota *int64
+}
+
+// GroupMultiplierSnapshot is immutable after admission and survives retries
+// and durable task settlement. It is also the user's billing explanation.
+type GroupMultiplierSnapshot struct {
+	Mode        string  `json:"mode"`
+	Version     string  `json:"version"`
+	Group       string  `json:"group"`
+	BaseRatio   float64 `json:"base_ratio"`
+	Factor      float64 `json:"factor"`
+	Concurrency int64   `json:"concurrency"`
+	Minimum     int64   `json:"minimum"`
 }
 
 type PriceData struct {

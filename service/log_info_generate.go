@@ -152,6 +152,12 @@ func AppendResponseModelLogInfo(relayInfo *relaycommon.RelayInfo, other *model.L
 }
 
 func appendDynamicRatioMatchInfo(other *model.LogOther, info hosttypes.GroupRatioInfo) {
+	if other != nil && info.MultiplierSnapshot != nil {
+		other.SetPublic("group_multiplier", info.MultiplierSnapshot)
+		if info.MultiplierSnapshot.Mode != model.MultiplierBalance {
+			return
+		}
+	}
 	if other == nil || info.DynamicRatio <= 0 {
 		return
 	}
@@ -207,6 +213,9 @@ func appendStreamStatus(relayInfo *relaycommon.RelayInfo, other *model.LogOther)
 func appendBillingInfo(relayInfo *relaycommon.RelayInfo, other *model.LogOther) {
 	if relayInfo == nil || other == nil {
 		return
+	}
+	if relayInfo.PriceData.GroupRatioInfo.MultiplierSnapshot != nil {
+		other.SetPublic("group_multiplier", relayInfo.PriceData.GroupRatioInfo.MultiplierSnapshot)
 	}
 	// billing_source: "wallet" or "subscription"
 	if relayInfo.BillingSource != "" {
