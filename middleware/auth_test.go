@@ -296,6 +296,12 @@ func TestUserAuthAppliesAccessTokenRouteRules(t *testing.T) {
 	admin := createMiddlewarePATUser(t, "route-rule-admin", legacy)
 	require.NoError(t, model.DB.Model(admin).Update("role", common.RoleAdminUser).Error)
 	profile, _ := createMiddlewareScopedToken(t, admin.Id, 0, "profile:read")
+	modelRead, _ := createMiddlewareScopedToken(t, admin.Id, 0, "model:read")
+	adminOptions, _ := createMiddlewareScopedToken(t, admin.Id, 0, "option:write")
+	root := createMiddlewarePATUser(t, "route-rule-root", "middleware-root-token")
+	require.NoError(t, model.DB.Model(root).Update("role", common.RoleRootUser).Error)
+	rootOptions, _ := createMiddlewareScopedToken(t, root.Id, 0, "option:write")
+	rootProfile, _ := createMiddlewareScopedToken(t, root.Id, 0, "profile:read")
 	channel, _ := createMiddlewareScopedToken(t, admin.Id, time.Now().Unix()+3600, "channel:read")
 	combined, _ := createMiddlewareScopedToken(t, admin.Id, 0, "channel:read", "channel:operate")
 	expired, _ := createMiddlewareScopedToken(t, admin.Id, time.Now().Unix()-1, "profile:read")
@@ -303,6 +309,10 @@ func TestUserAuthAppliesAccessTokenRouteRules(t *testing.T) {
 	ok := func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"id": c.GetInt("id")}) }
 	router := gin.New()
 	router.GET("/api/user/self", UserAuth(), ok)
+	router.GET("/api/user/self/rate_limit", UserAuth(), ok)
+	router.GET("/api/dynamic_ratio/groups", UserAuth(), ok)
+	router.GET("/api/dynamic_ratio/policies", AdminAuth(), ok)
+	router.PUT("/api/dynamic_ratio/policies", RootAuth(), ok)
 	router.GET("/api/user/access_tokens", UserAuth(), ok)
 	router.GET("/api/undeclared", UserAuth(), ok)
 	router.GET("/api/channel/", AdminAuth(), RequirePermission(authz.ChannelRead), ok)
@@ -310,10 +320,19 @@ func TestUserAuthAppliesAccessTokenRouteRules(t *testing.T) {
 	router.GET("/api/pricing", TryUserAuth(), ok)
 
 	for _, test := range []struct {
-		name, path, token, code, reason string
-		status                          int
+		name, method, path, token, code, reason string
+		status                                  int
 	}{
 		{name: "granted scope on a never expiring token", path: "/api/user/self", token: profile, status: http.StatusOK},
+		{name: "rate limit with profile scope", path: "/api/user/self/rate_limit", token: profile, status: http.StatusOK},
+		{name: "rate limit without profile scope", path: "/api/user/self/rate_limit", token: channel, status: http.StatusForbidden, code: "ACCESS_TOKEN_SCOPE_DENIED", reason: "scope_denied"},
+		{name: "group multipliers with profile scope", path: "/api/dynamic_ratio/groups", token: profile, status: http.StatusOK},
+		{name: "group multipliers without profile scope", path: "/api/dynamic_ratio/groups", token: channel, status: http.StatusForbidden, code: "ACCESS_TOKEN_SCOPE_DENIED", reason: "scope_denied"},
+		{name: "multiplier policies with model scope", path: "/api/dynamic_ratio/policies", token: modelRead, status: http.StatusOK},
+		{name: "multiplier policies without model scope", path: "/api/dynamic_ratio/policies", token: profile, status: http.StatusForbidden, code: "ACCESS_TOKEN_SCOPE_DENIED", reason: "scope_denied"},
+		{name: "root updates multiplier policies with option scope", method: http.MethodPut, path: "/api/dynamic_ratio/policies", token: rootOptions, status: http.StatusOK},
+		{name: "root cannot update multiplier policies without option scope", method: http.MethodPut, path: "/api/dynamic_ratio/policies", token: rootProfile, status: http.StatusForbidden, code: "ACCESS_TOKEN_SCOPE_DENIED", reason: "scope_denied"},
+		{name: "option scope does not grant root privileges", method: http.MethodPut, path: "/api/dynamic_ratio/policies", token: adminOptions, status: http.StatusForbidden, code: "AUTH_INSUFFICIENT_PRIVILEGE"},
 		{name: "missing scope", path: "/api/user/self", token: channel, status: http.StatusForbidden, code: "ACCESS_TOKEN_SCOPE_DENIED", reason: "scope_denied"},
 		{name: "undeclared route", path: "/api/undeclared", token: profile, status: http.StatusForbidden, code: "ACCESS_TOKEN_ROUTE_UNDECLARED", reason: "route_undeclared"},
 		{name: "session route", path: "/api/user/access_tokens", token: profile, status: http.StatusForbidden, code: "AUTH_SESSION_REQUIRED", reason: "session_required"},
@@ -326,7 +345,14 @@ func TestUserAuthAppliesAccessTokenRouteRules(t *testing.T) {
 		{name: "legacy token on a session route", path: "/api/user/access_tokens", token: legacy, status: http.StatusForbidden, code: "AUTH_SESSION_REQUIRED", reason: "session_required"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			response := middlewareBearerRequest(router, test.path, test.token)
+			method := test.method
+			if method == "" {
+				method = http.MethodGet
+			}
+			request := httptest.NewRequest(method, test.path, nil)
+			request.Header.Set("Authorization", "Bearer "+test.token)
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
 			assert.Equal(t, test.status, response.Code, response.Body.String())
 			if test.code != "" {
 				assert.Contains(t, response.Body.String(), `"code":"`+test.code+`"`)
