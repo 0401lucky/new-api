@@ -173,6 +173,8 @@ var accessTokenRouteRules = map[string]accessTokenRouteRule{
 	"GET /api/user/topup":                              accessTokenScopeRule("billing:read"),
 	"POST /api/user/topup/complete":                    accessTokenScopeRule("billing:write"),
 	"GET /api/user/search":                             accessTokenScopeRule("user:read"),
+	"GET /api/user/activity":                           accessTokenScopeRule("user:read"),
+	"POST /api/user/activity/batch-delete":             accessTokenSessionRule,
 	"GET /api/user/:id/oauth/bindings":                 accessTokenScopeRule("user:read"),
 	"DELETE /api/user/:id/oauth/bindings/:provider_id": accessTokenScopeRule("user:write"),
 	"DELETE /api/user/:id/bindings/:binding_type":      accessTokenScopeRule("user:write"),

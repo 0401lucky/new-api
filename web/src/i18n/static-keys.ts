@@ -19,6 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 // Static translation keys that don't get picked up by the t('...') regex.
 // These cover dynamic labels (e.g. constants, configs) that are passed into t at runtime.
 export const STATIC_I18N_KEYS = [
+  'Some selected users are no longer eligible for cleanup. Refresh the list and select again.',
+  'User activity history is still being initialized.',
   'Hourly token usage by model since local midnight',
   'Token share by model author since local midnight',
   'Task usage metadata is unavailable. Pricing details cannot be displayed.',

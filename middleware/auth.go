@@ -624,6 +624,7 @@ func TokenAuth() func(c *gin.Context) {
 		}
 		token, err := model.ValidateUserToken(key)
 		if token != nil {
+			recordUserRequestActivity(c, token.UserId)
 			id := c.GetInt("id")
 			if id == 0 {
 				c.Set("id", token.UserId)

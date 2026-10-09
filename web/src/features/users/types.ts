@@ -57,6 +57,12 @@ export const userSchema = z.object({
   created_at: z.number().optional(),
   updated_at: z.number().optional(),
   last_login_at: z.number().optional(),
+  last_request_at: z.number().optional(),
+  activity: z
+    .enum(['active', 'inactive', 'very_inactive', 'never_requested', 'unknown'])
+    .optional(),
+  no_request_days: z.number().optional(),
+  cleanup_eligible: z.boolean().optional(),
   DeletedAt: z.any().nullable().optional(),
   remark: z.string().optional(),
   temporary_quota: z.number().optional(),
@@ -118,6 +124,37 @@ export interface SearchUsersParams {
   page_size?: number
   sort_by?: UserSortBy
   sort_order?: UserSortOrder
+}
+
+export type UserActivity = NonNullable<User['activity']>
+export type UserActivityFilter = UserActivity | 'cleanup' | ''
+
+export interface GetUserActivityParams extends Omit<
+  SearchUsersParams,
+  'sort_by'
+> {
+  activity?: UserActivityFilter
+  sort_by?: 'id' | 'username' | 'created_at' | 'last_request_at'
+}
+
+export interface UserActivitySummary {
+  total: number
+  active: number
+  inactive: number
+  very_inactive: number
+  never_requested: number
+  unknown: number
+  cleanup_candidates: number
+}
+
+export interface UserActivityPage {
+  items: User[]
+  total: number
+  page: number
+  page_size: number
+  summary: UserActivitySummary
+  tracking_started_at: number
+  as_of: number
 }
 
 export interface UserFormData {

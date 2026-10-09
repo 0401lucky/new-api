@@ -32,6 +32,8 @@ import type {
   ManageUserAction,
   ManageUserQuotaPayload,
   ApiResponse,
+  GetUserActivityParams,
+  UserActivityPage,
 } from './types'
 
 // A step-up proof is single-use, so the request carrying it must never be
@@ -64,6 +66,30 @@ export async function getUsers(
     },
   })
   return res.data
+}
+
+export async function getUserActivity(
+  params: GetUserActivityParams
+): Promise<UserActivityPage> {
+  const res = await api.get<ApiResponse<UserActivityPage>>(
+    '/api/user/activity',
+    { params }
+  )
+  const response = requireServerSuccess(res.data)
+  if (!response.data) throw new Error('Failed to load user statistics')
+  return response.data
+}
+
+export async function batchDeleteInactiveUsers(
+  userIDs: number[],
+  proofToken: string
+): Promise<ApiResponse<{ deleted: number }>> {
+  const res = await api.post(
+    '/api/user/activity/batch-delete',
+    { user_ids: userIDs },
+    securityProofConfig(proofToken)
+  )
+  return requireServerSuccess(res.data)
 }
 
 /**

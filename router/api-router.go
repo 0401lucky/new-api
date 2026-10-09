@@ -192,6 +192,8 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.POST("/topup/complete", controller.AdminCompleteTopUp)
 				adminRoute.POST("/topup/epay/reconcile", controller.AdminReconcileEpayTopUps)
 				adminRoute.GET("/search", controller.SearchUsers)
+				adminRoute.GET("/activity", controller.GetUserActivity)
+				adminRoute.POST("/activity/batch-delete", controller.BatchDeleteInactiveUsers)
 				adminRoute.GET("/by_linuxdo", controller.GetUserByLinuxDOId)
 				adminRoute.GET("/:id/oauth/bindings", controller.GetUserOAuthBindingsByAdmin)
 				adminRoute.DELETE("/:id/oauth/bindings/:provider_id", controller.UnbindCustomOAuthByAdmin)

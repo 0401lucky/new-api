@@ -24,6 +24,18 @@ import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
 const usersSearchSchema = z.object({
+  tab: z.enum(['users', 'statistics']).optional().catch(undefined),
+  activity: z
+    .enum([
+      'active',
+      'inactive',
+      'very_inactive',
+      'never_requested',
+      'unknown',
+      'cleanup',
+    ])
+    .optional()
+    .catch(undefined),
   page: z.number().optional().catch(1),
   pageSize: z.number().optional().catch(undefined),
   filter: z.string().optional().catch(''),
