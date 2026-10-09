@@ -155,7 +155,7 @@ func GetUserActivity(filter UserActivityFilter, page *common.PageInfo, now int64
 	// Explicit projection prevents this read-only endpoint from returning
 	// credentials, account bindings, or private settings.
 	query := DB.Table("? AS u", clause.Table{Name: DB.NamingStrategy.TableName("User")}).
-		Joins("LEFT JOIN ? AS a ON a.user_id = u.id AND a.last_request_at >= u.created_at", clause.Table{Name: DB.NamingStrategy.TableName("UserRequestActivity")}).
+		Joins("LEFT JOIN ? AS a ON a.user_id = u.id AND a.last_request_at >= COALESCE(u.created_at, 0)", clause.Table{Name: DB.NamingStrategy.TableName("UserRequestActivity")}).
 		Where("u.deleted_at IS NULL").
 		Select(`u.id, u.username, u.display_name, u.email, u.role, u.status, ?, u.remark,
 			u.created_at, u.last_login_at, COALESCE(a.last_request_at, 0) AS last_request_at,

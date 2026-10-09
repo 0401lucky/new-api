@@ -188,6 +188,55 @@ func TestUserActivityFreshDatabaseAndClassification(t *testing.T) {
 	assert.Equal(t, page.Summary, first.Summary, "category selection does not change the summary for the current search filters")
 }
 
+func TestUserActivityPreservesRequestsWithMissingRegistrationTime(t *testing.T) {
+	db := setupUserActivityTestDB(t)
+	now := common.GetTimestamp()
+	start := now - 90*activityTestDay
+	require.NoError(t, db.Create(&model.UserActivityState{ID: 1, TrackingStartedAt: start, BackfillCompletedAt: start}).Error)
+	fixtures := []struct {
+		name        string
+		createdAt   any
+		requestAt   int64
+		wantRequest int64
+		activity    string
+	}{
+		{"legacy-active", nil, now - activityTestDay, now - activityTestDay, "active"},
+		{"legacy-inactive", nil, now - 14*activityTestDay, now - 14*activityTestDay, "inactive"},
+		{"legacy-old", nil, now - 40*activityTestDay, now - 40*activityTestDay, "very_inactive"},
+		{"legacy-unknown", nil, 0, 0, "unknown"},
+		{"reused-account", now - activityTestDay, now - 40*activityTestDay, 0, "never_requested"},
+	}
+	ids := make([]int, len(fixtures))
+	for i, fixture := range fixtures {
+		user := createActivityTestUser(t, db, fixture.name, now-120*activityTestDay, fixture.requestAt)
+		require.NoError(t, db.Model(&user).Update("created_at", fixture.createdAt).Error)
+		ids[i] = user.Id
+	}
+
+	page, err := model.GetUserActivity(model.UserActivityFilter{SortBy: "id"}, &common.PageInfo{Page: 1, PageSize: 20}, now)
+	require.NoError(t, err)
+	require.Len(t, page.Items, len(fixtures))
+	assert.Equal(t, model.UserActivitySummary{Total: 5, Active: 1, Inactive: 1, VeryInactive: 1, NeverRequested: 1, Unknown: 1}, page.Summary)
+	for i, fixture := range fixtures {
+		item := page.Items[i]
+		assert.Equal(t, ids[i], item.Id)
+		assert.Equal(t, fixture.activity, item.Activity, fixture.name)
+		assert.Equal(t, fixture.wantRequest, item.LastRequestAt, fixture.name)
+		assert.False(t, item.CleanupEligible, fixture.name)
+	}
+	assert.EqualValues(t, 40, page.Items[2].NoRequestDays)
+	assert.EqualValues(t, 90, page.Items[3].NoRequestDays)
+
+	// Missing registration dates must not make legacy accounts eligible for
+	// permanent cleanup, even after a full observation window without requests.
+	deleted, err := model.DeleteInactiveUsers([]int{ids[2], ids[3]}, authz.ClearUserAuthorizationInTx)
+	assert.ErrorIs(t, err, model.ErrInactiveUserSelection)
+	assert.Empty(t, deleted)
+	var count int64
+	require.NoError(t, db.Model(&model.User{}).Where("id IN ?", ids).Count(&count).Error)
+	assert.EqualValues(t, len(fixtures), count)
+}
+
 func TestUserActivityCountsSuccessfulAndFailedRequestsWithoutConsumeLogs(t *testing.T) {
 	db := setupUserActivityTestDB(t)
 	now := common.GetTimestamp()
@@ -274,7 +323,7 @@ func TestInactiveUserCleanupRequiresBoundSingleUseProofAndRevokesAccess(t *testi
 	require.NoError(t, db.Create(&model.UserActivityState{ID: 1, TrackingStartedAt: start, BackfillCompletedAt: start}).Error)
 	first := createActivityTestUser(t, db, "cleanup-first", now-60*activityTestDay, now-40*activityTestDay)
 	second := createActivityTestUser(t, db, "cleanup-second", now-40*activityTestDay, 0)
-	op := createQuotaTestOperator(t, db, common.RoleRootUser)
+	op := createQuotaTestOperator(t, db, common.RoleAdminUser)
 	require.NoError(t, authz.Init(db))
 	login, err := service.CreateLoginSession(op.Id, "password", "127.0.0.1", "activity-cleanup")
 	require.NoError(t, err)
