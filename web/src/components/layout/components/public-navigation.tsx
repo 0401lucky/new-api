@@ -51,13 +51,13 @@ export function PublicNavigation({
 
   return (
     <nav className={cn('hidden items-center gap-1 md:flex', className)}>
-      {links.map((link, index) => {
+      {links.map((link) => {
         // Handle external links
         if (link.external) {
           const target = link.openInNewTab === false ? undefined : '_blank'
           return (
             <a
-              key={index}
+              key={link.href}
               href={link.href}
               target={target}
               rel={target ? 'noopener noreferrer' : undefined}
@@ -73,7 +73,7 @@ export function PublicNavigation({
         // Handle internal links
         return (
           <Link
-            key={index}
+            key={link.href}
             to={link.href}
             className={cn(
               'text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground inline-flex h-9 w-max items-center justify-center rounded-md bg-transparent px-4 py-2 text-sm font-medium transition-colors focus:outline-none',

@@ -131,13 +131,14 @@ function TokenUsageSheet(props: {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {query.isFetching ? (
+                  {query.isFetching && (
                     <TableRow>
                       <TableCell colSpan={3} className='h-24 text-center'>
                         {t('Loading')}
                       </TableCell>
                     </TableRow>
-                  ) : rows.length === 0 ? (
+                  )}
+                  {!query.isFetching && rows.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={3}>
                         <Empty className='min-h-24 border-0'>
@@ -147,7 +148,9 @@ function TokenUsageSheet(props: {
                         </Empty>
                       </TableCell>
                     </TableRow>
-                  ) : (
+                  )}
+                  {!query.isFetching &&
+                    rows.length > 0 &&
                     rows.map((row) => (
                       <TableRow key={row.model_name}>
                         <TableCell className='max-w-72 truncate'>
@@ -158,8 +161,7 @@ function TokenUsageSheet(props: {
                           {formatNumber(row.request_count)}
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
+                    ))}
                 </TableBody>
               </Table>
             </CardContent>
@@ -259,13 +261,14 @@ export function ActiveTasks() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {rankQuery.isLoading ? (
+                        {rankQuery.isLoading && (
                           <TableRow>
                             <TableCell colSpan={3} className='h-32 text-center'>
                               {t('Loading')}
                             </TableCell>
                           </TableRow>
-                        ) : rank.length === 0 ? (
+                        )}
+                        {!rankQuery.isLoading && rank.length === 0 && (
                           <TableRow>
                             <TableCell colSpan={3}>
                               <Empty className='min-h-32 border-0'>
@@ -275,7 +278,9 @@ export function ActiveTasks() {
                               </Empty>
                             </TableCell>
                           </TableRow>
-                        ) : (
+                        )}
+                        {!rankQuery.isLoading &&
+                          rank.length > 0 &&
                           rank.map((row) => (
                             <TableRow key={row.user_id}>
                               <TableCell>
@@ -297,8 +302,7 @@ export function ActiveTasks() {
                                 </Button>
                               </TableCell>
                             </TableRow>
-                          ))
-                        )}
+                          ))}
                       </TableBody>
                     </Table>
                   </CardContent>
@@ -327,13 +331,14 @@ export function ActiveTasks() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {historyQuery.isLoading ? (
+                        {historyQuery.isLoading && (
                           <TableRow>
                             <TableCell colSpan={5} className='h-32 text-center'>
                               {t('Loading')}
                             </TableCell>
                           </TableRow>
-                        ) : history.length === 0 ? (
+                        )}
+                        {!historyQuery.isLoading && history.length === 0 && (
                           <TableRow>
                             <TableCell colSpan={5}>
                               <Empty className='min-h-32 border-0'>
@@ -343,7 +348,9 @@ export function ActiveTasks() {
                               </Empty>
                             </TableCell>
                           </TableRow>
-                        ) : (
+                        )}
+                        {!historyQuery.isLoading &&
+                          history.length > 0 &&
                           history.map((row) => (
                             <TableRow key={row.id}>
                               <TableCell>
@@ -375,8 +382,7 @@ export function ActiveTasks() {
                                 </Button>
                               </TableCell>
                             </TableRow>
-                          ))
-                        )}
+                          ))}
                       </TableBody>
                     </Table>
                   </CardContent>

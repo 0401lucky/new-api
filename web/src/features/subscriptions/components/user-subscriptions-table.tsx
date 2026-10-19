@@ -291,13 +291,13 @@ export function UserSubscriptionsTable() {
                   aria-label={t('Sort by quota usage')}
                 >
                   {t('Quota usage')}
-                  {orderBy === 'amount_used' ? (
-                    order === 'desc' ? (
-                      <ArrowDown className='h-3.5 w-3.5' />
-                    ) : (
-                      <ArrowUp className='h-3.5 w-3.5' />
-                    )
-                  ) : (
+                  {orderBy === 'amount_used' && order === 'desc' && (
+                    <ArrowDown className='h-3.5 w-3.5' />
+                  )}
+                  {orderBy === 'amount_used' && order !== 'desc' && (
+                    <ArrowUp className='h-3.5 w-3.5' />
+                  )}
+                  {orderBy !== 'amount_used' && (
                     <ArrowUpDown className='text-muted-foreground h-3.5 w-3.5' />
                   )}
                 </button>
@@ -307,7 +307,7 @@ export function UserSubscriptionsTable() {
             </tr>
           </thead>
           <tbody>
-            {isLoading && items.length === 0 ? (
+            {isLoading && items.length === 0 && (
               <tr>
                 <td
                   colSpan={7}
@@ -316,7 +316,8 @@ export function UserSubscriptionsTable() {
                   {t('Loading...')}
                 </td>
               </tr>
-            ) : items.length === 0 ? (
+            )}
+            {!isLoading && items.length === 0 && (
               <tr>
                 <td
                   colSpan={7}
@@ -325,7 +326,8 @@ export function UserSubscriptionsTable() {
                   {t('No subscription records')}
                 </td>
               </tr>
-            ) : (
+            )}
+            {items.length > 0 &&
               items.map((item) => {
                 const sub = item.subscription
                 return (
@@ -374,8 +376,7 @@ export function UserSubscriptionsTable() {
                     </td>
                   </tr>
                 )
-              })
-            )}
+              })}
           </tbody>
         </table>
       </div>

@@ -291,17 +291,19 @@ function DetailSheet(props: {
         </SheetHeader>
 
         <ScrollArea className='min-h-0 flex-1 px-4 pb-4'>
-          {props.loading ? (
+          {props.loading && (
             <div className='text-muted-foreground flex min-h-80 items-center justify-center text-sm'>
               {t('Loading')}
             </div>
-          ) : !record ? (
+          )}
+          {!props.loading && !record && (
             <Empty className='min-h-80 border'>
               <EmptyHeader>
                 <EmptyTitle>{t('No data')}</EmptyTitle>
               </EmptyHeader>
             </Empty>
-          ) : (
+          )}
+          {!props.loading && record && (
             <div className='flex flex-col gap-4 py-4'>
               <div className='flex flex-wrap items-center gap-2'>
                 <Badge variant='outline'>{formatDate(record.created_at)}</Badge>
@@ -419,7 +421,10 @@ export function RecentCalls() {
     enabled: Boolean(activeId && detailOpen),
   })
 
-  const rows = listQuery.data?.data || []
+  const rows = useMemo(
+    () => listQuery.data?.data ?? [],
+    [listQuery.data?.data]
+  )
   const nextBeforeId = useMemo(() => {
     if (rows.length === 0) return ''
     return String(Math.min(...rows.map((row) => row.id)))
@@ -541,13 +546,14 @@ export function RecentCalls() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {listQuery.isLoading ? (
+                    {listQuery.isLoading && (
                       <TableRow>
                         <TableCell colSpan={10} className='h-32 text-center'>
                           {t('Loading')}
                         </TableCell>
                       </TableRow>
-                    ) : listQuery.isError ? (
+                    )}
+                    {!listQuery.isLoading && listQuery.isError && (
                       <TableRow>
                         <TableCell colSpan={10} className='h-32 text-center'>
                           <span className='text-destructive inline-flex items-center gap-2'>
@@ -556,17 +562,23 @@ export function RecentCalls() {
                           </span>
                         </TableCell>
                       </TableRow>
-                    ) : rows.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={10}>
-                          <Empty className='min-h-32 border-0'>
-                            <EmptyHeader>
-                              <EmptyTitle>{t('No data')}</EmptyTitle>
-                            </EmptyHeader>
-                          </Empty>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
+                    )}
+                    {!listQuery.isLoading &&
+                      !listQuery.isError &&
+                      rows.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={10}>
+                            <Empty className='min-h-32 border-0'>
+                              <EmptyHeader>
+                                <EmptyTitle>{t('No data')}</EmptyTitle>
+                              </EmptyHeader>
+                            </Empty>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    {!listQuery.isLoading &&
+                      !listQuery.isError &&
+                      rows.length > 0 &&
                       rows.map((record) => (
                         <TableRow
                           key={record.id}
@@ -636,7 +648,7 @@ export function RecentCalls() {
                           </TableCell>
                         </TableRow>
                       ))
-                    )}
+                    }
                   </TableBody>
                 </Table>
               </CardContent>

@@ -42,6 +42,7 @@ import {
   TooltipTrigger,
   TooltipProvider,
 } from '@/components/ui/tooltip'
+import { toIntlLocale } from '@/i18n/languages'
 import { formatQuotaWithCurrency } from '@/lib/currency'
 import dayjs from '@/lib/dayjs'
 import { handleServerError } from '@/lib/handle-server-error'
@@ -270,12 +271,9 @@ export function CheckinCalendarCard({
 
   // 日历星期名称使用本地化格式（i18next language 需规范化为 BCP 47，否则 toLocaleDateString 抛异常）
   const weekDays = useMemo(() => {
-    let lang = i18n.resolvedLanguage || i18n.language || 'en'
-    try {
-      new Intl.Locale(lang)
-    } catch {
-      lang = 'en'
-    }
+    const lang = toIntlLocale(
+      i18n.resolvedLanguage || i18n.language || 'en'
+    ) ?? 'en'
     // 2026-01-04 是周日，用其作为基准生成一周的短星期名
     const base = new Date(2026, 0, 4)
     return Array.from({ length: 7 }, (_, i) =>

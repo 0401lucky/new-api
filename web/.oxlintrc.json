@@ -19,6 +19,7 @@
     "build",
     "coverage",
     ".tanstack",
+    "default",
     ".eslintrc.cjs",
     "src/components/ui",
     "src/routeTree.gen.ts"

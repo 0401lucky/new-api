@@ -417,23 +417,27 @@ export function Fingerprints() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {duplicateQuery.isLoading ? (
+                        {duplicateQuery.isLoading && (
                           <TableRow>
                             <TableCell colSpan={5} className='h-32 text-center'>
                               {t('Loading')}
                             </TableCell>
                           </TableRow>
-                        ) : duplicateRows.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={5}>
-                              <Empty className='min-h-32 border-0'>
-                                <EmptyHeader>
-                                  <EmptyTitle>{t('No data')}</EmptyTitle>
-                                </EmptyHeader>
-                              </Empty>
-                            </TableCell>
-                          </TableRow>
-                        ) : (
+                        )}
+                        {!duplicateQuery.isLoading &&
+                          duplicateRows.length === 0 && (
+                            <TableRow>
+                              <TableCell colSpan={5}>
+                                <Empty className='min-h-32 border-0'>
+                                  <EmptyHeader>
+                                    <EmptyTitle>{t('No data')}</EmptyTitle>
+                                  </EmptyHeader>
+                                </Empty>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        {!duplicateQuery.isLoading &&
+                          duplicateRows.length > 0 &&
                           duplicateRows.map((row) => (
                             <TableRow key={`${row.visitor_id}-${row.ip}`}>
                               <TableCell className='max-w-96 truncate font-mono text-xs'>
@@ -459,8 +463,7 @@ export function Fingerprints() {
                                 </Button>
                               </TableCell>
                             </TableRow>
-                          ))
-                        )}
+                          ))}
                       </TableBody>
                     </Table>
                   </div>

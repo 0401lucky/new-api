@@ -170,13 +170,17 @@ function ChatRouteComponent() {
 
   return (
     <div data-journal-level='medium' className='h-full w-full'>
+      {/* eslint-disable react/iframe-missing-sandbox -- The chat preset is an
+          admin-configured web app that needs its own origin storage. */}
       <iframe
         src={iframeSrc}
         key={iframeSrc}
         className='h-full w-full border-0'
+        sandbox='allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals'
         allow='camera; microphone'
         title={`Chat preset: ${preset.name}`}
       />
+      {/* eslint-enable react/iframe-missing-sandbox */}
     </div>
   )
 }

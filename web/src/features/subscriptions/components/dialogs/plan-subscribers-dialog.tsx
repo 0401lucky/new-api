@@ -149,7 +149,7 @@ export function PlanSubscribersDialog() {
               </tr>
             </thead>
             <tbody>
-              {isLoading && items.length === 0 ? (
+              {isLoading && items.length === 0 && (
                 <tr>
                   <td
                     colSpan={6}
@@ -158,7 +158,8 @@ export function PlanSubscribersDialog() {
                     {t('Loading...')}
                   </td>
                 </tr>
-              ) : items.length === 0 ? (
+              )}
+              {!isLoading && items.length === 0 && (
                 <tr>
                   <td
                     colSpan={6}
@@ -167,13 +168,40 @@ export function PlanSubscribersDialog() {
                     {t('No subscription records')}
                   </td>
                 </tr>
-              ) : (
+              )}
+              {items.length > 0 &&
                 items.map((item) => {
                   const sub = item.subscription
                   const effective = getEffectiveSubscriptionStatus(sub)
                   const totalAmt = Number(sub.amount_total || 0)
                   const used = Number(sub.amount_used || 0)
                   const pct = getSubscriptionUsagePercent(used, totalAmt)
+                  let statusBadge
+                  if (effective === 'active') {
+                    statusBadge = (
+                      <StatusBadge
+                        label={t('Active')}
+                        variant='success'
+                        copyable={false}
+                      />
+                    )
+                  } else if (effective === 'cancelled') {
+                    statusBadge = (
+                      <StatusBadge
+                        label={t('Invalidated')}
+                        variant='neutral'
+                        copyable={false}
+                      />
+                    )
+                  } else {
+                    statusBadge = (
+                      <StatusBadge
+                        label={t('Expired')}
+                        variant='neutral'
+                        copyable={false}
+                      />
+                    )
+                  }
                   return (
                     <tr key={sub.id} className='border-b last:border-0'>
                       <td className='px-3 py-2'>
@@ -187,27 +215,7 @@ export function PlanSubscribersDialog() {
                           ID: {sub.user_id}
                         </div>
                       </td>
-                      <td className='px-3 py-2'>
-                        {effective === 'active' ? (
-                          <StatusBadge
-                            label={t('Active')}
-                            variant='success'
-                            copyable={false}
-                          />
-                        ) : effective === 'cancelled' ? (
-                          <StatusBadge
-                            label={t('Invalidated')}
-                            variant='neutral'
-                            copyable={false}
-                          />
-                        ) : (
-                          <StatusBadge
-                            label={t('Expired')}
-                            variant='neutral'
-                            copyable={false}
-                          />
-                        )}
-                      </td>
+                      <td className='px-3 py-2'>{statusBadge}</td>
                       <td className='px-3 py-2'>
                         {totalAmt <= 0 ? (
                           <div className='text-sm'>
@@ -241,8 +249,7 @@ export function PlanSubscribersDialog() {
                       <td className='px-3 py-2 text-xs'>{sub.source || '-'}</td>
                     </tr>
                   )
-                })
-              )}
+                })}
             </tbody>
           </table>
         </div>
