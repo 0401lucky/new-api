@@ -139,6 +139,7 @@ export function ModelUsageTable(props: ModelUsageTableProps) {
 
   return (
     <section
+      data-slot='dashboard-usage-table'
       className='min-w-0 space-y-3 rounded-lg border p-3 sm:p-5'
       aria-label={t('Model Usage Details')}
       aria-busy={props.loading}

@@ -437,7 +437,7 @@ export function RecentCalls() {
 
   return (
     <>
-      <SectionPageLayout>
+      <SectionPageLayout journalLevel='medium'>
         <SectionPageLayout.Title>{t('Recent calls')}</SectionPageLayout.Title>
         <SectionPageLayout.Actions>
           <Button

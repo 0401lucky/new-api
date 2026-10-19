@@ -61,6 +61,24 @@ function toolbarProps(): PricingToolbarProps {
 }
 
 describe('pricing controls', () => {
+  it('keeps stable journal anchors on the filter column and toolbar', () => {
+    const props = toolbarProps()
+    const { container } = render(
+      <>
+        <PricingSidebar {...props} models={[]} />
+        <PricingToolbar {...props} />
+      </>
+    )
+    expect(
+      container.querySelector('[data-slot="pricing-sidebar"]')
+    ).toBeInTheDocument()
+    expect(
+      container.querySelector('[data-slot="pricing-toolbar"]')
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Filter' })).toBeVisible()
+  })
+
   it('counts each model once per filter and updates counts when the catalog changes', () => {
     const props = toolbarProps()
     const base: PricingModel = {

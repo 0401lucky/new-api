@@ -57,6 +57,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useThemeCustomization } from '@/context/theme-customization-provider'
 import { useTheme } from '@/context/theme-provider'
 import {
   getUserModelUsageStats,
@@ -68,6 +69,7 @@ import {
 } from '@/features/dashboard/constants'
 import {
   getDefaultDays,
+  getJournalChartColors,
   saveGranularity,
   processUserChartData,
 } from '@/features/dashboard/lib'
@@ -360,6 +362,11 @@ interface UserChartsProps {
 export function UserCharts(props: UserChartsProps) {
   const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
+  const { customization } = useThemeCustomization()
+  const journalPalette =
+    customization.preset === 'clover-journal'
+      ? getJournalChartColors(resolvedTheme)
+      : undefined
   const [themeReady, setThemeReady] = useState(false)
   const [selectedUser, setSelectedUser] = useState<SelectedUser | null>(null)
   const [usageOpen, setUsageOpen] = useState(false)
@@ -442,9 +449,10 @@ export function UserCharts(props: UserChartsProps) {
         isLoading ? [] : (userData ?? []),
         timeGranularity,
         t,
-        topUserLimit
+        topUserLimit,
+        journalPalette
       ),
-    [userData, isLoading, timeGranularity, t, topUserLimit]
+    [userData, isLoading, timeGranularity, t, topUserLimit, journalPalette]
   )
 
   const userIndex = useMemo(() => {
@@ -572,7 +580,7 @@ export function UserCharts(props: UserChartsProps) {
                     themeReady &&
                     spec && (
                       <VChart
-                        key={`user-${chart.value}-${topUserLimit}-${resolvedTheme}`}
+                        key={`user-${chart.value}-${topUserLimit}-${resolvedTheme}-${customization.preset}`}
                         spec={{
                           ...spec,
                           theme: resolvedTheme === 'dark' ? 'dark' : 'light',

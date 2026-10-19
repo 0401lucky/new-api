@@ -88,7 +88,7 @@ export function PricingTable(props: PricingTableProps) {
   )
 
   return (
-    <div className='space-y-4'>
+    <div data-slot='pricing-table' className='space-y-4'>
       <DataTableView
         table={table}
         isLoading={isLoading}

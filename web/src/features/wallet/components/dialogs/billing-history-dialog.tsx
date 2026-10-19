@@ -146,7 +146,10 @@ export function BillingHistoryDialog({
           </div>
 
           {/* Records List */}
-          <div className='max-h-[min(54vh,520px)] overflow-y-auto pr-1'>
+          <div
+            data-slot='billing-history-list'
+            className='max-h-[min(54vh,520px)] overflow-y-auto pr-1'
+          >
             {loading && (
               <div className='space-y-3'>
                 {['first', 'second', 'third', 'fourth', 'fifth'].map(
@@ -191,6 +194,7 @@ export function BillingHistoryDialog({
                   return (
                     <div
                       key={record.id}
+                      data-slot='billing-record'
                       className='rounded-lg border p-3 sm:p-4'
                     >
                       {/* Header Row */}

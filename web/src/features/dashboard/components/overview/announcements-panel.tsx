@@ -20,6 +20,7 @@ import { Megaphone } from 'lucide-react'
 import { memo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { StickyNote } from '@/components/clover-journal'
 import { IconBadge } from '@/components/ui/icon-badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useAnnouncements } from '@/features/dashboard/hooks/use-status-data'
@@ -73,6 +74,11 @@ export function AnnouncementsPanel() {
       emptyMessage={t('No announcements at this time')}
       height='h-72'
       contentClassName='p-0'
+      headerActions={
+        <StickyNote rotation={2} className='hidden text-xs sm:inline-block'>
+          {t('Fresh notes')}
+        </StickyNote>
+      }
     >
       <ScrollArea className='h-72'>
         <div>
@@ -82,6 +88,7 @@ export function AnnouncementsPanel() {
               <button
                 key={key}
                 type='button'
+                data-slot='overview-announcement'
                 onClick={() => handleAnnouncementClick(item)}
                 className={cn(
                   'group hover:bg-muted/40 w-full px-3 py-3 text-left transition-colors sm:px-5 sm:py-3.5',

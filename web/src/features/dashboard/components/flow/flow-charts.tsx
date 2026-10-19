@@ -60,6 +60,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useThemeCustomization } from '@/context/theme-customization-provider'
 import { getFlowQuotaDates } from '@/features/dashboard/api'
 import {
   buildDashboardFlowData,
@@ -69,6 +70,7 @@ import {
   flowSankeyDatumValue,
   getDefaultDays,
   getFlowStages,
+  getJournalChartColors,
 } from '@/features/dashboard/lib'
 import {
   compactFlowSelectionLabel,
@@ -256,6 +258,11 @@ function formatFlowMetricNumber(value: number): string {
 export function FlowCharts(props: FlowChartsProps) {
   const { t } = useTranslation()
   const { resolvedTheme, themeReady } = useChartTheme()
+  const { customization } = useThemeCustomization()
+  const journalPalette =
+    customization.preset === 'clover-journal'
+      ? getJournalChartColors(resolvedTheme)
+      : undefined
   const chartInstanceRef = useRef<IVChart | null>(null)
   const user = useAuthStore((state) => state.auth.user)
   const isRoot = Boolean(user?.role && user.role >= ROLE.SUPER_ADMIN)
@@ -357,6 +364,7 @@ export function FlowCharts(props: FlowChartsProps) {
         topNodeLimit,
         overflowMode,
         maskSensitive,
+        colorPalette: journalPalette,
         deletedTokenLabel: (tokenId) => t('Deleted ({{id}})', { id: tokenId }),
         otherNodeLabel: (kind) => t(FLOW_OTHER_NODE_LABEL_KEYS[kind]),
       }),
@@ -373,6 +381,7 @@ export function FlowCharts(props: FlowChartsProps) {
       topNodeLimit,
       visibleStages,
       maskSensitive,
+      journalPalette,
       t,
     ]
   )
@@ -480,6 +489,7 @@ export function FlowCharts(props: FlowChartsProps) {
     maskSensitive ? 'masked' : 'plain',
     flowRows?.length ?? 0,
     resolvedTheme,
+    customization.preset,
   ].join('-')
   const displayState = flowDisplayState({
     isLoading,

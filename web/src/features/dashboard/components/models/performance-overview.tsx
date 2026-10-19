@@ -21,6 +21,7 @@ import { Gauge, HeartPulse, Timer } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { WashiTape } from '@/components/clover-journal'
 import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getPerfMetricsSummary } from '@/features/performance-metrics/api'
@@ -68,7 +69,16 @@ export function PerformanceOverview() {
   }
 
   return (
-    <div className='overflow-hidden rounded-lg border'>
+    <div
+      data-slot='dashboard-performance'
+      className='relative overflow-hidden rounded-lg border'
+    >
+      <WashiTape
+        tone='gold'
+        width='4.5rem'
+        rotation={-1.5}
+        className='top-0 right-10 hidden sm:block'
+      />
       <div className='flex flex-wrap items-center gap-x-5 gap-y-2.5 px-4 py-2.5 sm:px-5 sm:py-3'>
         {/* Title */}
         <div className='flex items-center gap-1.5'>
@@ -145,7 +155,7 @@ function InlineMetric(props: {
   const Icon = props.icon
 
   return (
-    <div className='flex items-center gap-1.5'>
+    <div data-slot='dashboard-performance-metric' className='flex items-center gap-1.5'>
       <IconBadge tone={props.tone} size='xs'>
         <Icon />
       </IconBadge>
@@ -166,7 +176,10 @@ function ModelBadge(props: { model: PerfModelSummary }) {
   const model = props.model
 
   return (
-    <span className='bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1'>
+    <span
+      data-slot='dashboard-performance-model'
+      className='bg-muted/50 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1'
+    >
       <span className='max-w-[10rem] truncate font-mono text-[11px]'>
         {model.model_name}
       </span>

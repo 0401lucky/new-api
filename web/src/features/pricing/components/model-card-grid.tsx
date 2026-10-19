@@ -79,7 +79,7 @@ export const ModelCardGrid = memo(function ModelCardGrid(
   }
 
   return (
-    <div className='flex flex-col gap-4 sm:gap-5'>
+    <div data-slot='pricing-card-grid' className='flex flex-col gap-4 sm:gap-5'>
       <div className='grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3'>
         {pagedModels.map((model) => (
           <ModelCard
@@ -97,7 +97,10 @@ export const ModelCardGrid = memo(function ModelCardGrid(
       </div>
 
       {totalPages > 1 && (
-        <div className='text-muted-foreground flex flex-col items-center justify-between gap-3 border-t px-4 py-3 text-sm sm:flex-row'>
+        <div
+          data-slot='pricing-card-pagination'
+          className='text-muted-foreground flex flex-col items-center justify-between gap-3 border-t px-4 py-3 text-sm sm:flex-row'
+        >
           <p className='text-muted-foreground'>
             {t('Page {{current}} of {{total}}', {
               current: currentPage,

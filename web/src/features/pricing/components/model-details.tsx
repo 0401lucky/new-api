@@ -1487,7 +1487,11 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
     taskTiers.length === 0
 
   return (
-    <div className='@container/details space-y-4'>
+    <div
+      data-slot='model-details'
+      data-journal-level='immersive'
+      className='@container/details space-y-4'
+    >
       <ModelHeader model={props.model} />
 
       <Tabs defaultValue='overview' className='gap-4'>
@@ -1669,7 +1673,10 @@ export function ModelDetails() {
 
   return (
     <PublicLayout>
-      <div className='mx-auto max-w-5xl px-4 sm:px-6'>
+      <div
+        data-slot='model-details-page'
+        className='mx-auto max-w-5xl px-4 sm:px-6'
+      >
         <Button
           variant='ghost'
           size='sm'

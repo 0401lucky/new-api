@@ -183,6 +183,23 @@ describe('model cards', () => {
     expect(statusStrip).not.toHaveClass('justify-between')
   })
 
+  it('exposes journal anchors without changing the price values', () => {
+    const { container } = render(
+      <ModelCard model={pricingModel()} onClick={vi.fn()} />
+    )
+    expect(
+      container.querySelector('[data-slot="card"][data-model-card]')
+    ).toBeInTheDocument()
+    expect(
+      container.querySelector('[data-slot="model-card-pricing"]')
+    ).toBeInTheDocument()
+    expect(container.querySelectorAll('[data-slot="price-stamp"]')).toHaveLength(
+      2
+    )
+    expect(screen.getByText('Input')).toBeVisible()
+    expect(screen.getByText('Output')).toBeVisible()
+  })
+
   it('keeps group, endpoint and tag overflow counts with their own metadata', () => {
     const groups = ['default-with-a-long-group-name', 'premium', 'internal']
     const endpoints = ['openai-response', 'openai', 'claude', 'gemini', 'jina']

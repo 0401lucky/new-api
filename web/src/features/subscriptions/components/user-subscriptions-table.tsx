@@ -185,7 +185,10 @@ export function UserSubscriptionsTable() {
   )
 
   return (
-    <div className='flex h-full min-h-0 flex-col gap-3'>
+    <div
+      data-slot='user-subscriptions-table'
+      className='flex h-full min-h-0 flex-col gap-3'
+    >
       <div className='flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center'>
         <div className='relative min-w-[200px] flex-1'>
           <Search className='text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2' />
@@ -267,6 +270,7 @@ export function UserSubscriptionsTable() {
       </div>
 
       <div
+        data-slot='user-subscriptions-table-scroll'
         className={cn(
           'min-h-0 flex-1 overflow-auto rounded-md border',
           isFetching && !isLoading && 'opacity-80'

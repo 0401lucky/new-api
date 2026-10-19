@@ -1208,7 +1208,7 @@ export function InviteCodes() {
 
   return (
     <>
-      <SectionPageLayout>
+      <SectionPageLayout journalLevel='medium'>
         <SectionPageLayout.Title>{t('Invite Codes')}</SectionPageLayout.Title>
         <SectionPageLayout.Actions>
           <InviteCodesCleanupActions onRefresh={triggerRefresh} />

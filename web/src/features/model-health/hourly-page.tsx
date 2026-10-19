@@ -122,14 +122,19 @@ function StatCard(props: {
 }) {
   return (
     <div
+      data-slot='model-health-stat'
       className='relative flex min-h-[100px] flex-col justify-between overflow-hidden rounded-xl p-4 shadow-md transition-shadow duration-300 hover:shadow-lg sm:p-5'
-      style={{ background: props.bgGradient }}
+      style={{
+        background: `var(--model-health-stat-bg, ${props.bgGradient})`,
+      }}
     >
       <div
+        data-slot='model-health-stat-glow'
         className='absolute -top-6 -right-6 h-24 w-24 rounded-full opacity-20'
         style={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
       />
       <div
+        data-slot='model-health-stat-glow'
         className='absolute -right-3 -bottom-3 h-16 w-16 rounded-full opacity-15'
         style={{ backgroundColor: 'rgba(255,255,255,0.4)' }}
       />
@@ -474,12 +479,15 @@ export function ModelHealthHourlyPage() {
   }
 
   return (
-    <div className='h-full overflow-auto'>
+    <div data-journal-level='medium' className='h-full overflow-auto'>
       <div className='mx-auto max-w-[1800px] px-3 pt-6 pb-10 sm:px-6 lg:px-8'>
         <div className='mb-8'>
           <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
             <div>
-              <h1 className='bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 bg-clip-text text-2xl font-bold text-transparent sm:text-3xl lg:text-4xl'>
+              <h1
+                data-slot='model-health-title'
+                className='bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 bg-clip-text text-2xl font-bold text-transparent sm:text-3xl lg:text-4xl'
+              >
                 {t('Model health analysis')}
               </h1>
               <p className='mt-2 text-sm text-gray-500 sm:text-base'>
@@ -556,13 +564,14 @@ export function ModelHealthHourlyPage() {
 
             <div className='flex gap-3'>
               <Button
+                data-journal-slot='model-health-query'
                 onClick={query}
                 disabled={loading}
                 size='lg'
                 className='h-11 rounded-xl border-0 px-7 text-white'
                 style={{
                   background:
-                    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    'var(--model-health-query-bg, linear-gradient(135deg, #667eea 0%, #764ba2 100%))',
                 }}
               >
                 {loading ? <Spinner className='size-4' /> : <Search />}
@@ -663,9 +672,12 @@ export function ModelHealthHourlyPage() {
           )}
 
           <div className='grid grid-cols-1 gap-5 xl:grid-cols-2'>
-            <div className='bg-card rounded-2xl border shadow-sm'>
+            <div data-slot='model-health-panel' className='bg-card rounded-2xl border shadow-sm'>
               <div className='flex items-center gap-3 border-b px-5 py-4'>
-                <div className='h-6 w-1.5 rounded-full bg-gradient-to-b from-purple-500 to-blue-500' />
+                <div
+                  data-slot='model-health-panel-accent'
+                  className='h-6 w-1.5 rounded-full bg-gradient-to-b from-purple-500 to-blue-500'
+                />
                 <span className='text-base font-semibold'>
                   {t('Success rate trend')}
                 </span>
@@ -694,9 +706,13 @@ export function ModelHealthHourlyPage() {
               </div>
             </div>
 
-            <div className='bg-card rounded-2xl border shadow-sm'>
+            <div data-slot='model-health-panel' className='bg-card rounded-2xl border shadow-sm'>
               <div className='flex items-center gap-3 border-b px-5 py-4'>
-                <div className='h-6 w-1.5 rounded-full bg-gradient-to-b from-green-500 to-teal-500' />
+                <div
+                  data-slot='model-health-panel-accent'
+                  data-tone='gold'
+                  className='h-6 w-1.5 rounded-full bg-gradient-to-b from-green-500 to-teal-500'
+                />
                 <span className='text-base font-semibold'>
                   {t('Detailed data')}
                 </span>

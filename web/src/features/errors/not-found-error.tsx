@@ -26,11 +26,11 @@ export function NotFoundError() {
   const navigate = useNavigate()
   const { history } = useRouter()
   return (
-    <div className='h-svh'>
+    <div data-slot='error-page' data-journal-level='medium' className='h-svh'>
       <div className='m-auto flex h-full w-full flex-col items-center justify-center gap-2'>
         <h1 className='text-[7rem] leading-tight font-bold'>404</h1>
         <span className='font-medium'>{t('Oops! Page Not Found!')}</span>
-        <p className='text-muted-foreground text-center'>
+        <p data-slot='error-note' className='text-muted-foreground text-center'>
           {t("It seems like the page you're looking for")} <br />
           {t('does not exist or might have been removed.')}
         </p>

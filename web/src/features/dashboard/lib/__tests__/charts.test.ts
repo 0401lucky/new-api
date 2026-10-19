@@ -21,7 +21,11 @@ import { describe, expect, test } from 'vitest'
 import type { QuotaDataItem } from '@/features/dashboard/types'
 import type { TimeGranularity } from '@/lib/time'
 
-import { processChartData, processUserChartData } from '../charts'
+import {
+  getJournalChartColors,
+  processChartData,
+  processUserChartData,
+} from '../charts'
 
 const cases: Array<{
   granularity: TimeGranularity
@@ -152,5 +156,56 @@ describe.each(cases)('dashboard $granularity chart chronology', (scenario) => {
         )
       ).toEqual([0, 0, 0, 0, 0, 0, 8])
     }
+  })
+})
+
+describe('journal chart palette', () => {
+  const palette = ['#101010', '#202020', '#303030'] as const
+
+  test('uses the supplied palette and sticky-note tooltip for model series', () => {
+    const data = unorderedUsage('2025-12-27T12:00:00', 86400)
+    const result = processChartData(data, 'day', undefined, undefined, palette)
+
+    expect(result.spec_line.color).toEqual({
+      type: 'ordinal',
+      domain: ['model-a', 'Other'],
+      range: palette,
+    })
+    expect(result.spec_pie.color.range).toEqual(palette)
+    expect(result.spec_line.stackCornerRadius).toBe(4)
+    expect(result.spec_rank_bar.bar.style.cornerRadius).toBe(4)
+    expect(result.spec_line.tooltip.style.panel.backgroundColor).toBe('#fefdf5')
+    expect(result.spec_line.tooltip.style.valueLabel.fill).toBe('#22392a')
+  })
+
+  test('keeps the default VChart geometry and tooltip when no palette is supplied', () => {
+    const data = unorderedUsage('2025-12-27T12:00:00', 86400)
+    const result = processChartData(data, 'day')
+
+    expect(result.spec_line.stackCornerRadius).toBeUndefined()
+    expect(result.spec_rank_bar.bar.style).toBeUndefined()
+    expect(result.spec_line.tooltip.style).toBeUndefined()
+  })
+
+  test('maps user series onto the supplied palette', () => {
+    const data = unorderedUsage('2025-12-27T12:00:00', 86400)
+    const result = processUserChartData(data, 'day', undefined, 10, palette)
+
+    expect(result.spec_user_rank.color.specified.alice).toBe(palette[0])
+    expect(result.spec_user_trend.color.specified.alice).toBe(palette[0])
+    expect(result.spec_user_rank.bar.style.cornerRadius).toBe(4)
+    expect(result.spec_user_rank.tooltip.style.panel.backgroundColor).toBe(
+      '#fefdf5'
+    )
+  })
+
+  test('returns distinct light and dark botanical palettes', () => {
+    const light = getJournalChartColors('light')
+    const dark = getJournalChartColors('dark')
+
+    expect(light).toHaveLength(5)
+    expect(dark).toHaveLength(5)
+    expect(dark).not.toEqual(light)
+    expect(getJournalChartColors(undefined)).toEqual(light)
   })
 })

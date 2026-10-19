@@ -118,12 +118,14 @@ export function Home() {
 
   return (
     <PublicLayout showMainContainer={false}>
-      <Hero isAuthenticated={isAuthenticated} />
-      <Stats />
-      <Features />
-      <HowItWorks />
-      <CTA isAuthenticated={isAuthenticated} />
-      <Footer />
+      <div data-slot='home-journal' data-journal-level='immersive'>
+        <Hero isAuthenticated={isAuthenticated} />
+        <Stats />
+        <Features />
+        <HowItWorks />
+        <CTA isAuthenticated={isAuthenticated} />
+        <Footer />
+      </div>
     </PublicLayout>
   )
 }

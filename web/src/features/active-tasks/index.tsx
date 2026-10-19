@@ -212,7 +212,7 @@ export function ActiveTasks() {
 
   return (
     <>
-      <SectionPageLayout>
+      <SectionPageLayout journalLevel='medium'>
         <SectionPageLayout.Title>{t('Active tasks')}</SectionPageLayout.Title>
         <SectionPageLayout.Actions>
           <Button variant='outline' disabled={isFetching} onClick={refresh}>

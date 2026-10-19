@@ -269,6 +269,7 @@ export function SubscriptionPlansCard({
         icon={<Crown className='h-4 w-4' />}
         iconTone='warning'
         disableHoverEffect
+        className='wallet-plans-card'
         contentClassName='space-y-4 sm:space-y-5'
       >
         {/* My subscriptions & billing preference */}

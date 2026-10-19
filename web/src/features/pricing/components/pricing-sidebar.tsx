@@ -74,6 +74,8 @@ export interface PricingSidebarProps {
   models: PricingModel[]
   hasActiveFilters: boolean
   onClearFilters: () => void
+  /** Rendered inside the mobile filter sheet, which already supplies the paper. */
+  embedded?: boolean
   className?: string
 }
 
@@ -265,7 +267,11 @@ export const PricingSidebar = memo(function PricingSidebar(
   ]
 
   return (
-    <aside className={cn('bg-card rounded-xl border p-3', props.className)}>
+    <aside
+      data-slot='pricing-sidebar'
+      data-embedded={props.embedded ? '' : undefined}
+      className={cn('bg-card rounded-xl border p-3', props.className)}
+    >
       <div className='mb-2.5 flex items-center justify-between gap-2'>
         <div>
           <h2 className='text-foreground text-sm font-bold'>{t('Filter')}</h2>

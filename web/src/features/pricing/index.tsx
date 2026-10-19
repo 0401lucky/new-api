@@ -19,6 +19,11 @@ For commercial licensing, please contact support@quantumnous.com
 import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import {
+  CloverDoodle,
+  HandNote,
+  WashiTape,
+} from '@/components/clover-journal'
 import { PublicLayout } from '@/components/layout'
 import { PageTransition } from '@/components/page-transition'
 
@@ -160,9 +165,14 @@ export function Pricing() {
 
   return (
     <PublicLayout showMainContainer={false}>
-      <div className='relative'>
+      <div
+        data-slot='pricing-page'
+        data-journal-level='immersive'
+        className='relative'
+      >
         <div
           aria-hidden
+          data-slot='pricing-aura'
           className='pointer-events-none absolute inset-x-0 top-0 h-[600px] opacity-20 dark:opacity-[0.10]'
           style={{
             background: [
@@ -176,9 +186,28 @@ export function Pricing() {
               'linear-gradient(to bottom, black 40%, transparent 100%)',
           }}
         />
+        <CloverDoodle
+          variant='sprig'
+          size='lg'
+          className='absolute top-28 left-2 hidden opacity-40 xl:block'
+        />
+        <CloverDoodle
+          variant='four-leaf'
+          size='lg'
+          className='absolute top-64 right-3 hidden opacity-35 2xl:block'
+        />
         <PageTransition className='relative mx-auto w-full max-w-[1800px] px-3 pt-16 pb-8 sm:px-6 sm:pt-20 sm:pb-10 xl:px-8'>
-          <header className='mx-auto mb-5 max-w-3xl pt-5 text-center sm:mb-10 sm:pt-10'>
-            <h1 className='text-[clamp(2rem,5.5vw,3.5rem)] leading-[1.15] font-bold tracking-tight'>
+          <header className='relative mx-auto mb-5 max-w-3xl pt-5 text-center sm:mb-10 sm:pt-10'>
+            <WashiTape
+              className='top-0 left-[calc(50%-4rem)] hidden sm:block'
+              tone='gold'
+              width='8rem'
+              rotation={-2}
+            />
+            <h1
+              data-slot='pricing-heading'
+              className='text-[clamp(2rem,5.5vw,3.5rem)] leading-[1.15] font-bold tracking-tight'
+            >
               {t('Model Square')}
             </h1>
             <p className='text-muted-foreground/80 mt-3 text-sm sm:mt-4 sm:text-base'>
@@ -191,6 +220,9 @@ export function Pricing() {
                 'Discover curated AI models, compare pricing and capabilities, and choose the right model for every scenario.'
               )}
             </p>
+            <HandNote className='mt-2 block text-base'>
+              {t('Better models start here')}
+            </HandNote>
             <SearchBar
               value={searchInput}
               onChange={setSearchInput}

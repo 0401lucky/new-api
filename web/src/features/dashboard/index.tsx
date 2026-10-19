@@ -330,11 +330,14 @@ export function Dashboard() {
   }
 
   return (
-    <SectionPageLayout>
+    <SectionPageLayout journalLevel='immersive'>
       <SectionPageLayout.Title>{t(meta.titleKey)}</SectionPageLayout.Title>
       <SectionPageLayout.Content>
         <div className='space-y-3 sm:space-y-4'>
-          <div className='flex flex-wrap items-center justify-between gap-1.5 sm:gap-2'>
+          <div
+            data-slot='dashboard-section-toolbar'
+            className='flex flex-wrap items-center justify-between gap-1.5 sm:gap-2'
+          >
             {showSectionTabs ? (
               <Tabs value={activeSection} onValueChange={handleSectionChange}>
                 <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>

@@ -103,6 +103,13 @@ For commercial licensing, please contact support@quantumnous.com
    * in theme-presets.css. Default mirrors `--font-sans` so behavior is
    * identical when no font preference is set. */
   --font-body: var(--font-sans);
+  /* Journal typography axes: serif display headings and a hand-written face
+   * for short decorative annotations. Body copy and tabular data stay on
+   * `--font-sans`; `--font-hand` falls through to system KaiTi for CJK. */
+  --font-display: var(--font-serif);
+  --font-hand:
+    'Caveat Variable', 'Caveat', 'KaiTi', 'STKaiti', 'Kaiti SC', '楷体',
+    'FangSong', '仿宋', cursive;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);

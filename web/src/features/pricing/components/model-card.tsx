@@ -155,7 +155,9 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
                     </span>
                   )}
                   <span className='flex flex-wrap items-baseline gap-x-1 font-mono text-sm font-semibold tabular-nums'>
-                    <span>{entry.formattedRange ?? entry.formatted}</span>
+                    <span data-slot='price-stamp'>
+                      {entry.formattedRange ?? entry.formatted}
+                    </span>
                     <span className='text-muted-foreground text-xs font-normal whitespace-nowrap'>
                       {' '}
                       / {unitLabel}
@@ -216,7 +218,10 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
     priceSummary = prices.map((price) => (
       <div key={price.type} className='flex min-w-0 flex-col gap-1'>
         <span className='text-muted-foreground text-xs'>{price.label}</span>
-        <span className='font-mono text-sm font-semibold tabular-nums'>
+        <span
+          data-slot='price-stamp'
+          className='font-mono text-sm font-semibold tabular-nums'
+        >
           {formatPrice(
             props.model,
             price.type,
@@ -236,7 +241,10 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   } else {
     priceSummary = (
       <div className='col-span-full flex min-w-0 flex-col gap-1'>
-        <span className='font-mono text-sm font-semibold tabular-nums'>
+        <span
+          data-slot='price-stamp'
+          className='font-mono text-sm font-semibold tabular-nums'
+        >
           {formatRequestPrice(
             props.model,
             showRechargePrice,
@@ -254,7 +262,10 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   }
 
   return (
-    <Card className='hover:ring-foreground/20 h-full min-w-0 gap-3 transition-colors'>
+    <Card
+      data-model-card='true'
+      className='hover:ring-foreground/20 h-full min-w-0 gap-3 transition-colors'
+    >
       <CardHeader className='flex flex-row items-start gap-3'>
         <div
           aria-hidden
@@ -313,6 +324,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
           )}
         </div>
         <div
+          data-slot='model-card-pricing'
           role='group'
           aria-label={t('Pricing')}
           className='mt-auto flex min-w-0 flex-col gap-1.5'

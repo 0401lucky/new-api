@@ -25,6 +25,7 @@ type MainProps = React.HTMLAttributes<HTMLElement> & {
 export function Main({ className, fluid = true, ...props }: MainProps) {
   return (
     <main
+      data-slot='main'
       className={cn(
         'flex min-h-0 flex-1 flex-col overflow-hidden',
         !fluid &&

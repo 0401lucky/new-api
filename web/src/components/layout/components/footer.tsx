@@ -225,6 +225,7 @@ export function Footer(props: FooterProps) {
   if (footerHtml) {
     return (
       <footer
+        data-slot='footer'
         className={cn(
           'border-border/40 relative z-10 border-t',
           props.className
@@ -248,6 +249,7 @@ export function Footer(props: FooterProps) {
 
   return (
     <footer
+      data-slot='footer'
       className={cn('border-border/40 relative z-10 border-t', props.className)}
     >
       <div className='mx-auto max-w-6xl px-6 py-12 md:py-16'>
@@ -272,14 +274,14 @@ export function Footer(props: FooterProps) {
           {/* Links columns */}
           {isDemoSiteMode && (
             <div className='grid grid-cols-3 gap-8 md:gap-16'>
-              {displayColumns.map((column, index) => (
-                <div key={index}>
+              {displayColumns.map((column) => (
+                <div key={column.title}>
                   <p className='text-muted-foreground/50 mb-3 text-xs font-medium tracking-wider uppercase'>
                     {t(column.title)}
                   </p>
                   <ul className='space-y-2.5'>
-                    {column.links.map((link, linkIndex) => (
-                      <li key={linkIndex}>
+                    {column.links.map((link) => (
+                      <li key={link.href}>
                         <FooterLinkItem link={link} />
                       </li>
                     ))}

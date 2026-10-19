@@ -204,7 +204,10 @@ export function PublicHeader(props: PublicHeaderProps) {
 
   return (
     <>
-      <header className='pointer-events-none fixed inset-x-0 top-0 z-50'>
+      <header
+        data-slot='public-header'
+        className='pointer-events-none fixed inset-x-0 top-0 z-50'
+      >
         <div
           className={cn(
             'pointer-events-auto mx-auto transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
@@ -212,6 +215,8 @@ export function PublicHeader(props: PublicHeaderProps) {
           )}
         >
           <nav
+            data-slot='public-header-nav'
+            data-scrolled={scrolled ? 'true' : 'false'}
             className={cn(
               'flex items-center justify-between gap-2 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
               scrolled
@@ -223,6 +228,7 @@ export function PublicHeader(props: PublicHeaderProps) {
             <div className='@container/system-brand flex min-w-0 flex-1 items-center gap-1 lg:min-w-36'>
               <Link
                 to={homeUrl}
+                data-slot='public-brand'
                 className='group flex min-w-0 items-center gap-2.5'
               >
                 <div className='flex size-7 shrink-0 items-center justify-center transition-all duration-300 group-hover:scale-105'>
@@ -259,6 +265,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                       aria-disabled={link.disabled}
                       tabIndex={link.disabled ? -1 : undefined}
                       onClick={(event) => handleNavLinkClick(event, link)}
+                      data-slot='public-nav-link'
                       className={cn(
                         'text-muted-foreground hover:text-foreground min-w-0 truncate rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200',
                         link.disabled && 'pointer-events-none opacity-50'
@@ -275,6 +282,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                     title={t(link.title)}
                     disabled={link.disabled}
                     onClick={(event) => handleNavLinkClick(event, link)}
+                    data-slot='public-nav-link'
                     className={cn(
                       'min-w-0 truncate rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200',
                       isActive

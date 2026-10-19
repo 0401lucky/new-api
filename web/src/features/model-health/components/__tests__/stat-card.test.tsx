@@ -35,6 +35,11 @@ describe('model health stat card', () => {
     expect(screen.getByText('Overall success rate')).toBeInTheDocument()
     expect(screen.getByText('91.79%')).toBeInTheDocument()
     expect(screen.getByText('Past 24 hours')).toBeInTheDocument()
+    expect(
+      screen
+        .getByText('Overall success rate')
+        .closest("[data-slot='model-health-public-stat']")
+    ).not.toBeNull()
     expect(screen.getByTestId('stat-icon').parentElement).toHaveAttribute(
       'aria-hidden',
       'true'

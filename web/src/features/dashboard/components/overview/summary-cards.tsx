@@ -22,6 +22,11 @@ import { ArrowRight, Flame, ShieldCheck, TrendingDown } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import {
+  HandNote,
+  PaperClip,
+  WashiTape,
+} from '@/components/clover-journal'
 import { StaggerContainer, StaggerItem } from '@/components/page-transition'
 import { Button } from '@/components/ui/button'
 import { getUserQuotaDates } from '@/features/dashboard/api'
@@ -253,7 +258,17 @@ export function SummaryCards() {
   })
 
   return (
-    <div className='bg-card overflow-hidden rounded-2xl border shadow-xs'>
+    <div
+      data-slot='overview-summary'
+      className='bg-card relative overflow-hidden rounded-2xl border shadow-xs'
+    >
+      <WashiTape
+        tone='gold'
+        width='4.5rem'
+        rotation={-2}
+        className='top-0 left-1/2 hidden -translate-x-1/2 sm:block'
+      />
+      <PaperClip className='absolute top-2 left-3 rotate-[10deg]' />
       <div className='grid xl:grid-cols-[minmax(0,1fr)_19rem]'>
         <div className='flex flex-col gap-2.5 p-3 sm:gap-3 sm:p-5'>
           <div className='flex flex-wrap items-start justify-between gap-3'>
@@ -265,11 +280,15 @@ export function SummaryCards() {
                 {t('Monitor balance, usage, and request volume')}
               </p>
             </div>
+            <HandNote className='mt-1 hidden text-sm sm:inline-block'>
+              {t('Steady progress, keep going!')}
+            </HandNote>
           </div>
           <StaggerContainer className='grid grid-cols-3 gap-1.5 sm:gap-3'>
             {items.map((it) => (
               <StaggerItem
                 key={it.key}
+                data-slot='overview-summary-stat'
                 className='bg-background/60 rounded-lg border px-2 py-1.5 sm:rounded-xl sm:p-3'
               >
                 <StatCard
@@ -288,7 +307,10 @@ export function SummaryCards() {
           </StaggerContainer>
         </div>
 
-        <div className='flex flex-col justify-between gap-3 border-t bg-[linear-gradient(135deg,color-mix(in_oklch,var(--overview-accent-2)_12%,var(--background))_0%,color-mix(in_oklch,oklch(0.82_0.04_155)_8%,var(--background))_48%,color-mix(in_oklch,var(--overview-accent-1)_7%,var(--background))_100%)] p-3 sm:gap-4 sm:p-5 xl:border-t-0 xl:border-l'>
+        <div
+          data-slot='overview-balance-slip'
+          className='relative flex flex-col justify-between gap-3 border-t bg-[linear-gradient(135deg,color-mix(in_oklch,var(--overview-accent-2)_12%,var(--background))_0%,color-mix(in_oklch,oklch(0.82_0.04_155)_8%,var(--background))_48%,color-mix(in_oklch,var(--overview-accent-1)_7%,var(--background))_100%)] p-3 sm:gap-4 sm:p-5 xl:border-t-0 xl:border-l'
+        >
           <div className='flex flex-col gap-2 sm:gap-3'>
             <div className='flex items-center justify-between'>
               <span className='text-muted-foreground text-xs font-medium'>

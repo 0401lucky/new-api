@@ -50,6 +50,42 @@ export function getDashboardChartColors(domainLength: number): string[] {
   )
 }
 
+/* Botanical palette for the `clover-journal` preset. These are the sRGB
+ * equivalents of the preset's `--chart-1`…`--chart-5` tokens (light and dark),
+ * because VChart paints its canvas without resolving CSS custom properties.
+ * The dark set lifts lightness so series stay legible on the night-paper
+ * canvas. */
+const JOURNAL_CHART_COLORS = {
+  light: ['#2a7449', '#60ad64', '#d7a94f', '#4e939a', '#bc4c31'],
+  dark: ['#69ba7c', '#7aa761', '#ebbc63', '#67abb3', '#e58870'],
+} as const
+
+export function getJournalChartColors(
+  resolvedTheme: string | undefined
+): readonly string[] {
+  return JOURNAL_CHART_COLORS[resolvedTheme === 'dark' ? 'dark' : 'light']
+}
+
+/* Sticky-note tooltip shared by the journal chart specs. A cream note stays
+ * readable over both the daylight and night-paper canvases. */
+const JOURNAL_TOOLTIP_STYLE = {
+  panel: {
+    padding: [8, 10],
+    backgroundColor: '#fefdf5',
+    border: { color: '#c9dac5', width: 1, radius: 6 },
+    shadow: {
+      x: 0,
+      y: 4,
+      blur: 12,
+      spread: 0,
+      color: 'rgba(34, 57, 42, 0.18)',
+    },
+  },
+  titleLabel: { fill: '#22392a', fontSize: 12, fontWeight: 600 },
+  keyLabel: { fill: '#5c6759', fontSize: 12 },
+  valueLabel: { fill: '#22392a', fontSize: 12, fontWeight: 600 },
+} as const
+
 function renderQuotaCompat(rawQuota: number, digits = 4): string {
   const { config, meta } = getCurrencyDisplay()
   if (meta.kind === 'tokens') return rawQuota.toLocaleString()
@@ -71,7 +107,8 @@ export function processChartData(
   data: QuotaDataItem[],
   timeGranularity: TimeGranularity = 'day',
   t?: TFunction,
-  chartCornerRadius?: number
+  chartCornerRadius?: number,
+  colorPalette?: readonly string[]
 ): ProcessedChartData {
   const tt: TFunction = t ?? ((x) => x)
   const otherLabel = tt('Other')
@@ -270,10 +307,15 @@ export function processChartData(
     .map(([time]) => time)
   const sortedModels = [...allModels].sort()
   const modelColorDomain = [...new Set([...sortedModels, otherLabel])]
-  const modelColorRange = getDashboardChartColors(modelColorDomain.length)
-  const otherColor = modelColorRange[modelColorDomain.indexOf(otherLabel)]
+  const modelColorRange =
+    colorPalette && colorPalette.length > 0
+      ? colorPalette
+      : getDashboardChartColors(modelColorDomain.length)
+  const otherColorIndex = modelColorDomain.indexOf(otherLabel)
   const otherTooltipColor =
-    typeof otherColor === 'string' ? otherColor : '#FF8A00'
+    colorPalette && colorPalette.length > 0
+      ? (colorPalette[otherColorIndex % colorPalette.length] ?? '#FF8A00')
+      : (modelColorRange[otherColorIndex] ?? '#FF8A00')
   const modelColor = {
     type: 'ordinal',
     domain: modelColorDomain,
@@ -311,6 +353,9 @@ export function processChartData(
     (sum, x) => sum + (Number(x.quota) || 0),
     0
   )
+  const journalTooltipStyle = colorPalette
+    ? { style: JOURNAL_TOOLTIP_STYLE }
+    : {}
 
   // Pie chart (model call count proportion)
   const pieValues = [...modelTotalsMap.entries()]
@@ -489,6 +534,7 @@ export function processChartData(
             },
           ],
         },
+        ...journalTooltipStyle,
       },
       background: { fill: 'transparent' },
       animation: true,
@@ -502,6 +548,7 @@ export function processChartData(
       stack: true,
       legends: { visible: true, selectMode: 'single' },
       color: modelColor,
+      ...(colorPalette ? { stackCornerRadius: 4 } : {}),
       bar: {
         state: {
           hover: { stroke: '#000', lineWidth: 1 },
@@ -527,6 +574,7 @@ export function processChartData(
           ],
           updateContent: makeTooltipDimensionUpdateContent(),
         },
+        ...journalTooltipStyle,
       },
       background: { fill: 'transparent' },
       animation: true,
@@ -562,6 +610,7 @@ export function processChartData(
             collapseOverflow: false,
           }),
         },
+        ...journalTooltipStyle,
       },
       area: {
         style: {
@@ -640,6 +689,7 @@ export function processChartData(
             return array
           },
         },
+        ...journalTooltipStyle,
       },
       area: {
         style: {
@@ -670,6 +720,7 @@ export function processChartData(
         text: tt('Call Count Ranking'),
       },
       bar: {
+        ...(colorPalette ? { style: { cornerRadius: 4 } } : {}),
         state: {
           hover: { stroke: '#000', lineWidth: 1 },
         },
@@ -684,6 +735,7 @@ export function processChartData(
             },
           ],
         },
+        ...journalTooltipStyle,
       },
       background: { fill: 'transparent' },
       animation: true,
@@ -710,11 +762,14 @@ export function processUserChartData(
   data: QuotaDataItem[],
   timeGranularity: TimeGranularity = 'day',
   t?: TFunction,
-  limit = 10
+  limit = 10,
+  colorPalette?: readonly string[]
 ): ProcessedUserChartData {
   const tt: TFunction = t ?? ((x) => x)
   const { config } = getCurrencyDisplay()
   const quotaPerUnit = config.quotaPerUnit
+  const userColors =
+    colorPalette && colorPalette.length > 0 ? colorPalette : USER_COLORS
 
   const formatVal = (raw: number) => renderQuotaCompat(raw, 2)
 
@@ -732,7 +787,7 @@ export function processUserChartData(
         subtext: tt('No data available'),
       },
       legends: { visible: false },
-      color: { type: 'ordinal', range: USER_COLORS },
+      color: { type: 'ordinal', range: userColors },
       background: { fill: 'transparent' },
     },
     spec_user_trend: {
@@ -747,7 +802,7 @@ export function processUserChartData(
         subtext: tt('No data available'),
       },
       legends: { visible: true, selectMode: 'single' },
-      color: { type: 'ordinal', range: USER_COLORS },
+      color: { type: 'ordinal', range: userColors },
       point: { visible: false },
       background: { fill: 'transparent' },
     },
@@ -775,7 +830,7 @@ export function processUserChartData(
 
   const userColorMap = topUsers.reduce<Record<string, string>>(
     (acc, user, i) => {
-      acc[user] = USER_COLORS[i % USER_COLORS.length]
+      acc[user] = userColors[i % userColors.length]
       return acc
     },
     {}
@@ -820,6 +875,10 @@ export function processUserChartData(
     })
   })
 
+  const journalTooltipStyle = colorPalette
+    ? { style: JOURNAL_TOOLTIP_STYLE }
+    : {}
+
   return {
     spec_user_rank: {
       type: 'bar',
@@ -835,6 +894,7 @@ export function processUserChartData(
       },
       legends: { visible: false },
       bar: {
+        ...(colorPalette ? { style: { cornerRadius: 4 } } : {}),
         state: { hover: { stroke: '#000', lineWidth: 1 } },
       },
       label: {
@@ -872,6 +932,7 @@ export function processUserChartData(
             return array
           },
         },
+        ...journalTooltipStyle,
       },
       color: { specified: userColorMap },
       background: { fill: 'transparent' },
@@ -940,6 +1001,7 @@ export function processUserChartData(
             return array
           },
         },
+        ...journalTooltipStyle,
       },
       area: {
         style: {

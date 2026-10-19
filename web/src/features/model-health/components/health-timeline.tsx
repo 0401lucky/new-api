@@ -50,6 +50,8 @@ export function HealthTimeline(props: {
           return (
             <Tooltip key={item.hour_start_ts}>
               <TooltipTrigger
+                data-journal-slot='model-health-timeline-bar'
+                data-status={status}
                 className={cn(
                   'min-w-0 flex-1 cursor-pointer rounded-[2px] transition-transform duration-150 hover:scale-y-110 hover:opacity-80',
                   meta.barClass

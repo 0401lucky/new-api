@@ -150,3 +150,53 @@ test('an hour without samples displays no data rather than a zero success rate',
   expect(within(tooltip).getByText('No data')).toBeVisible()
   expect(within(tooltip).queryByText('0.00%')).not.toBeInTheDocument()
 })
+
+test('journal timeline bars expose a stable status hook per hour', () => {
+  const item = {
+    hour_start_ts: 3600,
+    success_requests: 0,
+    error_requests: 0,
+    qualified_success_requests: 0,
+    success_tokens: 0,
+  }
+  const { container } = render(
+    <TooltipProvider delay={0}>
+      <HealthTimeline
+        items={[
+          {
+            ...item,
+            success_rate: 0.99,
+            total_requests: 120,
+            success_requests: 119,
+            qualified_success_requests: 118,
+          },
+          {
+            ...item,
+            hour_start_ts: 7200,
+            success_rate: 0.9,
+            total_requests: 120,
+            error_requests: 12,
+          },
+          {
+            ...item,
+            hour_start_ts: 10800,
+            success_rate: 0,
+            total_requests: 0,
+          },
+        ]}
+      />
+    </TooltipProvider>
+  )
+
+  const bars = container.querySelectorAll(
+    "[data-journal-slot='model-health-timeline-bar']"
+  )
+  expect(bars).toHaveLength(3)
+  expect(bars[0]).toHaveAttribute('data-status', 'operational')
+  expect(bars[1]).toHaveAttribute('data-status', 'degraded')
+  expect(bars[2]).toHaveAttribute('data-status', 'no_data')
+  expect(bars[0]).toHaveAttribute(
+    'aria-label',
+    expect.stringContaining('99.00%')
+  )
+})

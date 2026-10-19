@@ -67,6 +67,7 @@ export function DataTablePagination<TData>({
     return (
       <nav
         aria-label={t('Page')}
+        data-slot='data-table-pagination'
         className='flex w-full min-w-0 flex-wrap items-center justify-between gap-2 text-sm'
       >
         <span className='text-muted-foreground min-w-0 [overflow-wrap:anywhere]'>
@@ -103,6 +104,7 @@ export function DataTablePagination<TData>({
 
   return (
     <div
+      data-slot='data-table-pagination'
       className={cn(
         '@container/pagination flex min-w-0 items-center justify-end overflow-clip'
       )}

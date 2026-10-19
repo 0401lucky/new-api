@@ -26,7 +26,10 @@ export function StatCard(props: {
   subtitle?: string
 }) {
   return (
-    <div className='bg-card hover:border-foreground/20 flex flex-col justify-between gap-4 rounded-xl border p-4 transition-colors sm:p-5'>
+    <div
+      data-slot='model-health-public-stat'
+      className='bg-card hover:border-foreground/20 flex flex-col justify-between gap-4 rounded-xl border p-4 transition-colors sm:p-5'
+    >
       <div className='text-muted-foreground flex items-center gap-2'>
         <span aria-hidden='true'>{props.icon}</span>
         <span className='text-[10px] font-semibold tracking-wider uppercase'>
@@ -53,7 +56,10 @@ export function StatCardSkeleton(props: {
   valueWidth?: number
 }) {
   return (
-    <div className='bg-card flex flex-col justify-between gap-4 rounded-xl border p-4 sm:p-5'>
+    <div
+      data-slot='model-health-public-stat'
+      className='bg-card flex flex-col justify-between gap-4 rounded-xl border p-4 sm:p-5'
+    >
       <div className='text-muted-foreground flex items-center gap-2'>
         <span aria-hidden='true'>{props.icon}</span>
         <span className='text-[10px] font-semibold tracking-wider uppercase'>

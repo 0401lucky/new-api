@@ -29,7 +29,7 @@ export function Redemptions() {
   const { t } = useTranslation()
   return (
     <RedemptionsProvider>
-      <SectionPageLayout fixedContent>
+      <SectionPageLayout fixedContent journalLevel='medium'>
         <SectionPageLayout.Title>
           {t('Redemption Codes')}
         </SectionPageLayout.Title>

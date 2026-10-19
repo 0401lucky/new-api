@@ -40,6 +40,14 @@ export const THEME_PRESETS = [
     swatches: ['oklch(0.45 0.105 160)', 'oklch(0.78 0.155 162)'],
   },
   {
+    // Botanical journal: cream paper, clover green, washi tape and hand-drawn
+    // annotations. Sits beside the cleaner Lucky Clover preset so users can
+    // pick between a calm green skin and the full scrapbook treatment.
+    value: 'clover-journal',
+    name: 'Clover Journal',
+    swatches: ['oklch(0.46 0.09 158)', 'oklch(0.90 0.06 135)'],
+  },
+  {
     // Inspired by Anthropic's official brand language: warm cream canvas
     // (#faf9f5) paired with clay/coral (#d97757) as the single accent.
     // Swatches preview the canvas → accent gradient that defines the system.

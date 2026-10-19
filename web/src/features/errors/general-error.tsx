@@ -61,7 +61,11 @@ export function GeneralError({
     : t('Please try again later.')
 
   return (
-    <div className={cn('h-svh w-full', className)}>
+    <div
+      data-slot='error-page'
+      data-journal-level='medium'
+      className={cn('h-svh w-full', className)}
+    >
       <div className='m-auto flex h-full w-full flex-col items-center justify-center gap-2'>
         {!minimal && (
           <h1 className='text-[7rem] leading-tight font-bold'>
@@ -69,7 +73,7 @@ export function GeneralError({
           </h1>
         )}
         <span className='font-medium'>{title}</span>
-        <p className='text-muted-foreground text-center'>
+        <p data-slot='error-note' className='text-muted-foreground text-center'>
           {t('We apologize for the inconvenience.')} <br /> {description}
         </p>
         {!minimal && (

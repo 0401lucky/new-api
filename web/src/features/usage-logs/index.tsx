@@ -124,7 +124,7 @@ function UsageLogsContent() {
 
   return (
     <>
-      <SectionPageLayout fixedContent>
+      <SectionPageLayout fixedContent journalLevel='medium'>
         <SectionPageLayout.Title>
           {t(pageMeta.titleKey)}
         </SectionPageLayout.Title>

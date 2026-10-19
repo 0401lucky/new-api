@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { CloverDoodle } from '@/components/clover-journal'
 import { Button } from '@/components/ui/button'
 
 export interface EmptyStateProps {
@@ -32,8 +33,18 @@ export function EmptyState(props: EmptyStateProps) {
   const hasSearch = Boolean(props.searchQuery?.trim())
 
   return (
-    <div className='flex min-h-[320px] flex-col items-center justify-center rounded-lg border border-dashed px-6 py-12 text-center'>
-      <Search className='text-muted-foreground/40 mb-3 size-10' />
+    <div
+      data-slot='pricing-empty'
+      className='flex min-h-[320px] flex-col items-center justify-center rounded-lg border border-dashed px-6 py-12 text-center'
+    >
+      <div className='relative mb-3'>
+        <Search className='text-muted-foreground/40 size-10' />
+        <CloverDoodle
+          variant='sprig'
+          size='sm'
+          className='absolute -right-5 -bottom-2 rotate-12'
+        />
+      </div>
 
       <h3 className='text-foreground mb-1 text-base font-semibold'>
         {t('No models found')}

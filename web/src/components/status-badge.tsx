@@ -181,6 +181,7 @@ export function StatusBadge({
   return (
     <span
       data-slot='status-badge'
+      data-type={type}
       className={cn(
         'inline-flex w-fit max-w-full min-w-0 shrink items-center font-medium tracking-normal whitespace-nowrap transition-colors',
         isBadge

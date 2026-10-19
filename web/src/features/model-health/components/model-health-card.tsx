@@ -60,7 +60,10 @@ export function ModelHealthCard(props: {
   const meta = STATUS_META[model.status]
 
   return (
-    <div className='bg-card hover:border-foreground/20 flex flex-col gap-4 rounded-xl border p-4 transition-colors sm:p-5'>
+    <div
+      data-slot='model-health-public-card'
+      className='bg-card hover:border-foreground/20 flex flex-col gap-4 rounded-xl border p-4 transition-colors sm:p-5'
+    >
       <div className='flex items-center gap-3'>
         <div className='min-w-0 flex-1'>
           <Tooltip>

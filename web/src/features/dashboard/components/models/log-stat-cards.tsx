@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { PaperClip, WashiTape } from '@/components/clover-journal'
 import { IconBadge } from '@/components/ui/icon-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getUserQuotaDates } from '@/features/dashboard/api'
@@ -149,7 +150,17 @@ export function LogStatCards(props: LogStatCardsProps) {
   })
 
   return (
-    <div className='overflow-hidden rounded-lg border'>
+    <div
+      data-slot='dashboard-stat-strip'
+      className='relative overflow-hidden rounded-lg border'
+    >
+      <WashiTape
+        tone='green'
+        width='5rem'
+        rotation={-2}
+        className='top-0 left-1/2 hidden -translate-x-1/2 sm:block'
+      />
+      <PaperClip size='sm' className='absolute top-1.5 left-3 hidden sm:block' />
       <div className='divide-border/60 grid min-w-0 grid-cols-2 divide-x sm:grid-cols-3 lg:grid-cols-5'>
         {items.map((it, idx) => {
           const Icon = it.icon
@@ -191,6 +202,7 @@ export function LogStatCards(props: LogStatCardsProps) {
           return (
             <div
               key={it.title}
+              data-slot='dashboard-stat-cell'
               className={cn(
                 'min-w-0 px-2.5 py-1.5 sm:px-5 sm:py-4',
                 idx === items.length - 1 &&

@@ -132,6 +132,7 @@ export function TopNav({ className, links, ...props }: TopNavProps) {
               href={link.href}
               target={target}
               rel={target ? 'noopener noreferrer' : undefined}
+              data-slot='top-nav-link'
               className={`hover:text-primary text-sm font-medium transition-colors ${link.isActive ? '' : 'text-muted-foreground'}`}
             >
               {link.title}
@@ -141,6 +142,7 @@ export function TopNav({ className, links, ...props }: TopNavProps) {
               key={`${link.title}-${link.href}`}
               to={link.href}
               disabled={link.disabled}
+              data-slot='top-nav-link'
               className={`hover:text-primary text-sm font-medium transition-colors ${link.isActive ? '' : 'text-muted-foreground'}`}
             >
               {link.title}

@@ -119,6 +119,17 @@ describe('theme preference persistence', () => {
     expect(document.body).toHaveAttribute('data-theme-content-layout', 'full')
   })
 
+  it('restores the clover journal preset on mount', () => {
+    localStorage.setItem('newapi:theme:v1:preset', 'clover-journal')
+
+    render(<ThemeFixture />)
+
+    expect(document.body).toHaveAttribute(
+      'data-theme-preset',
+      'clover-journal'
+    )
+  })
+
   it('restores all customized preferences after remounting without writing cookies', async () => {
     const user = userEvent.setup()
     const first = render(<ThemeFixture />)

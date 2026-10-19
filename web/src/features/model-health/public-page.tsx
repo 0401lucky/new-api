@@ -120,7 +120,10 @@ export function ModelHealthPublicPage() {
   return (
     <PublicLayout showMainContainer={false}>
       <TooltipProvider>
-        <div className='mx-auto mt-[60px] max-w-6xl px-3 pb-10 sm:px-6 lg:px-8'>
+        <div
+          data-journal-level='medium'
+          className='mx-auto mt-[60px] max-w-6xl px-3 pb-10 sm:px-6 lg:px-8'
+        >
           <div className='mb-8 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between'>
             <div>
               <div className='text-muted-foreground mb-3 flex items-center gap-2 text-xs font-bold tracking-[0.2em] uppercase'>

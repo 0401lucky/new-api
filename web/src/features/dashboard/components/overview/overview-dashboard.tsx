@@ -628,7 +628,7 @@ export function OverviewDashboard() {
   }
 
   return (
-    <SectionPageLayout>
+    <SectionPageLayout journalLevel='immersive'>
       <SectionPageLayout.Title>{t('Overview')}</SectionPageLayout.Title>
       <SectionPageLayout.Actions>
         {setupStatusReady && setupComplete && (
@@ -646,7 +646,10 @@ export function OverviewDashboard() {
         )}
       </SectionPageLayout.Actions>
       <SectionPageLayout.Content>
-        <div className='flex flex-col gap-4'>
+        <div
+          data-slot='dashboard-overview'
+          className='relative flex flex-col gap-4'
+        >
           <div id={setupGuideId} hidden={!setupGuideExpanded}>
             {setupGuideExpanded && (
               <CardStaggerContainer className='grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]'>

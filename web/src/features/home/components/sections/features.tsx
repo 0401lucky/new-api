@@ -180,13 +180,19 @@ export function Features(_props: FeaturesProps) {
   ]
 
   return (
-    <section className='relative z-10 px-6 py-24 md:py-32'>
+    <section
+      data-slot='home-features'
+      className='relative z-10 px-6 py-24 md:py-32'
+    >
       <div className='mx-auto max-w-6xl'>
         <AnimateInView className='mb-16 max-w-lg'>
           <p className='text-muted-foreground mb-3 text-xs font-medium tracking-widest uppercase'>
             {t('Core Features')}
           </p>
-          <h2 className='text-2xl leading-tight font-bold tracking-tight md:text-3xl'>
+          <h2
+            data-slot='home-section-heading'
+            className='text-2xl leading-tight font-bold tracking-tight md:text-3xl'
+          >
             {t('Built for developers,')}
             <br />
             {t('designed for scale')}
@@ -194,7 +200,10 @@ export function Features(_props: FeaturesProps) {
         </AnimateInView>
 
         {/* Bento grid */}
-        <div className='border-border/40 bg-border/40 grid gap-px overflow-hidden rounded-xl border md:grid-cols-3'>
+        <div
+          data-slot='home-features-grid'
+          className='border-border/40 bg-border/40 grid gap-px overflow-hidden rounded-xl border md:grid-cols-3'
+        >
           {features.map((f, i) => (
             <AnimateInView
               key={f.id}

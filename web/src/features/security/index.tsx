@@ -137,7 +137,7 @@ export function Security() {
   }
 
   return (
-    <SectionPageLayout>
+    <SectionPageLayout journalLevel='medium'>
       <SectionPageLayout.Title>
         {t('Security & Access')}
       </SectionPageLayout.Title>

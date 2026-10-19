@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { Activity, BarChart3, Timer, WalletCards } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { PaperClip, WashiTape } from '@/components/clover-journal'
 import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatQuota } from '@/lib/format'
@@ -36,9 +37,16 @@ export function WalletStatsCard(props: WalletStatsCardProps) {
   const { t } = useTranslation()
   if (props.loading) {
     return (
-      <div className='grid grid-cols-2 divide-x divide-y rounded-lg border md:grid-cols-4 md:divide-y-0'>
+      <div
+        data-slot='wallet-stats'
+        className='relative grid grid-cols-2 divide-x divide-y rounded-lg border md:grid-cols-4 md:divide-y-0'
+      >
         {['balance', 'temporary', 'usage', 'requests'].map((key) => (
-          <div key={key} className='min-w-0 px-2.5 py-2.5 sm:px-5 sm:py-4'>
+          <div
+            key={key}
+            data-slot='wallet-stat'
+            className='min-w-0 px-2.5 py-2.5 sm:px-5 sm:py-4'
+          >
             <Skeleton className='h-3.5 w-full' />
             <Skeleton className='mt-2 h-6 w-full sm:h-7' />
             <Skeleton className='mt-1.5 hidden h-3.5 w-24 md:block' />
@@ -99,9 +107,23 @@ export function WalletStatsCard(props: WalletStatsCardProps) {
   ]
 
   return (
-    <div className='grid grid-cols-2 divide-x divide-y rounded-lg border md:grid-cols-4 md:divide-y-0'>
+    <div
+      data-slot='wallet-stats'
+      className='relative grid grid-cols-2 divide-x divide-y rounded-lg border md:grid-cols-4 md:divide-y-0'
+    >
+      <WashiTape
+        tone='gold'
+        width='5rem'
+        rotation={-2}
+        className='top-0 left-1/2 hidden -translate-x-1/2 sm:block'
+      />
+      <PaperClip size='sm' className='absolute top-2 left-3 hidden sm:block' />
       {stats.map((item) => (
-        <div key={item.label} className='min-w-0 px-2.5 py-2.5 sm:px-5 sm:py-4'>
+        <div
+          key={item.label}
+          data-slot='wallet-stat'
+          className='min-w-0 px-2.5 py-2.5 sm:px-5 sm:py-4'
+        >
           <div className='flex items-center gap-1.5 sm:gap-2.5'>
             <IconBadge tone={item.tone} size='stat'>
               <item.icon />

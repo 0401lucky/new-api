@@ -34,7 +34,7 @@ export function DonationLayout(props: {
   const user = useAuthStore((state) => state.auth.user)
   const permissions = donationPermissions(user)
   return (
-    <SectionPageLayout stackActionsOnMobile>
+    <SectionPageLayout stackActionsOnMobile journalLevel='medium'>
       <SectionPageLayout.Title>{t('Donations')}</SectionPageLayout.Title>
       <SectionPageLayout.Actions>
         <nav

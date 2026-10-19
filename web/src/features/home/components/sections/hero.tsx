@@ -21,6 +21,11 @@ import { Link } from '@tanstack/react-router'
 import { ArrowRight, BookOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import {
+  CloverDoodle,
+  HandNote,
+  WashiTape,
+} from '@/components/clover-journal'
 import { Button } from '@/components/ui/button'
 import { useStatus } from '@/hooks/use-status'
 
@@ -80,30 +85,55 @@ export function Hero(props: HeroProps) {
   }
 
   return (
-    <section className='relative z-10 overflow-hidden px-6 pt-24 pb-16 md:pt-32 md:pb-24 lg:pt-36 lg:pb-28'>
-      {/* Radial gradient background */}
+    <section
+      data-slot='home-hero'
+      className='relative z-10 overflow-hidden px-6 pt-24 pb-16 md:pt-32 md:pb-24 lg:pt-36 lg:pb-28'
+    >
+      {/* Radial gradient background. The journal preset swaps the cool aura
+       * for botanical washes through --home-hero-aura while every other
+       * preset keeps the original fallback gradients. */}
       <div
         aria-hidden
+        data-slot='home-hero-aura'
         className='pointer-events-none absolute inset-0 -z-10 opacity-25 dark:opacity-[0.12]'
         style={{
-          background: [
-            'radial-gradient(ellipse 60% 50% at 20% 20%, oklch(0.72 0.18 250 / 80%) 0%, transparent 70%)',
-            'radial-gradient(ellipse 50% 40% at 80% 15%, oklch(0.65 0.15 200 / 60%) 0%, transparent 70%)',
-            'radial-gradient(ellipse 40% 35% at 40% 80%, oklch(0.70 0.12 280 / 40%) 0%, transparent 70%)',
-          ].join(', '),
+          background:
+            'var(--home-hero-aura, radial-gradient(ellipse 60% 50% at 20% 20%, oklch(0.72 0.18 250 / 80%) 0%, transparent 70%), radial-gradient(ellipse 50% 40% at 80% 15%, oklch(0.65 0.15 200 / 60%) 0%, transparent 70%), radial-gradient(ellipse 40% 35% at 40% 80%, oklch(0.70 0.12 280 / 40%) 0%, transparent 70%))',
         }}
       />
       {/* Grid pattern */}
       <div
         aria-hidden
+        data-slot='home-hero-grid'
         className='absolute inset-0 -z-10 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_30%,black_20%,transparent_100%)] bg-[size:4rem_4rem] opacity-[0.08]'
+      />
+
+      <CloverDoodle
+        variant='four-leaf'
+        size='lg'
+        className='absolute top-24 right-[3%] -z-10 hidden opacity-35 md:block'
+      />
+      <CloverDoodle
+        variant='sprig'
+        size='md'
+        className='absolute bottom-12 left-[3%] -z-10 hidden opacity-35 lg:block'
       />
 
       <div className='mx-auto grid max-w-6xl grid-cols-1 items-start gap-12 lg:grid-cols-12 lg:gap-8'>
         {/* Left Column: Title, description, action buttons and application support */}
-        <div className='flex flex-col items-start text-left lg:col-span-6'>
+        <div
+          data-slot='home-hero-copy'
+          className='relative flex flex-col items-start text-left lg:col-span-6'
+        >
+          <WashiTape
+            className='-top-7 left-6 hidden sm:block'
+            tone='gold'
+            width='5rem'
+            rotation={-3}
+          />
           {/* Top Pill Badge */}
           <div
+            data-slot='home-hero-badge'
             className='landing-animate-fade-up mb-5 inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/5 px-3 py-1.5 text-[11px] font-medium text-blue-600 opacity-0 shadow-xs dark:border-blue-400/20 dark:bg-blue-400/5 dark:text-blue-400'
             style={{ animationDelay: '0ms' }}
           >
@@ -114,13 +144,20 @@ export function Hero(props: HeroProps) {
             <span>{t('AI Application Infrastructure Foundation')}</span>
           </div>
 
+          <HandNote className='landing-animate-fade-up mb-3 text-base opacity-0 sm:text-lg'>
+            {t('Better models start here')}
+          </HandNote>
+
           <h1
             className='landing-animate-fade-up text-[clamp(2.25rem,4.5vw,3.25rem)] leading-[1.15] font-bold tracking-tight'
             style={{ animationDelay: '60ms' }}
           >
             {t('Unified API Gateway for')}
             <br />
-            <span className='bg-gradient-to-r from-blue-400 via-violet-400 to-purple-500 bg-clip-text text-transparent'>
+            <span
+              data-slot='home-hero-title-accent'
+              className='bg-gradient-to-r from-blue-400 via-violet-400 to-purple-500 bg-clip-text text-transparent'
+            >
               {t('Vast Range of AI Models')}
             </span>
           </h1>
@@ -232,12 +269,24 @@ export function Hero(props: HeroProps) {
           </div>
         </div>
 
-        {/* Right Column: Hero Terminal API Demo */}
+        {/* Right Column: Hero Terminal API Demo framed as a journal photo */}
         <div
-          className='landing-animate-fade-up flex w-full justify-center opacity-0 lg:col-span-6'
+          data-slot='home-hero-polaroid'
+          className='landing-animate-fade-up relative mt-8 w-full max-w-2xl justify-self-center opacity-0 lg:col-span-6 lg:mt-0'
           style={{ animationDelay: '320ms' }}
         >
-          <HeroTerminalDemo className='mt-8 lg:mt-0' />
+          <WashiTape
+            className='-top-3 left-[calc(50%-3.5rem)]'
+            tone='green'
+            width='7rem'
+            rotation={-2}
+          />
+          <div data-slot='home-polaroid-frame' className='relative'>
+            <HeroTerminalDemo />
+          </div>
+          <HandNote className='mt-3 block text-center text-base' rotation={-1}>
+            {t('Record every valuable call')}
+          </HandNote>
         </div>
       </div>
     </section>

@@ -21,6 +21,7 @@ import { ArrowRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AnimateInView } from '@/components/animate-in-view'
+import { HandNote, WashiTape } from '@/components/clover-journal'
 import { Button } from '@/components/ui/button'
 
 interface CTAProps {
@@ -36,7 +37,10 @@ export function CTA(props: CTAProps) {
   }
 
   return (
-    <section className='relative z-10 overflow-hidden px-6 py-24 md:py-32'>
+    <section
+      data-slot='home-cta'
+      className='relative z-10 overflow-hidden px-6 py-24 md:py-32'
+    >
       {/* Gradient mesh background */}
       <div
         aria-hidden
@@ -53,30 +57,44 @@ export function CTA(props: CTAProps) {
         className='mx-auto max-w-2xl text-center'
         animation='scale-in'
       >
-        <h2 className='text-2xl leading-tight font-bold tracking-tight md:text-4xl'>
-          {t('Ready to simplify')}
-          <br />
-          <span className='bg-gradient-to-r from-blue-400 via-violet-400 to-purple-500 bg-clip-text text-transparent'>
-            {t('your AI integration?')}
-          </span>
-        </h2>
-        <p className='text-muted-foreground/80 mx-auto mt-5 max-w-md text-sm leading-relaxed md:text-base'>
-          {t(
-            'Deploy your own gateway and start routing requests through your configured upstream services.'
-          )}
-        </p>
-        <div className='mt-8 flex items-center justify-center gap-3'>
-          <Button className='group rounded-lg' render={<Link to='/sign-up' />}>
-            {t('Get Started')}
-            <ArrowRight className='ml-1 size-3.5 transition-transform duration-200 group-hover:translate-x-0.5' />
-          </Button>
-          <Button
-            variant='outline'
-            className='border-border/50 hover:border-border hover:bg-muted/50 rounded-lg'
-            render={<Link to='/pricing' />}
-          >
-            {t('View Pricing')}
-          </Button>
+        <div data-slot='home-cta-card' className='relative'>
+          <WashiTape
+            className='-top-2 left-[calc(50%-3rem)]'
+            tone='clay'
+            width='6rem'
+            rotation={-2}
+          />
+          <HandNote className='mb-2 block text-base' rotation={-2}>
+            {t('Good things are always around you')}
+          </HandNote>
+          <h2 className='text-2xl leading-tight font-bold tracking-tight md:text-4xl'>
+            {t('Ready to simplify')}
+            <br />
+            <span
+              data-slot='home-cta-title-accent'
+              className='bg-gradient-to-r from-blue-400 via-violet-400 to-purple-500 bg-clip-text text-transparent'
+            >
+              {t('your AI integration?')}
+            </span>
+          </h2>
+          <p className='text-muted-foreground/80 mx-auto mt-5 max-w-md text-sm leading-relaxed md:text-base'>
+            {t(
+              'Deploy your own gateway and start routing requests through your configured upstream services.'
+            )}
+          </p>
+          <div className='mt-8 flex items-center justify-center gap-3'>
+            <Button className='group rounded-lg' render={<Link to='/sign-up' />}>
+              {t('Get Started')}
+              <ArrowRight className='ml-1 size-3.5 transition-transform duration-200 group-hover:translate-x-0.5' />
+            </Button>
+            <Button
+              variant='outline'
+              className='border-border/50 hover:border-border hover:bg-muted/50 rounded-lg'
+              render={<Link to='/pricing' />}
+            >
+              {t('View Pricing')}
+            </Button>
+          </div>
         </div>
       </AnimateInView>
     </section>

@@ -28,7 +28,10 @@ import {
   DEFAULT_TIME_GRANULARITY,
   MODEL_ANALYTICS_CHART_OPTIONS,
 } from '@/features/dashboard/constants'
-import { processChartData } from '@/features/dashboard/lib'
+import {
+  processChartData,
+  getJournalChartColors,
+} from '@/features/dashboard/lib'
 import type {
   ModelAnalyticsChartTab,
   QuotaDataItem,
@@ -64,6 +67,10 @@ export function ModelCharts(props: ModelChartsProps) {
     '--radius-md',
     `${customization.preset}:${customization.radius}`
   )
+  const journalPalette =
+    customization.preset === 'clover-journal'
+      ? getJournalChartColors(resolvedTheme)
+      : undefined
   const [activeTab, setActiveTab] = useState<ModelAnalyticsChartTab>(
     props.defaultChartTab ?? 'trend'
   )
@@ -102,9 +109,10 @@ export function ModelCharts(props: ModelChartsProps) {
         props.loading ? [] : props.data,
         timeGranularity,
         t,
-        chartRadius
+        chartRadius,
+        journalPalette
       ),
-    [props.data, props.loading, timeGranularity, t, chartRadius]
+    [props.data, props.loading, timeGranularity, t, chartRadius, journalPalette]
   )
 
   const spec = chartData[CHART_SPEC_KEYS[activeTab]]
@@ -119,7 +127,10 @@ export function ModelCharts(props: ModelChartsProps) {
   ].join('-')
 
   return (
-    <div className='overflow-hidden rounded-lg border'>
+    <div
+      data-slot='dashboard-chart-card'
+      className='overflow-hidden rounded-lg border'
+    >
       <div className='flex w-full flex-col gap-1.5 border-b px-3 py-2 sm:gap-3 sm:px-5 sm:py-3 lg:flex-row lg:items-center lg:justify-between'>
         <div className='flex items-center gap-2'>
           <IconBadge tone='chart-4' size='sm'>

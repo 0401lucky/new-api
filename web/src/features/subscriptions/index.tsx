@@ -40,7 +40,7 @@ function SubscriptionsContent() {
 
   return (
     <>
-      <SectionPageLayout fixedContent>
+      <SectionPageLayout fixedContent journalLevel='immersive'>
         <SectionPageLayout.Title>
           {t('Subscription Management')}
         </SectionPageLayout.Title>

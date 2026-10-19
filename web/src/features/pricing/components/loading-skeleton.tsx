@@ -27,7 +27,7 @@ export interface LoadingSkeletonProps {
 
 export function LoadingSkeleton(props: LoadingSkeletonProps) {
   return (
-    <div aria-busy='true'>
+    <div data-slot='pricing-loading' aria-busy='true'>
       <div className='mx-auto mb-5 flex max-w-3xl flex-col items-center pt-5 sm:mb-10 sm:pt-10'>
         <Skeleton className='h-[clamp(2.3rem,6.325vw,4.025rem)] w-48 max-w-full sm:w-64' />
         <Skeleton className='mt-3 h-5 w-56 max-w-full sm:mt-4 sm:h-6' />

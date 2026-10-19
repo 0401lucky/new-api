@@ -209,6 +209,7 @@ export function HeroTerminalDemo(props: HeroTerminalDemoProps) {
   return (
     <div className={cn('mx-auto w-full max-w-2xl', props.className)}>
       <div
+        data-slot='home-terminal'
         className={cn(
           'overflow-hidden rounded-2xl border backdrop-blur-sm',
           'border-border/60 bg-white/95 shadow-[0_20px_50px_-25px_rgba(15,23,42,0.18)]',
