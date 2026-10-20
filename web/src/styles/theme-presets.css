@@ -896,1395 +896,406 @@ For commercial licensing, please contact support@quantumnous.com
   opacity: 0.06;
 }
 
-/* ── Clover Journal ───────────────────────────────────────────────────── */
-/*
- * Botanical scrapbook: cream paper, clover-green ink, washi tape and
- * hand-drawn annotations. Deliberately separate from `lucky-clover` so the
- * calm mint skin remains available; every rule is scoped to this attribute.
- *
- * Layering:
- *   1. Canvas — paper grain + two watercolour washes.
- *   2. Surfaces — near-white paper cards with irregular corners and soft
- *      green shadows; the grain repeats on the card so it reads as paper.
- *   3. Decorations — tape/clips/doodles only inside `data-journal-level`
- *      scopes; dense tables never receive them.
- *   4. Typography — serif headings + hand-written accents; body and data
- *      keep the humanist sans for readability.
- *
- * OKLCH hue 155-158 = clover green; 95 = warm cream; 82 = gold; 35 = clay.
+/* ── Clover Journal ─────────────────────────────────────────────────────
+ * A botanical notebook: warm paper, forest ink and a few quiet margin notes.
+ * Data surfaces share one paper tone; decoration stays outside the controls.
+ * Every skin is scoped to the preset so font, radius and density preferences
+ * below can keep working independently.
  */
 [data-theme-preset='clover-journal'] {
-  /* Canvas + ink — cream paper under clover-green ink. */
-  --background: oklch(0.965 0.018 95);
-  --foreground: oklch(0.32 0.04 155);
+  --background: oklch(0.974 0.008 100);
+  --foreground: oklch(0.31 0.025 150);
+  --card: oklch(0.994 0.004 100);
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
 
-  /* Near-white paper surfaces; the canvas, not the card, carries the tint. */
-  --card: oklch(0.992 0.01 95);
-  --card-foreground: oklch(0.32 0.04 155);
-  --popover: oklch(0.995 0.008 95);
-  --popover-foreground: oklch(0.32 0.04 155);
+  --primary: oklch(0.445 0.065 153);
+  --primary-foreground: oklch(0.99 0.006 100);
+  --secondary: oklch(0.946 0.014 140);
+  --secondary-foreground: oklch(0.37 0.035 150);
+  --muted: oklch(0.948 0.009 110);
+  --muted-foreground: oklch(0.49 0.018 145);
+  --accent: oklch(0.93 0.023 140);
+  --accent-foreground: var(--foreground);
 
-  /* Clover ink — deep forest for CTAs, never neon. */
-  --primary: oklch(0.46 0.09 158);
-  --primary-foreground: oklch(0.985 0.012 95);
-  --secondary: oklch(0.92 0.035 145);
-  --secondary-foreground: oklch(0.36 0.055 150);
-  --muted: oklch(0.945 0.018 100);
-  --muted-foreground: oklch(0.46 0.025 140);
-  --accent: oklch(0.9 0.06 135);
-  --accent-foreground: oklch(0.3 0.05 150);
+  --destructive: oklch(0.55 0.14 32);
+  --destructive-foreground: var(--primary-foreground);
+  --success: oklch(0.5 0.09 153);
+  --success-foreground: var(--primary-foreground);
+  --warning: oklch(0.7 0.095 82);
+  --warning-foreground: oklch(0.29 0.035 80);
+  --info: oklch(0.54 0.055 210);
+  --info-foreground: var(--primary-foreground);
+  --neutral: var(--muted-foreground);
+  --neutral-foreground: var(--primary-foreground);
 
-  --destructive: oklch(0.56 0.15 35);
-  --destructive-foreground: oklch(0.99 0.01 95);
-  --success: oklch(0.52 0.13 155);
-  --success-foreground: oklch(0.99 0.01 95);
-  --warning: oklch(0.76 0.12 82);
-  --warning-foreground: oklch(0.26 0.04 80);
-  --info: oklch(0.58 0.07 210);
-  --info-foreground: oklch(0.99 0.01 95);
-  --neutral: oklch(0.5 0.025 140);
-  --neutral-foreground: oklch(0.99 0.01 95);
+  --border: oklch(0.89 0.012 125);
+  --input: oklch(0.85 0.015 135);
+  --ring: oklch(0.53 0.075 150);
 
-  /* Sage hairlines, not gray. */
-  --border: oklch(0.87 0.035 140);
-  --input: oklch(0.88 0.035 140);
-  --ring: oklch(0.62 0.12 150);
+  --chart-1: oklch(0.49 0.075 153);
+  --chart-2: oklch(0.63 0.07 140);
+  --chart-3: oklch(0.66 0.09 82);
+  --chart-4: oklch(0.61 0.05 205);
+  --chart-5: oklch(0.6 0.09 38);
 
-  /* Charts walk the botanical palette: forest → leaf → gold → mist → clay. */
-  --chart-1: oklch(0.5 0.1 155);
-  --chart-2: oklch(0.68 0.13 145);
-  --chart-3: oklch(0.76 0.12 82);
-  --chart-4: oklch(0.62 0.07 205);
-  --chart-5: oklch(0.56 0.15 35);
-
-  /* Sidebar reads as the notebook page behind the content. */
-  --sidebar: oklch(0.952 0.022 100);
-  --sidebar-foreground: oklch(0.32 0.04 155);
+  --sidebar: oklch(0.958 0.009 110);
+  --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.9 0.055 135);
-  --sidebar-accent-foreground: oklch(0.28 0.05 150);
-  --sidebar-border: oklch(0.87 0.035 140);
-  --sidebar-ring: oklch(0.62 0.12 150);
+  --sidebar-accent: oklch(0.916 0.023 140);
+  --sidebar-accent-foreground: var(--primary);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
 
-  --skeleton-base: oklch(0.945 0.02 100);
-  --skeleton-highlight: oklch(0.98 0.012 95);
-
-  /* Dense data keeps paper-white rows under a slightly warmer header. */
+  --skeleton-base: var(--muted);
+  --skeleton-highlight: var(--background);
   --table-row: var(--card);
-  --table-header: oklch(0.945 0.03 115);
-  --table-header-hover: oklch(0.93 0.038 115);
-  --table-disabled: oklch(0.95 0.015 100);
-  --table-disabled-hover: oklch(0.935 0.018 100);
-  --table-disabled-border: oklch(0.86 0.03 140);
+  --table-header: var(--muted);
+  --table-header-hover: var(--secondary);
+  --table-disabled: var(--background);
+  --table-disabled-hover: var(--muted);
+  --table-disabled-border: var(--border);
 
-  --radius: 1.25rem;
-
-  /* Journal shaping tokens consumed by the rules below and by the decorative
-   * React components (which only need the colours, not the geometry). */
-  --journal-card-radius:
-    1.35rem 1.6rem 1.3rem 1.55rem / 1.5rem 1.3rem 1.6rem 1.35rem;
+  --radius: 0.8rem;
+  --journal-card-radius: var(--radius);
   --journal-paper-shadow:
-    0 1px 0 oklch(0.45 0.05 150 / 0.08),
-    0 10px 24px -12px oklch(0.35 0.05 150 / 0.28);
+    0 1px 2px oklch(0.2 0.015 150 / 3%),
+    0 8px 24px -18px oklch(0.2 0.015 150 / 16%);
   --journal-paper-shadow-hover:
-    0 2px 0 oklch(0.45 0.05 150 / 0.1),
-    0 16px 32px -14px oklch(0.35 0.05 150 / 0.34);
+    0 2px 4px oklch(0.2 0.015 150 / 4%),
+    0 12px 28px -18px oklch(0.2 0.015 150 / 20%);
   --journal-grain-blend: multiply;
-  --journal-grain:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.32'/%3E%3C/svg%3E");
-  --journal-tape-green: oklch(0.82 0.08 145 / 0.7);
-  --journal-tape-gold: oklch(0.86 0.09 88 / 0.7);
-  --journal-tape-clay: oklch(0.78 0.09 45 / 0.65);
-  --journal-note: oklch(0.94 0.06 92);
-  --journal-doodle-opacity: 0.55;
-}
+  --journal-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+  --journal-tape-green: oklch(0.87 0.035 140 / 70%);
+  --journal-tape-gold: oklch(0.9 0.035 88 / 70%);
+  --journal-tape-clay: oklch(0.86 0.035 45 / 65%);
+  --journal-note: oklch(0.96 0.025 92);
+  --journal-doodle-opacity: 0.4;
+  --journal-warning-ink: oklch(0.47 0.085 75);
+  --journal-danger-ink: oklch(0.5 0.13 32);
+  --journal-success-ink: oklch(0.46 0.085 153);
+  --journal-info-ink: oklch(0.48 0.055 210);
 
-/* Canvas wash: paper grain plus leaf-green top-left and warm-cream top-right
- * watercolour blooms. Deliberately scroll-attached; the app scrolls inside the
- * sidebar inset, so the wash already behaves as a fixed backdrop. */
-[data-theme-preset='clover-journal'] {
+  --home-hero-aura: radial-gradient(
+    ellipse 65% 55% at 80% 20%,
+    color-mix(in oklch, var(--primary) 6%, transparent),
+    transparent 75%
+  );
+
   background-color: var(--background);
-  background-image:
-    var(--journal-grain),
-    radial-gradient(
-      72rem 36rem at 6% -8%,
-      oklch(0.9 0.06 135 / 0.45),
-      transparent 62%
-    ),
-    radial-gradient(
-      58rem 30rem at 94% -6%,
-      oklch(0.94 0.06 90 / 0.38),
-      transparent 60%
-    );
-  background-size:
-    160px 160px,
-    auto,
-    auto;
-  background-repeat: repeat, no-repeat, no-repeat;
-  background-blend-mode: var(--journal-grain-blend), normal, normal;
+  background-image: var(--journal-grain);
+  background-size: 160px 160px;
+  background-blend-mode: var(--journal-grain-blend);
 }
 
 .dark [data-theme-preset='clover-journal'] {
-  /* Night journal: deep green paper, cream ink, muted botanical accents. */
-  --background: oklch(0.22 0.025 155);
-  --foreground: oklch(0.91 0.02 95);
-  --card: oklch(0.27 0.028 155);
-  --card-foreground: oklch(0.91 0.02 95);
-  --popover: oklch(0.29 0.03 155);
-  --popover-foreground: oklch(0.91 0.02 95);
+  --background: oklch(0.205 0.012 150);
+  --foreground: oklch(0.92 0.01 100);
+  --card: oklch(0.25 0.014 150);
+  --primary: oklch(0.76 0.065 145);
+  --primary-foreground: oklch(0.21 0.022 150);
+  --secondary: oklch(0.3 0.016 145);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(0.285 0.013 150);
+  --muted-foreground: oklch(0.74 0.015 125);
+  --accent: oklch(0.325 0.025 145);
+  --accent-foreground: var(--foreground);
 
-  --primary: oklch(0.72 0.12 150);
-  --primary-foreground: oklch(0.18 0.03 155);
-  --secondary: oklch(0.32 0.03 150);
-  --secondary-foreground: oklch(0.9 0.02 95);
-  --muted: oklch(0.29 0.022 155);
-  --muted-foreground: oklch(0.74 0.02 110);
-  --accent: oklch(0.34 0.045 145);
-  --accent-foreground: oklch(0.93 0.02 95);
+  --destructive: oklch(0.73 0.12 32);
+  --destructive-foreground: var(--primary-foreground);
+  --success: oklch(0.75 0.09 150);
+  --success-foreground: var(--primary-foreground);
+  --warning: oklch(0.81 0.09 82);
+  --warning-foreground: var(--primary-foreground);
+  --info: oklch(0.73 0.05 210);
+  --info-foreground: var(--primary-foreground);
+  --neutral-foreground: var(--primary-foreground);
 
-  --destructive: oklch(0.68 0.16 30);
-  --destructive-foreground: oklch(0.18 0.03 30);
-  --success: oklch(0.74 0.13 150);
-  --success-foreground: oklch(0.18 0.03 155);
-  --warning: oklch(0.82 0.12 82);
-  --warning-foreground: oklch(0.2 0.03 80);
-  --info: oklch(0.7 0.07 210);
-  --info-foreground: oklch(0.18 0.03 210);
-  --neutral: oklch(0.74 0.02 110);
-  --neutral-foreground: oklch(0.18 0.03 155);
+  --border: oklch(0.355 0.014 145);
+  --input: oklch(0.41 0.019 145);
+  --ring: var(--primary);
+  --chart-1: var(--primary);
+  --chart-2: oklch(0.64 0.065 135);
+  --chart-3: var(--warning);
+  --chart-4: var(--info);
+  --chart-5: oklch(0.72 0.09 38);
+  --sidebar: oklch(0.225 0.012 150);
+  --sidebar-accent: oklch(0.315 0.024 145);
+  --table-header: var(--muted);
+  --table-disabled: var(--background);
 
-  --border: oklch(0.8 0.05 150 / 14%);
-  --input: oklch(0.85 0.05 150 / 20%);
-  --ring: oklch(0.72 0.12 150);
-
-  --chart-1: oklch(0.72 0.12 150);
-  --chart-2: oklch(0.68 0.11 135);
-  --chart-3: oklch(0.82 0.12 82);
-  --chart-4: oklch(0.7 0.07 205);
-  --chart-5: oklch(0.72 0.12 35);
-
-  --sidebar: oklch(0.2 0.022 155);
-  --sidebar-foreground: oklch(0.91 0.02 95);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.34 0.045 145);
-  --sidebar-accent-foreground: oklch(0.93 0.02 95);
-  --sidebar-border: oklch(0.8 0.05 150 / 13%);
-  --sidebar-ring: oklch(0.72 0.12 150);
-
-  --skeleton-base: oklch(0.3 0.025 155);
-  --skeleton-highlight: oklch(0.38 0.03 155);
-
-  --table-row: var(--card);
-  --table-header: oklch(0.3 0.03 155);
-  --table-header-hover: oklch(0.34 0.035 155);
-  --table-disabled: oklch(0.285 0.02 155);
-  --table-disabled-hover: oklch(0.31 0.024 155);
-  --table-disabled-border: oklch(0.42 0.04 150);
-
-  /* Dark elevation reads as depth, not glow. */
-  --journal-paper-shadow:
-    0 1px 0 oklch(0.1 0.02 155 / 0.5),
-    0 12px 28px -12px oklch(0.08 0.02 155 / 0.6);
-  --journal-paper-shadow-hover:
-    0 2px 0 oklch(0.1 0.02 155 / 0.55),
-    0 18px 36px -14px oklch(0.08 0.02 155 / 0.7);
+  --journal-paper-shadow: 0 3px 16px -10px oklch(0.1 0.01 150 / 45%);
+  --journal-paper-shadow-hover: 0 6px 22px -12px oklch(0.1 0.01 150 / 55%);
   --journal-grain-blend: screen;
-  --journal-tape-green: oklch(0.62 0.08 145 / 0.45);
-  --journal-tape-gold: oklch(0.68 0.08 88 / 0.4);
-  --journal-tape-clay: oklch(0.6 0.08 45 / 0.4);
-  --journal-note: oklch(0.36 0.045 92);
-  --journal-doodle-opacity: 0.42;
-
-  background-image:
-    var(--journal-grain),
-    radial-gradient(
-      72rem 36rem at 6% -8%,
-      oklch(0.48 0.07 150 / 0.18),
-      transparent 62%
-    ),
-    radial-gradient(
-      58rem 30rem at 94% -6%,
-      oklch(0.62 0.05 90 / 0.1),
-      transparent 60%
-    );
-  background-size:
-    160px 160px,
-    auto,
-    auto;
-  background-repeat: repeat, no-repeat, no-repeat;
-  background-blend-mode: screen, normal, normal;
+  --journal-tape-green: oklch(0.51 0.035 140 / 60%);
+  --journal-tape-gold: oklch(0.53 0.035 88 / 55%);
+  --journal-tape-clay: oklch(0.5 0.035 45 / 55%);
+  --journal-note: oklch(0.315 0.022 92);
+  --journal-warning-ink: var(--warning);
+  --journal-danger-ink: var(--destructive);
+  --journal-success-ink: var(--success);
+  --journal-info-ink: var(--info);
 }
 
-/* Paper cards: irregular cut-paper corners, a sage hairline and a soft green
- * shadow. The grain repeats on the card so it reads as a separate sheet. */
-[data-theme-preset='clover-journal'] [data-slot='card'] {
-  border-color: transparent;
+/* Quiet paper surfaces. Grain belongs to the canvas rather than every card. */
+[data-theme-preset='clover-journal']
+  :is(
+    [data-slot='card'],
+    [data-slot='dashboard-stat-strip'],
+    [data-slot='dashboard-performance'],
+    [data-slot='dashboard-usage-table'],
+    [data-slot='dashboard-chart-card'],
+    [data-slot='overview-summary'],
+    [data-slot='overview-performance-health'],
+    .overview-panel,
+    [data-slot='wallet-stats'],
+    [data-slot='model-health-panel'],
+    [data-slot='model-health-public-stat'],
+    [data-slot='model-health-public-card'],
+    [data-slot='model-details-page']
+  ) {
+  border-color: var(--border);
   border-radius: var(--journal-card-radius);
+  background-color: var(--card);
+  background-image: none;
   box-shadow: var(--journal-paper-shadow);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
 }
-
-/* The global card-hover rule in index.css uses a neutral shadow at
- * specificity (0,3,0); this reaches higher so the lift stays green. */
-@media (prefers-reduced-motion: no-preference) {
-  @media (min-width: 641px) {
-    [data-theme-preset='clover-journal']
-      [data-slot='card']:not([data-card-hover='false']):hover {
-      box-shadow: var(--journal-paper-shadow-hover);
-    }
+[data-theme-preset='clover-journal'] [data-slot='card'] {
+  box-shadow:
+    0 0 0 1px var(--border),
+    var(--journal-paper-shadow);
+}
+@media (prefers-reduced-motion: no-preference) and (min-width: 641px) {
+  [data-theme-preset='clover-journal']
+    [data-slot='card']:not([data-card-hover='false']):hover {
+    transform: none;
+    box-shadow:
+      0 0 0 1px var(--border),
+      var(--journal-paper-shadow-hover);
   }
 }
 
-/* Editorial headings; body copy and data keep the humanist sans. */
-[data-theme-preset='clover-journal'] :is(h1, h2, h3, h4) {
+/* Serif is reserved for page headings; small labels and metrics keep body ink. */
+[data-theme-preset='clover-journal'] :is(h1, h2) {
   font-family: var(--font-display);
-  letter-spacing: -0.01em;
-}
-
-[data-theme-preset='clover-journal'] .journal-hand {
-  font-family: var(--font-hand);
-}
-
-/* Capsule chrome — buttons and sidebar entries read as paper labels. */
-[data-theme-preset='clover-journal']
-  [data-slot='button']:not([data-slot='button-group'] *),
-[data-theme-preset='clover-journal'] [data-slot='sidebar-menu-button'] {
-  border-radius: calc(infinity * 1px);
-}
-
-/* Primary CTAs get a subtle letterpress edge instead of a flat fill. */
-[data-theme-preset='clover-journal']
-  [data-slot='button'][data-variant='default'] {
-  box-shadow:
-    inset 0 1px 0 oklch(0.99 0.01 95 / 0.22),
-    0 2px 6px -2px oklch(0.35 0.05 150 / 0.35);
-}
-
-/* Paper-chip variants carry the grain too. */
-[data-theme-preset='clover-journal']
-  [data-slot='button'][data-variant='outline'],
-[data-theme-preset='clover-journal']
-  [data-slot='button'][data-variant='secondary'] {
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-}
-
-/* Leaf-shaped tabs; the active tab becomes a small paper sticker. */
-[data-theme-preset='clover-journal'] [data-slot='tabs-list'] {
-  background: transparent;
-  gap: 0.25rem;
-}
-[data-theme-preset='clover-journal'] [data-slot='tabs-trigger'] {
-  border-radius: calc(infinity * 1px);
-}
-[data-theme-preset='clover-journal'] [data-slot='tabs-trigger'][data-active] {
-  background-color: var(--card);
-  border-color: var(--border);
-  box-shadow: var(--journal-paper-shadow);
-}
-
-/* Sidebar as a notebook page. */
-[data-theme-preset='clover-journal'] [data-slot='sidebar'] {
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
+  letter-spacing: -0.025em;
 }
 [data-theme-preset='clover-journal']
-  [data-slot='sidebar-menu-button'][data-active='true'] {
-  background-color: var(--sidebar-accent);
-  box-shadow: inset 0 0 0 1px
-    color-mix(in oklch, var(--primary) 12%, transparent);
+  :is(h3, h4, [data-slot='card-title'], [data-slot='overview-panel-title']) {
+  font-family: var(--font-body);
 }
-
-/* Paper dialogs and sheets. */
-[data-theme-preset='clover-journal']
-  :is(
-    [data-slot='dialog-content'],
-    [data-slot='alert-dialog-content'],
-    [data-slot='sheet-content'],
-    [data-slot='drawer-content']
-  ) {
-  border-radius: var(--journal-card-radius);
-  box-shadow: var(--journal-paper-shadow-hover);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-}
-[data-theme-preset='clover-journal'] [data-slot='sheet-content'],
-[data-theme-preset='clover-journal'] [data-slot='drawer-content'] {
-  border-style: dashed;
-  border-color: color-mix(in oklch, var(--border) 80%, transparent);
-}
-
-/* Paper inputs — soft corners and a sage hairline. */
-/* (Field styling lives in the P3 component-skins section below.) */
-
-/* ── Clover Journal — decorative primitives ───────────────────────────────
- * Kept in the preset stylesheet so the whole visual language lives in one
- * place. Components only supply markup, colour tone and placement. */
-[data-theme-preset='clover-journal'] .journal-tape {
-  background-image: repeating-linear-gradient(
-    90deg,
-    transparent 0 5px,
-    oklch(1 0 0 / 0.28) 5px 7px
-  );
-  box-shadow: 0 1px 1px oklch(0.35 0.05 150 / 0.08);
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0,
-    #000 4%,
-    #000 96%,
-    transparent 100%
-  );
-}
-[data-theme-preset='clover-journal'] .journal-sticky-note {
-  border-radius: 2px;
-  background-color: var(--journal-note);
+[data-theme-preset='clover-journal'] [data-slot='section-page-title'] {
   color: var(--foreground);
-  box-shadow: var(--journal-paper-shadow);
-  font-family: var(--font-hand);
-}
-[data-theme-preset='clover-journal'] .journal-sticky-note::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 0.75rem;
-  height: 0.75rem;
-  background: linear-gradient(
-    135deg,
-    transparent 50%,
-    color-mix(in oklch, var(--foreground) 12%, transparent) 50%
-  );
-}
-[data-theme-preset='clover-journal'] .journal-doodle,
-[data-theme-preset='clover-journal'] .journal-paper-clip {
-  color: var(--primary);
-  opacity: var(--journal-doodle-opacity);
+  font-size: 1.4rem;
+  line-height: 1.35;
+  letter-spacing: -0.025em;
 }
 [data-theme-preset='clover-journal'] .journal-hand {
   font-family: var(--font-hand);
+  color: var(--muted-foreground);
 }
 
-/* Decoration levels. Pages opt in; unmarked subtrees behave as `calm`. */
-[data-theme-preset='clover-journal'] [data-journal-level='calm']
-  :is(
-    .journal-tape,
-    .journal-doodle,
-    .journal-sticky-note,
-    .journal-hand,
-    .journal-paper-clip
-  ) {
-  display: none;
-}
-[data-theme-preset='clover-journal'] [data-journal-level='medium']
-  :is(.journal-sticky-note, .journal-hand) {
-  display: none;
-}
-
-/* ── Clover Journal — application shell ───────────────────────────────────
- * The header becomes a paper strip, the sidebar a notebook page, and the page
- * title gets a hand-drawn dash underline. Everything stays preset-scoped. */
-
-/* Decorations must never leak into the other presets, including `default`
- * where the preset attribute is removed entirely. A decoration is visible
- * only when it is inside the clover-journal subtree. */
+/* Decoration opt-in also covers the new canvas and photo components. */
 :is(
+  .journal-tape,
+  .journal-doodle,
+  .journal-sticky-note,
+  .journal-hand,
+  .journal-grain,
+  .journal-paper-clip,
+  .journal-botanical-canvas,
+  .journal-polaroid
+):not([data-theme-preset='clover-journal'] *) {
+  display: none;
+}
+[data-theme-preset='clover-journal']
+  :is([data-journal-level='calm'], [data-journal-level='medium'])
+  :is(
     .journal-tape,
     .journal-doodle,
     .journal-sticky-note,
     .journal-hand,
     .journal-grain,
-    .journal-paper-clip
-  ):not([data-theme-preset='clover-journal'] *) {
+    .journal-paper-clip,
+    .journal-botanical-canvas,
+    .journal-polaroid
+  ) {
   display: none;
 }
-
-/* App header — paper strip with a stitched bottom edge. */
-[data-theme-preset='clover-journal'] [data-slot='app-header'] {
-  background-color: color-mix(in oklch, var(--background) 78%, var(--card));
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  border-bottom: 1px dashed
-    color-mix(in oklch, var(--border) 72%, transparent);
-  box-shadow: 0 8px 18px -18px oklch(0.35 0.05 150 / 0.45);
-}
-[data-theme-preset='clover-journal'] [data-slot='system-brand'] {
-  font-family: var(--font-display);
-}
-[data-theme-preset='clover-journal'] [data-slot='system-brand-logo'] {
-  border-radius: calc(infinity * 1px);
-  box-shadow:
-    0 0 0 2px var(--background),
-    0 0 0 3px color-mix(in oklch, var(--border) 80%, transparent);
-}
-[data-theme-preset='clover-journal'] [data-slot='top-nav-link'],
-[data-theme-preset='clover-journal'] [data-slot='public-nav-link'] {
-  border-radius: calc(infinity * 1px);
-}
-[data-theme-preset='clover-journal'] [data-slot='top-nav-link']:hover,
-[data-theme-preset='clover-journal'] [data-slot='public-nav-link']:hover {
-  color: var(--primary);
-  text-decoration: underline;
-  text-decoration-style: wavy;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.3rem;
-}
-
-/* Public header — the scrolled state becomes a floating paper strip. */
+/* Data is never decorated, including the overview's immersive page. */
 [data-theme-preset='clover-journal']
-  [data-slot='public-header-nav'][data-scrolled='true'] {
-  background-color: color-mix(in oklch, var(--background) 82%, var(--card));
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+  :is(
+    [data-slot='overview-summary'],
+    [data-slot='overview-performance-health'],
+    .overview-panel,
+    [data-slot='dashboard-stat-strip'],
+    [data-slot='dashboard-performance'],
+    [data-slot='wallet-stats'],
+    .wallet-recharge-card,
+    .wallet-plans-card
+  )
+  :is(.journal-tape, .journal-paper-clip, .journal-hand, .journal-sticky-note) {
+  display: none;
+}
+[data-theme-preset='clover-journal'] .journal-doodle {
+  color: var(--primary);
+  opacity: var(--journal-doodle-opacity);
+}
+[data-theme-preset='clover-journal'] .journal-botanical-canvas .journal-doodle {
+  opacity: 0.22;
+}
+[data-theme-preset='clover-journal'] .journal-tape {
+  background-color: var(--journal-tape-green);
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0 6px,
+    oklch(1 0 0 / 18%) 6px 8px
+  );
+  clip-path: polygon(
+    2% 0,
+    98% 0,
+    100% 20%,
+    98% 45%,
+    100% 75%,
+    98% 100%,
+    2% 100%,
+    0 75%,
+    2% 45%,
+    0 20%
+  );
+}
+[data-theme-preset='clover-journal'] .journal-tape-gold {
+  background-color: var(--journal-tape-gold);
+}
+[data-theme-preset='clover-journal'] .journal-tape-clay {
+  background-color: var(--journal-tape-clay);
+}
+[data-theme-preset='clover-journal'] .journal-tape-gingham {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      oklch(1 0 0 / 20%) 0 5px,
+      transparent 5px 10px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      oklch(1 0 0 / 20%) 0 5px,
+      transparent 5px 10px
+    );
+}
+[data-theme-preset='clover-journal'] .journal-sticky-note {
+  border-radius: 0.2rem;
+  background-color: var(--journal-note);
+  color: var(--foreground);
+  font-family: var(--font-hand);
   box-shadow: var(--journal-paper-shadow);
 }
+[data-theme-preset='clover-journal'] .journal-paper-clip {
+  opacity: 0.65;
+}
 
-/* Sidebar as a notebook page: grain, a dashed spine and handwritten group
- * labels. The active entry gets a green index-tab bar instead of a pill. */
+/* Shell: a single paper backdrop, a fine spine, a restrained active index. */
+[data-theme-preset='clover-journal'] [data-slot='app-header'] {
+  background-color: var(--background);
+  border-bottom: 1px solid var(--border);
+  box-shadow: none;
+}
 [data-theme-preset='clover-journal'] [data-slot='sidebar-inner'] {
-  position: relative;
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  border-inline-end: 1px dashed
-    color-mix(in oklch, var(--border) 65%, transparent);
-}
-[data-theme-preset='clover-journal'] [data-slot='sidebar-inner']::before {
-  content: '';
-  position: absolute;
-  inset-block: 0.75rem;
-  inset-inline-start: 1.35rem;
-  border-inline-start: 1px dashed
-    color-mix(in oklch, var(--primary) 18%, transparent);
-  pointer-events: none;
-}
-[data-theme-preset='clover-journal'] [data-slot='sidebar-header'] {
-  border-bottom: 1px dashed
-    color-mix(in oklch, var(--border) 65%, transparent);
+  border-inline-end: 1px solid var(--border);
 }
 [data-theme-preset='clover-journal'] [data-slot='sidebar-group-label'] {
-  font-family: var(--font-hand);
-  font-size: 0.82rem;
-  letter-spacing: 0.02em;
-  text-transform: none;
-  color: color-mix(in oklch, var(--foreground) 58%, transparent);
+  font-family: var(--font-body);
+  color: var(--muted-foreground);
+}
+[data-theme-preset='clover-journal'] [data-slot='sidebar-menu-button'] {
+  border-radius: 0.55rem;
 }
 [data-theme-preset='clover-journal']
   [data-slot='sidebar-menu-button'][data-active='true'] {
+  color: var(--primary);
   background-color: var(--sidebar-accent);
-  border-radius: 0.9rem;
-  box-shadow:
-    inset 0.2rem 0 0 var(--primary),
-    inset 0 0 0 1px color-mix(in oklch, var(--primary) 10%, transparent);
+  box-shadow: inset 2px 0 0 var(--primary);
 }
-
-/* A large clover watermark at the bottom of the notebook page. */
-[data-theme-preset='clover-journal'] [data-slot='sidebar-footer'] {
-  position: relative;
+[data-theme-preset='clover-journal']
+  [data-slot='public-header-nav'][data-scrolled='true'] {
+  background-color: color-mix(in oklch, var(--background) 94%, transparent);
+  border: 1px solid var(--border);
+  box-shadow: var(--journal-paper-shadow);
 }
-[data-theme-preset='clover-journal'] [data-slot='sidebar-footer']::after {
-  content: '';
-  position: absolute;
-  right: 0.5rem;
-  bottom: 0.5rem;
-  width: 4.5rem;
-  height: 4.5rem;
-  background-color: var(--primary);
-  opacity: 0.08;
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23000'%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z'/%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z' transform='rotate(90 16 16)'/%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z' transform='rotate(180 16 16)'/%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z' transform='rotate(270 16 16)'/%3E%3C/g%3E%3C/svg%3E");
-  mask-size: contain;
-  mask-repeat: no-repeat;
-  pointer-events: none;
-}
-
-/* Page titles read as a journal heading with a hand-drawn dash underline. */
-[data-theme-preset='clover-journal'] [data-slot='section-page-title'] {
-  font-family: var(--font-display);
-  font-size: 1.35rem;
-  line-height: 1.25;
-  padding-bottom: 0.45rem;
-  background-image: repeating-linear-gradient(
-    90deg,
-    color-mix(in oklch, var(--primary) 55%, transparent) 0 0.4rem,
-    transparent 0.4rem 0.8rem
-  );
-  background-repeat: no-repeat;
-  background-position: left bottom;
-  background-size: 6rem 0.12rem;
-}
-@media (min-width: 640px) {
-  [data-theme-preset='clover-journal'] [data-slot='section-page-title'] {
-    font-size: 1.6rem;
-  }
-}
-
-/* Footer as the last page of the journal. */
 [data-theme-preset='clover-journal'] [data-slot='footer'] {
-  border-top: 1px dashed
-    color-mix(in oklch, var(--border) 70%, transparent);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
+  border-top: 1px solid var(--border);
 }
 
-/* Auth form paper card. */
-[data-theme-preset='clover-journal'] .journal-auth-card {
-  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
-  border-radius: var(--journal-card-radius);
-  background-color: color-mix(in oklch, var(--card) 95%, transparent);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-
-/* Journal auth pages split into a decorative cover and a form page. Other
- * presets keep the original centered, single-column form. */
-@media (min-width: 1024px) {
-  [data-theme-preset='clover-journal'] [data-slot='auth-form-shell'] {
-    margin-inline-start: 46%;
-    padding-inline: 2.5rem;
-    padding-block: 2.5rem;
-  }
-}
-[data-theme-preset]:not([data-theme-preset='clover-journal'])
-  [data-slot='auth-cover'] {
-  display: none;
-}
-[data-theme-preset]:not([data-theme-preset='clover-journal'])
-  [data-slot='auth-welcome-note'] {
-  display: none;
-}
-
-/* ── Clover Journal — P4 page compositions ───────────────────────────────
- * Page-level scrapbooking: the home collage, the pricing binder index and
- * the paper model cards. All rules stay preset-scoped; page components only
- * provide stable `data-slot` anchors plus decorative primitives. */
-
-/* Home hero: botanical washes replace the cool blue aura. The inline style
- * reads this custom property with its original gradients as fallback, so
- * every other preset is untouched. */
-[data-theme-preset='clover-journal'] {
-  --home-hero-aura:
-    radial-gradient(
-      ellipse 60% 50% at 18% 18%,
-      oklch(0.88 0.09 135 / 60%) 0%,
-      transparent 70%
-    ),
-    radial-gradient(
-      ellipse 50% 40% at 82% 12%,
-      oklch(0.93 0.07 88 / 55%) 0%,
-      transparent 70%
-    ),
-    radial-gradient(
-      ellipse 40% 35% at 38% 78%,
-      oklch(0.9 0.05 150 / 35%) 0%,
-      transparent 70%
-    );
-}
-.dark [data-theme-preset='clover-journal'] {
-  --home-hero-aura:
-    radial-gradient(
-      ellipse 60% 50% at 18% 18%,
-      oklch(0.5 0.08 145 / 30%) 0%,
-      transparent 70%
-    ),
-    radial-gradient(
-      ellipse 50% 40% at 82% 12%,
-      oklch(0.62 0.06 88 / 20%) 0%,
-      transparent 70%
-    ),
-    radial-gradient(
-      ellipse 40% 35% at 38% 78%,
-      oklch(0.48 0.06 150 / 18%) 0%,
-      transparent 70%
-    );
-}
-
-/* Dotted paper grid instead of the technical blueprint lines. */
-[data-theme-preset='clover-journal'] [data-slot='home-hero-grid'] {
-  background-image: radial-gradient(
-    color-mix(in oklch, var(--primary) 55%, transparent) 1px,
-    transparent 1px
-  );
-  background-size: 1.25rem 1.25rem;
-  opacity: 0.22;
-  mask-image: radial-gradient(
-    ellipse 60% 50% at 50% 30%,
-    #000 20%,
-    transparent 100%
-  );
-}
-
-/* The eyebrow becomes a paper label; the gradient headline lands in ink. */
-[data-theme-preset='clover-journal'] [data-slot='home-hero-badge'] {
-  border-style: dashed;
-  border-color: color-mix(in oklch, var(--primary) 32%, transparent);
-  background-color: color-mix(in oklch, var(--card) 72%, transparent);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  color: var(--primary);
-  box-shadow: var(--journal-paper-shadow);
+/* Rounded paper controls; selected tabs use ink and a light paper inset. */
+[data-theme-preset='clover-journal']
+  [data-slot='button']:not([data-slot='button-group'] *) {
+  border-radius: max(0px, calc(var(--radius) - 0.15rem));
 }
 [data-theme-preset='clover-journal']
-  [data-slot='home-hero-badge']
-  :is(.bg-blue-400, .bg-blue-500) {
-  background-color: var(--primary);
-}
-[data-theme-preset='clover-journal'] [data-slot='home-hero-title-accent'],
-[data-theme-preset='clover-journal'] [data-slot='home-cta-title-accent'] {
-  background-image: none;
-  color: var(--primary);
-  -webkit-text-fill-color: var(--primary);
-}
-
-/* The API demo sits inside a polaroid frame with a handwritten caption. */
-[data-theme-preset='clover-journal'] [data-slot='home-polaroid-frame'] {
-  padding: 0.65rem 0.65rem 0.9rem;
-  border: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
-  border-radius: 0.4rem;
+  [data-slot='button'][data-variant='outline'] {
   background-color: var(--card);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow-hover);
-}
-[data-theme-preset='clover-journal'] [data-slot='home-terminal'] {
-  border-radius: 0.55rem;
-  background-color: color-mix(in oklch, var(--card) 96%, transparent);
-}
-.dark [data-theme-preset='clover-journal'] [data-slot='home-terminal'] {
-  background-color: color-mix(in oklch, var(--card) 94%, transparent);
-}
-
-/* Stats become a paper index strip with a tape tab. */
-[data-theme-preset='clover-journal'] [data-slot='home-stats'] {
-  position: relative;
-  border-style: dashed;
-  border-color: color-mix(in oklch, var(--border) 75%, transparent);
-  background-color: color-mix(in oklch, var(--card) 55%, transparent);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-}
-[data-theme-preset='clover-journal'] [data-slot='home-stats']::before {
-  content: '';
-  position: absolute;
-  top: -0.35rem;
-  left: 3rem;
-  width: 5rem;
-  height: 0.7rem;
-  transform: rotate(-2deg);
-  background-color: var(--journal-tape-green);
-  background-image: repeating-linear-gradient(
-    90deg,
-    transparent 0 5px,
-    oklch(1 0 0 / 0.28) 5px 7px
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0,
-    #000 6%,
-    #000 94%,
-    transparent 100%
-  );
-  opacity: 0.85;
-  pointer-events: none;
 }
 [data-theme-preset='clover-journal']
-  [data-slot='home-stat']
-  > span:first-child {
+  [data-slot='button'][data-variant='outline']:hover:not(:disabled):not(
+    [aria-disabled='true']
+  ) {
+  background-color: var(--muted);
+}
+[data-theme-preset='clover-journal']
+  [data-slot='button'][data-variant='outline'][aria-pressed='true'] {
+  background-color: var(--accent);
   color: var(--primary);
 }
-@media (min-width: 768px) {
-  [data-theme-preset='clover-journal']
-    [data-slot='home-stat']
-    + [data-slot='home-stat'] {
-    border-left: 1px dashed
-      color-mix(in oklch, var(--border) 70%, transparent);
-  }
+[data-theme-preset='clover-journal'] [data-slot='tabs-list'] {
+  gap: 0.2rem;
+  border-radius: 0.65rem;
+  background-color: var(--muted);
+}
+[data-theme-preset='clover-journal'] :is(input, textarea)::placeholder {
+  color: var(--muted-foreground);
+  opacity: 1;
 }
-
-/* Bento cells read as small paper cards cut into a larger sheet. */
-[data-theme-preset='clover-journal'] [data-slot='home-features-grid'] {
-  border-style: dashed;
-  border-color: color-mix(in oklch, var(--border) 80%, transparent);
-  border-radius: var(--journal-card-radius);
-}
-[data-theme-preset='clover-journal'] [data-slot='home-features-grid'] > div {
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-}
-[data-theme-preset='clover-journal']
-  [data-slot='home-features-grid']
-  > div:hover {
-  background-color: color-mix(in oklch, var(--accent) 32%, var(--background));
-}
-
-/* Section headings carry a short washi tab; the step icons are paper chips. */
-[data-theme-preset='clover-journal'] [data-slot='home-section-heading'] {
-  position: relative;
-  display: inline-block;
-}
-[data-theme-preset='clover-journal']
-  [data-slot='home-section-heading']::before {
-  content: '';
-  position: absolute;
-  top: -0.55rem;
-  left: 0.15rem;
-  width: 3.5rem;
-  height: 0.5rem;
-  transform: rotate(-2deg);
-  background-color: var(--journal-tape-gold);
-  background-image: repeating-linear-gradient(
-    90deg,
-    transparent 0 5px,
-    oklch(1 0 0 / 0.28) 5px 7px
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0,
-    #000 8%,
-    #000 92%,
-    transparent 100%
-  );
-  opacity: 0.85;
-  pointer-events: none;
-}
-[data-theme-preset='clover-journal'] [data-slot='home-step-icon'] {
-  border-radius: var(--journal-card-radius);
-  background-color: color-mix(in oklch, var(--card) 78%, transparent);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-[data-theme-preset='clover-journal'] [data-slot='home-how-it-works'] {
-  border-top-style: dashed;
-}
-
-/* Closing CTA becomes a taped paper note. */
-[data-theme-preset='clover-journal'] [data-slot='home-cta-card'] {
-  padding: 2.5rem 1.5rem;
-  border-radius: var(--journal-card-radius);
-  background-color: color-mix(in oklch, var(--card) 74%, transparent);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-@media (min-width: 640px) {
-  [data-theme-preset='clover-journal'] [data-slot='home-cta-card'] {
-    padding: 2.5rem;
-  }
-}
-
-/* Pricing: the blue mesh gives way to botanical washes, the header gets a
- * hand-drawn underline, and the filter column becomes a binder index. */
-[data-theme-preset='clover-journal'] [data-slot='pricing-aura'] {
-  display: none;
-}
-[data-theme-preset='clover-journal'] [data-slot='pricing-page']::before {
-  content: '';
-  position: absolute;
-  inset-inline: 0;
-  top: 0;
-  height: 600px;
-  background-image:
-    radial-gradient(
-      ellipse 55% 45% at 16% 14%,
-      oklch(0.88 0.08 135 / 45%) 0%,
-      transparent 70%
-    ),
-    radial-gradient(
-      ellipse 45% 38% at 84% 10%,
-      oklch(0.93 0.06 88 / 40%) 0%,
-      transparent 70%
-    );
-  mask-image: linear-gradient(to bottom, #000 40%, transparent 100%);
-  pointer-events: none;
-}
-[data-theme-preset='clover-journal'] [data-slot='pricing-heading'] {
-  font-family: var(--font-display);
-  padding-bottom: 0.45rem;
-  background-image: repeating-linear-gradient(
-    90deg,
-    color-mix(in oklch, var(--primary) 55%, transparent) 0 0.45rem,
-    transparent 0.45rem 0.9rem
-  );
-  background-repeat: no-repeat;
-  background-position: center bottom;
-  background-size: 9rem 0.14rem;
-}
-[data-theme-preset='clover-journal'] [data-slot='pricing-search-input'] {
-  border-radius: calc(infinity * 1px);
-  border-style: dashed;
-  border-color: color-mix(in oklch, var(--border) 85%, transparent);
-  background-color: color-mix(in oklch, var(--card) 72%, var(--background));
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-[data-theme-preset='clover-journal']
-  [data-slot='pricing-sidebar']:not([data-embedded]) {
-  position: relative;
-  border-style: dashed;
-  border-color: color-mix(in oklch, var(--border) 80%, transparent);
-  border-radius: var(--journal-card-radius);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-/* Punch holes only on the desktop binder column; the mobile sheet already
- * supplies its own paper and tape. */
-@media (min-width: 1280px) {
-  [data-theme-preset='clover-journal']
-    [data-slot='pricing-sidebar']:not([data-embedded]) {
-    padding-inline-start: 1.7rem;
-  }
-  [data-theme-preset='clover-journal']
-    [data-slot='pricing-sidebar']:not([data-embedded])::before {
-    content: '';
-    position: absolute;
-    top: 0.9rem;
-    bottom: 0.9rem;
-    left: 0.5rem;
-    width: 0.85rem;
-    background-image: radial-gradient(
-      circle at 50% 50%,
-      var(--background) 0 0.15rem,
-      color-mix(in oklch, var(--border) 70%, transparent) 0.16rem 0.2rem,
-      transparent 0.21rem
-    );
-    background-size: 0.85rem 2.25rem;
-    background-repeat: repeat-y;
-    pointer-events: none;
-  }
-}
-[data-theme-preset='clover-journal'] [data-slot='pricing-toolbar'] {
-  position: relative;
-  border-style: dashed;
-  border-color: color-mix(in oklch, var(--border) 80%, transparent);
-  border-radius: 1rem 1.35rem 1.05rem 1.25rem;
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-[data-theme-preset='clover-journal'] [data-slot='pricing-toolbar']::before {
-  content: '';
-  position: absolute;
-  top: 0.15rem;
-  left: calc(50% - 3rem);
-  width: 6rem;
-  height: 0.5rem;
-  transform: rotate(-1.5deg);
-  background-color: var(--journal-tape-green);
-  background-image: repeating-linear-gradient(
-    90deg,
-    transparent 0 5px,
-    oklch(1 0 0 / 0.28) 5px 7px
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0,
-    #000 8%,
-    #000 92%,
-    transparent 100%
-  );
-  opacity: 0.8;
-  pointer-events: none;
-}
-
-/* Model cards are taped paper slips; the price reads as an ink stamp. */
-[data-theme-preset='clover-journal'] [data-slot='card'][data-model-card] {
-  position: relative;
-  border: 1px solid color-mix(in oklch, var(--border) 55%, transparent);
-}
-[data-theme-preset='clover-journal']
-  [data-slot='card'][data-model-card]::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 1.1rem;
-  width: 3.2rem;
-  height: 0.45rem;
-  transform: rotate(-2deg);
-  background-color: var(--journal-tape-gold);
-  background-image: repeating-linear-gradient(
-    90deg,
-    transparent 0 5px,
-    oklch(1 0 0 / 0.28) 5px 7px
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0,
-    #000 6%,
-    #000 94%,
-    transparent 100%
-  );
-  opacity: 0.9;
-  pointer-events: none;
-}
-[data-theme-preset='clover-journal'] [data-slot='price-stamp'] {
-  display: inline-block;
-  padding: 0.05rem 0.4rem;
-  border: 1px dashed color-mix(in oklch, var(--primary) 42%, transparent);
-  border-radius: 0.35rem 0.6rem 0.4rem 0.55rem;
-  background-color: color-mix(in oklch, var(--card) 72%, transparent);
-  box-decoration-break: clone;
-}
-
-/* Pricing empty state and the standalone model-details page keep the paper. */
-[data-theme-preset='clover-journal'] [data-slot='pricing-empty'] {
-  border-color: color-mix(in oklch, var(--border) 82%, transparent);
-  border-radius: var(--journal-card-radius);
-  background-color: color-mix(in oklch, var(--card) 55%, transparent);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-[data-theme-preset='clover-journal'] [data-slot='pricing-empty'] h3 {
-  font-family: var(--font-display);
-}
-[data-theme-preset='clover-journal'] [data-slot='model-details-page'] {
-  padding: 1rem;
-  border-radius: var(--journal-card-radius);
-  background-color: color-mix(in oklch, var(--card) 78%, transparent);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-@media (min-width: 640px) {
-  [data-theme-preset='clover-journal'] [data-slot='model-details-page'] {
-    padding: 1.5rem 1.75rem;
-  }
-}
-
-/* ── Clover Journal — P4-5 model call analytics ──────────────────────────
- * The KPI strip is one ruled sheet, the performance row a pinned card, and
- * chart/table panels are loose pages. Numbers stay in the body font and the
- * data grid is never rotated. */
-
-[data-theme-preset='clover-journal'] [data-slot='dashboard-stat-strip'] {
-  border-color: color-mix(in oklch, var(--border) 70%, transparent);
-  border-radius: var(--journal-card-radius);
-  background-color: color-mix(in oklch, var(--card) 86%, var(--background));
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-[data-theme-preset='clover-journal']
-  [data-slot='dashboard-stat-strip']
-  [data-slot='dashboard-stat-cell'] {
-  border-left-style: dashed;
-  border-left-color: color-mix(in oklch, var(--border) 72%, transparent);
-}
-[data-theme-preset='clover-journal']
-  [data-slot='dashboard-stat-strip']
-  [data-slot='dashboard-stat-cell']:first-child {
-  border-left-width: 0;
-}
-
-[data-theme-preset='clover-journal'] [data-slot='dashboard-performance'] {
-  border-color: color-mix(in oklch, var(--border) 70%, transparent);
-  border-radius: var(--journal-card-radius);
-  background-color: color-mix(in oklch, var(--card) 82%, var(--background));
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-
-/* Success-rate entries read as a handwritten index list rather than pills:
- * transparent, underlined, still horizontal and monospaced. */
-[data-theme-preset='clover-journal']
-  [data-slot='dashboard-performance']
-  [data-slot='dashboard-performance-model'] {
-  border-radius: 0.2rem;
-  border-bottom: 1px dashed
-    color-mix(in oklch, var(--border) 80%, transparent);
-  background-color: transparent;
-  padding: 0.05rem 0.3rem 0.15rem;
-}
-
-[data-theme-preset='clover-journal'] [data-slot='dashboard-usage-table'],
-[data-theme-preset='clover-journal'] [data-slot='dashboard-chart-card'] {
-  border-color: color-mix(in oklch, var(--border) 70%, transparent);
-  border-radius: var(--journal-card-radius);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-[data-theme-preset='clover-journal']
-  [data-slot='dashboard-chart-card']
-  > div:first-child {
-  border-bottom-style: dashed;
-  border-bottom-color: color-mix(in oklch, var(--border) 75%, transparent);
-}
-
-/* ── Clover Journal — P4-6 wallet, subscriptions, redemptions ─────────────
- * Wallet statistics read as a passbook spread, billing history as a stack of
- * paper receipts, and status chips become ink stamps. Amounts and table data
- * stay horizontal in the body font. */
-
-[data-theme-preset='clover-journal'] [data-slot='wallet-stats'] {
-  position: relative;
-  border-color: color-mix(in oklch, var(--border) 70%, transparent);
-  border-radius: var(--journal-card-radius);
-  background-color: color-mix(in oklch, var(--card) 88%, var(--background));
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-[data-theme-preset='clover-journal']
-  [data-slot='wallet-stats']
-  [data-slot='wallet-stat'] {
-  border-left-style: dashed;
-  border-top-style: dashed;
-  border-color: color-mix(in oklch, var(--border) 72%, transparent);
-}
-[data-theme-preset='clover-journal']
-  [data-slot='wallet-stats']
-  [data-slot='wallet-stat']:first-child {
-  border-left-width: 0;
-  border-top-width: 0;
-}
-/* Punched binding along the left edge; only where there is room for it. */
-@media (min-width: 768px) {
-  [data-theme-preset='clover-journal'] [data-slot='wallet-stats'] {
-    padding-inline-start: 0.9rem;
-  }
-  [data-theme-preset='clover-journal'] [data-slot='wallet-stats']::before {
-    content: '';
-    position: absolute;
-    top: 0.75rem;
-    bottom: 0.75rem;
-    left: 0.4rem;
-    width: 0.8rem;
-    background-image: radial-gradient(
-      circle at 50% 50%,
-      var(--background) 0 0.14rem,
-      color-mix(in oklch, var(--border) 75%, transparent) 0.15rem 0.19rem,
-      transparent 0.2rem
-    );
-    background-size: 0.8rem 2rem;
-    background-repeat: repeat-y;
-    pointer-events: none;
-  }
-}
-
-/* Recharge and plan cards carry a receipt-style header seam and a tape tab. */
-[data-theme-preset='clover-journal'] .wallet-recharge-card,
-[data-theme-preset='clover-journal'] .wallet-plans-card {
-  position: relative;
-}
-[data-theme-preset='clover-journal']
-  .wallet-recharge-card
-  [data-slot='card-header'],
-[data-theme-preset='clover-journal']
-  .wallet-plans-card
-  [data-slot='card-header'] {
-  border-bottom-style: dashed;
-  border-bottom-color: color-mix(in oklch, var(--border) 78%, transparent);
-}
-[data-theme-preset='clover-journal'] .wallet-recharge-card::before {
-  content: '';
-  position: absolute;
-  top: 0.25rem;
-  left: 3.25rem;
-  width: 4.5rem;
-  height: 0.5rem;
-  transform: rotate(-1.5deg);
-  background-color: var(--journal-tape-green);
-  background-image: repeating-linear-gradient(
-    90deg,
-    transparent 0 5px,
-    oklch(1 0 0 / 0.28) 5px 7px
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0,
-    #000 8%,
-    #000 92%,
-    transparent 100%
-  );
-  opacity: 0.8;
-  pointer-events: none;
-}
-
-/* Billing history entries are loose receipts inside the paper dialog. */
-[data-theme-preset='clover-journal'] [data-slot='billing-record'] {
-  border-style: dashed;
-  border-color: color-mix(in oklch, var(--border) 78%, transparent);
-  border-radius: 0.9rem 1.2rem 0.95rem 1.1rem;
-  background-color: color-mix(in oklch, var(--card) 76%, var(--background));
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-[data-theme-preset='clover-journal'] [data-slot='billing-record']:hover {
-  background-color: color-mix(in oklch, var(--accent) 32%, var(--card));
-}
-
-/* The admin user-subscription table keeps the paper header band and dashed
- * row seams; it is dense data, so no tape or rotation. */
-[data-theme-preset='clover-journal'] [data-slot='user-subscriptions-table-scroll'] {
-  border-color: color-mix(in oklch, var(--border) 70%, transparent);
-  border-radius: var(--journal-card-radius);
-  background-color: var(--card);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-[data-theme-preset='clover-journal']
-  [data-slot='user-subscriptions-table-scroll']
-  thead {
-  background-color: var(--table-header);
-}
-[data-theme-preset='clover-journal']
-  [data-slot='user-subscriptions-table-scroll']
-  thead
-  tr {
-  border-bottom-style: dashed;
-  border-bottom-color: color-mix(in oklch, var(--border) 78%, transparent);
-}
-[data-theme-preset='clover-journal']
-  [data-slot='user-subscriptions-table-scroll']
-  tbody
-  tr {
-  border-bottom-style: dashed;
-  border-bottom-color: color-mix(in oklch, var(--border) 65%, transparent);
-}
-[data-theme-preset='clover-journal']
-  [data-slot='user-subscriptions-table-scroll']
-  tbody
-  tr:hover {
-  background-color: color-mix(in oklch, var(--accent) 42%, transparent);
-}
-
-/* Status chips are ink stamps: dashed border, cut-paper corners, paper fill.
- * They stay horizontal inside tables. */
-[data-theme-preset='clover-journal']
-  [data-slot='status-badge'][data-type='badge'] {
-  padding-inline: 0.45rem;
-  border: 1px dashed
-    color-mix(in oklch, currentColor 38%, transparent);
-  border-radius: 0.35rem 0.6rem 0.4rem 0.55rem;
-  background-color: color-mix(in oklch, var(--card) 62%, transparent);
-  box-shadow: 0 1px 1px oklch(0.35 0.05 150 / 0.08);
-}
-.dark
-  [data-theme-preset='clover-journal']
-  [data-slot='status-badge'][data-type='badge'] {
-  background-color: color-mix(in oklch, var(--card) 48%, transparent);
-  box-shadow: 0 1px 1px oklch(0.08 0.02 155 / 0.4);
-}
-
-/* ── Clover Journal — P4-4 dashboard overview ────────────────────────────
- * The overview becomes a scrapbook spread: a clipped paper summary sheet,
- * note-style announcement panels and botanical watermarks. Numbers and
- * labels keep the body font and never rotate. */
-
-[data-theme-preset='clover-journal'] [data-slot='overview-summary'] {
-  border-color: color-mix(in oklch, var(--border) 70%, transparent);
-  border-radius: var(--journal-card-radius);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-
-/* Summary stats are small dashed paper chips inside the sheet. */
-[data-theme-preset='clover-journal'] [data-slot='overview-summary-stat'] {
-  border-style: dashed;
-  border-color: color-mix(in oklch, var(--border) 78%, transparent);
-  background-color: color-mix(in oklch, var(--card) 58%, transparent);
-}
-
-/* The balance column reads as a detachable ledger stub. */
-[data-theme-preset='clover-journal'] [data-slot='overview-balance-slip'] {
-  border-left-style: dashed;
-  border-left-color: color-mix(in oklch, var(--border) 70%, transparent);
-}
-[data-theme-preset='clover-journal']
-  [data-slot='overview-balance-slip']::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  opacity: 0.45;
-  pointer-events: none;
-}
-
-/* Overview panels (announcements, API info, FAQ, uptime) are loose sheets
- * clipped onto the page, each with a faint clover in the corner. */
-[data-theme-preset='clover-journal'] .overview-panel {
-  position: relative;
-  border-color: color-mix(in oklch, var(--border) 70%, transparent);
-  border-radius: var(--journal-card-radius);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-[data-theme-preset='clover-journal'] .overview-panel::after {
-  content: '';
-  position: absolute;
-  right: 0.75rem;
-  bottom: 0.75rem;
-  width: 3.25rem;
-  height: 3.25rem;
-  background-color: var(--primary);
-  opacity: 0.06;
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23000'%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z'/%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z' transform='rotate(90 16 16)'/%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z' transform='rotate(180 16 16)'/%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z' transform='rotate(270 16 16)'/%3E%3C/g%3E%3C/svg%3E");
-  mask-size: contain;
-  mask-repeat: no-repeat;
-  pointer-events: none;
-}
-[data-theme-preset='clover-journal'] [data-slot='overview-panel-header'] {
-  border-bottom-style: dashed;
-  border-bottom-color: color-mix(in oklch, var(--border) 75%, transparent);
-}
-[data-theme-preset='clover-journal'] [data-slot='overview-panel-title'] {
-  font-family: var(--font-display);
-  font-size: 0.95rem;
-}
-
-/* Rows in the note panels use dashed seams and a marker-stroke hover. */
-[data-theme-preset='clover-journal'] [data-slot='overview-announcement'] {
-  border-bottom-style: dashed;
-  border-bottom-color: color-mix(in oklch, var(--border) 68%, transparent);
-}
-[data-theme-preset='clover-journal']
-  [data-slot='overview-announcement']:hover {
-  background-color: color-mix(in oklch, var(--accent) 45%, transparent);
-}
-
-/* Performance health is a single paper card with stitched metric cells. */
-[data-theme-preset='clover-journal'] [data-slot='overview-performance-health'] {
-  border-color: color-mix(in oklch, var(--border) 70%, transparent);
-  border-radius: var(--journal-card-radius);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-[data-theme-preset='clover-journal']
-  [data-slot='overview-performance-health']
-  > div:first-child {
-  border-bottom-style: dashed;
-  border-bottom-color: color-mix(in oklch, var(--border) 75%, transparent);
-}
-[data-theme-preset='clover-journal'] [data-slot='overview-health-metric'] {
-  border: 1px dashed color-mix(in oklch, var(--border) 72%, transparent);
-  border-radius: 0.8rem 1.1rem 0.85rem 1.05rem;
-  background-color: color-mix(in oklch, var(--card) 55%, transparent);
-}
-
-/* ── Clover Journal — P3 component skins ─────────────────────────────────
- * Shared primitives get their journal treatment here, keyed off the existing
- * `data-slot` / `data-variant` anchors so the base components stay untouched.
- * Everything is scoped to the preset; dense data regions never rotate, never
- * receive tape, and keep the humanist sans for text. */
-
-/* P3-1 — cards, buttons, tabs, badges, fields --------------------------- */
-
-/* Card titles take the editorial serif; footers become a torn paper seam. */
-[data-theme-preset='clover-journal'] [data-slot='card-title'] {
-  font-family: var(--font-display);
-}
-[data-theme-preset='clover-journal'] [data-slot='card-footer'] {
-  background-color: color-mix(in oklch, var(--muted) 55%, transparent);
-  border-top-style: dashed;
-  border-top-color: color-mix(in oklch, var(--border) 80%, transparent);
-}
-
-/* Ink-stamp CTAs and clay danger buttons carry the same paper grain. */
-[data-theme-preset='clover-journal']
-  [data-slot='button'][data-variant='default'],
-[data-theme-preset='clover-journal']
-  [data-slot='button'][data-variant='destructive'] {
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-}
-
-/* Ghost buttons highlight like a marker stroke, still rectangular enough to
- * stay legible on icon-only toolbar actions. */
-[data-theme-preset='clover-journal']
-  [data-slot='button'][data-variant='ghost']:hover {
-  background-color: color-mix(in oklch, var(--accent) 55%, transparent);
-}
-
-/* Links use a wavy hand-drawn underline on hover. */
-[data-theme-preset='clover-journal']
-  [data-slot='button'][data-variant='link']:hover {
-  text-decoration-style: wavy;
-  text-underline-offset: 0.25rem;
-}
-
-/* Leaf tabs: soft asymmetric corners; the active tab is a cut-paper sticker
- * with a dashed edge. */
 [data-theme-preset='clover-journal'] [data-slot='tabs-trigger'] {
-  border-radius: 0.75rem 1.15rem 0.8rem 1.1rem;
+  border-radius: 0.45rem;
+  color: var(--muted-foreground);
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    box-shadow 150ms ease;
 }
-[data-theme-preset='clover-journal'] [data-slot='tabs-trigger'][data-active] {
-  border-style: dashed;
+[data-theme-preset='clover-journal']
+  [data-slot='tabs-trigger']:is(
+    [data-active],
+    [data-state='active'],
+    [aria-selected='true']
+  ) {
+  border-color: transparent;
+  background-color: var(--card);
+  color: var(--primary);
+  box-shadow: 0 1px 3px oklch(0.2 0.01 150 / 10%);
+}
+[data-theme-preset='clover-journal']
+  [data-slot='tabs-list'][data-variant='line'],
+[data-theme-preset='clover-journal']
+  [data-slot='tabs-list'][data-variant='line']
+  [data-slot='tabs-trigger'] {
+  background-color: transparent;
+  box-shadow: none;
 }
 [data-theme-preset='clover-journal']
   [data-slot='tabs-list'][data-variant='line']
-  [data-slot='tabs-trigger'][data-active]::after {
-  background-color: transparent;
-  background-image: repeating-linear-gradient(
-    90deg,
-    var(--primary) 0 0.4rem,
-    transparent 0.4rem 0.75rem
-  );
+  [data-slot='tabs-trigger']::after {
+  background-color: var(--primary);
 }
-
-/* Stamp badges: irregular corners, dashed outline chips, no rotation even
- * inside tables. */
 [data-theme-preset='clover-journal'] [data-slot='badge'] {
-  border-radius: 0.4rem 0.65rem 0.45rem 0.6rem;
-  font-weight: 600;
+  border-radius: 0.4rem;
 }
-[data-theme-preset='clover-journal'] [data-slot='badge'][data-variant='default'] {
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow:
-    inset 0 1px 0 oklch(0.99 0.01 95 / 0.2),
-    0 1px 2px oklch(0.35 0.05 150 / 0.18);
+[data-theme-preset='clover-journal']
+  [data-slot='badge'][data-variant='outline'] {
+  background-color: var(--card);
 }
-[data-theme-preset='clover-journal'] [data-slot='badge'][data-variant='outline'] {
-  border-style: dashed;
-  background-color: color-mix(in oklch, var(--card) 70%, transparent);
-}
-
-/* Inset paper fields with a stitched bottom edge. The focus ring keeps its
- * existing green token; disabled fields fall back to a muted sheet. */
 [data-theme-preset='clover-journal']
   :is(
     [data-slot='input'],
@@ -2292,20 +1303,9 @@ For commercial licensing, please contact support@quantumnous.com
     [data-slot='select-trigger'],
     [data-slot='native-select']
   ) {
-  border-radius: 0.9rem;
-  border-bottom-style: dashed;
-  border-bottom-color: color-mix(in oklch, var(--primary) 28%, var(--border));
-  background-color: color-mix(in oklch, var(--card) 58%, var(--background));
-  box-shadow: inset 0 1px 2px oklch(0.35 0.05 150 / 0.05);
-}
-[data-theme-preset='clover-journal']
-  :is(
-    [data-slot='input'],
-    [data-slot='textarea'],
-    [data-slot='select-trigger'],
-    [data-slot='native-select']
-  ):focus-visible {
-  background-color: color-mix(in oklch, var(--card) 82%, var(--background));
+  border-color: var(--input);
+  border-radius: max(0px, calc(var(--radius) - 0.15rem));
+  background-color: var(--card);
 }
 [data-theme-preset='clover-journal']
   :is(
@@ -2314,127 +1314,55 @@ For commercial licensing, please contact support@quantumnous.com
     [data-slot='select-trigger'],
     [data-slot='native-select']
   ):disabled {
-  background-color: color-mix(in oklch, var(--muted) 72%, var(--background));
-  box-shadow: none;
+  background-color: var(--muted);
 }
 
-/* Ink-stamp checks; unchecked boxes keep a paper fill. The radii stay small
- * because the control is only 16px square — larger values read as circles. */
-[data-theme-preset='clover-journal'] [data-slot='checkbox'] {
-  border-radius: 0.22rem 0.34rem 0.26rem 0.32rem;
-}
-[data-theme-preset='clover-journal']
-  :is([data-slot='checkbox'], [data-slot='radio-group-item']):not(
-    [data-checked]
-  ) {
-  background-color: color-mix(in oklch, var(--card) 55%, var(--background));
-}
-[data-theme-preset='clover-journal']
-  :is([data-slot='checkbox'], [data-slot='radio-group-item'])[data-checked] {
-  box-shadow:
-    inset 0 1px 0 oklch(0.99 0.01 95 / 0.22),
-    0 1px 2px oklch(0.35 0.05 150 / 0.25);
-}
-
-/* P3-2 — tables, pagination, empty, loading ----------------------------- */
-
-/* Paper header band and dashed row seams. Hover reads as a highlighter
- * wash; selected rows deepen the same green instead of switching hue. */
+/* Tables and feedback share the same flat paper surface. */
 [data-theme-preset='clover-journal'] [data-slot='table-header'] {
   background-color: var(--table-header);
 }
-[data-theme-preset='clover-journal']
-  [data-slot='table-header']
-  [data-slot='table-row'] {
-  border-bottom-style: dashed;
-  border-bottom-color: color-mix(in oklch, var(--border) 82%, transparent);
-}
 [data-theme-preset='clover-journal'] [data-slot='table-head'] {
-  color: color-mix(in oklch, var(--foreground) 82%, var(--primary));
-  font-weight: 600;
+  color: var(--muted-foreground);
 }
 [data-theme-preset='clover-journal'] [data-slot='table-body'] {
   background-color: var(--table-row);
 }
 [data-theme-preset='clover-journal'] [data-slot='table-row'] {
-  border-bottom-style: dashed;
-  border-bottom-color: color-mix(in oklch, var(--border) 68%, transparent);
+  border-bottom-color: var(--border);
 }
 [data-theme-preset='clover-journal']
   [data-slot='table-row']:not([data-state='selected']):hover {
-  background-color: color-mix(in oklch, var(--accent) 42%, transparent);
-}
-[data-theme-preset='clover-journal']
-  [data-slot='table-row'][data-state='selected'] {
-  background-color: color-mix(in oklch, var(--primary) 9%, transparent);
-}
-
-/* The active page becomes a paper sticker. */
-[data-theme-preset='clover-journal']
-  [data-slot='pagination-link'][data-active='true'],
-[data-theme-preset='clover-journal']
-  [data-slot='data-table-pagination']
-  [data-slot='button'][data-variant='default'] {
-  background-color: var(--card);
-  color: var(--foreground);
-  border-style: dashed;
-  border-color: color-mix(in oklch, var(--border) 90%, transparent);
-  box-shadow: var(--journal-paper-shadow);
-}
-
-/* Empty states keep the paper grain and a serif heading everywhere. The
- * clover doodle and handwritten hint are decorations, so they only appear
- * on pages that explicitly opt into medium or immersive journaling. */
-[data-theme-preset='clover-journal'] [data-slot='empty'] {
-  position: relative;
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
+  background-color: color-mix(in oklch, var(--accent) 45%, var(--card));
 }
 [data-theme-preset='clover-journal'] [data-slot='empty-title'] {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: 1rem;
+  color: var(--foreground);
 }
-[data-theme-preset='clover-journal']
-  :is([data-journal-level='medium'], [data-journal-level='immersive'])
-  [data-slot='empty-description'] {
-  font-family: var(--font-hand);
-  font-size: 1rem;
-  line-height: 1.35;
-}
-[data-theme-preset='clover-journal']
-  :is([data-journal-level='medium'], [data-journal-level='immersive'])
-  [data-slot='empty']::after {
-  content: '';
-  position: absolute;
-  top: 1rem;
-  right: 1.25rem;
-  width: 4.5rem;
-  height: 4.5rem;
-  background-color: var(--primary);
-  opacity: 0.07;
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23000'%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z'/%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z' transform='rotate(90 16 16)'/%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z' transform='rotate(180 16 16)'/%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z' transform='rotate(270 16 16)'/%3E%3C/g%3E%3C/svg%3E");
-  mask-size: contain;
-  mask-repeat: no-repeat;
-  pointer-events: none;
-}
-
-/* Loading states read as small paper strips; the spinner inks itself green. */
-[data-theme-preset='clover-journal'] [data-slot='skeleton'] {
-  border-radius: 0.5rem 0.7rem 0.55rem 0.65rem;
-  background-color: var(--skeleton-base);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-}
-[data-theme-preset='clover-journal'] [data-slot='spinner'],
-[data-theme-preset='clover-journal'] [role='status'][aria-label='Loading'] {
+[data-theme-preset='clover-journal'] [data-slot='empty-icon'] {
+  border-radius: 0.85rem;
+  background-color: var(--muted);
   color: var(--primary);
 }
-
-/* P3-3 — overlays, menus, tooltips, toasts ------------------------------ */
-
-/* Warm ink wash behind modal layers; darker at night without turning black. */
+[data-theme-preset='clover-journal']
+  :is([data-slot='spinner'], [role='status'][aria-label='Loading']) {
+  color: var(--primary);
+}
+[data-theme-preset='clover-journal']
+  :is(
+    [data-slot='dialog-content'],
+    [data-slot='alert-dialog-content'],
+    [data-slot='drawer-content']
+  ) {
+  border-color: var(--border);
+  border-radius: var(--journal-card-radius);
+  background-color: var(--card);
+  box-shadow: var(--journal-paper-shadow-hover);
+}
+[data-theme-preset='clover-journal'] [data-slot='sheet-content'] {
+  border-color: var(--border);
+  background-color: var(--card);
+}
 [data-theme-preset='clover-journal']
   :is(
     [data-slot='dialog-overlay'],
@@ -2442,7 +1370,7 @@ For commercial licensing, please contact support@quantumnous.com
     [data-slot='sheet-overlay'],
     [data-slot='drawer-overlay']
   ) {
-  background-color: oklch(0.28 0.03 155 / 0.24);
+  background-color: oklch(0.2 0.015 150 / 28%);
 }
 .dark
   [data-theme-preset='clover-journal']
@@ -2452,197 +1380,246 @@ For commercial licensing, please contact support@quantumnous.com
     [data-slot='sheet-overlay'],
     [data-slot='drawer-overlay']
   ) {
-  background-color: oklch(0.1 0.02 155 / 0.58);
+  background-color: oklch(0.1 0.01 150 / 65%);
 }
-
-/* A strip of washi tape across the top edge of paper dialogs. Absolutely
- * positioned and pointer-transparent, so focus and layout are untouched. */
-[data-theme-preset='clover-journal']
-  :is(
-    [data-slot='dialog-content'],
-    [data-slot='alert-dialog-content'],
-    [data-slot='sheet-content']
-  )::before {
-  content: '';
-  position: absolute;
-  top: 0.35rem;
-  left: 50%;
-  width: 5rem;
-  height: 0.6rem;
-  transform: translateX(-50%) rotate(-1.5deg);
-  background-color: var(--journal-tape-green);
-  background-image: repeating-linear-gradient(
-    90deg,
-    transparent 0 5px,
-    oklch(1 0 0 / 0.28) 5px 7px
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0,
-    #000 6%,
-    #000 94%,
-    transparent 100%
-  );
-  opacity: 0.8;
-  pointer-events: none;
-}
-
-/* Close controls become round paper stickers instead of bare ghost icons. */
-[data-theme-preset='clover-journal']
-  :is([data-slot='dialog-content'], [data-slot='sheet-content'])
-  > :is(
-    [data-slot='dialog-close'],
-    [data-slot='sheet-close'],
-    [data-slot='button'].absolute
-  ) {
-  border: 1px dashed
-    color-mix(in oklch, var(--border) 88%, transparent);
-  border-radius: calc(infinity * 1px);
-  background-color: color-mix(in oklch, var(--card) 88%, transparent);
-  box-shadow: 0 1px 3px oklch(0.35 0.05 150 / 0.16);
-}
-
-/* Paper popovers, menus and selects. The ring moves into the shadow so the
- * panel keeps its exact box size. */
 [data-theme-preset='clover-journal']
   :is(
     [data-slot='select-content'],
     [data-slot='popover-content'],
     [data-slot='dropdown-menu-content'],
-    [data-slot='dropdown-menu-sub-content']
+    [data-slot='dropdown-menu-sub-content'],
+    [data-slot='chart-tooltip']
   ) {
-  border-radius: 0.95rem 1.2rem 1rem 1.15rem;
+  border-color: var(--border);
+  border-radius: var(--radius);
   background-color: var(--popover);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
   box-shadow:
-    0 0 0 1px color-mix(in oklch, var(--border) 85%, transparent),
-    var(--journal-paper-shadow);
+    0 0 0 1px var(--border),
+    var(--journal-paper-shadow-hover);
+}
+[data-theme-preset='clover-journal'] [data-slot='tooltip-content'] {
+  border-radius: 0.5rem;
+  background-color: var(--foreground);
+  color: var(--background);
+}
+[data-theme-preset='clover-journal'] [data-slot='tooltip-content'] > svg {
+  fill: var(--foreground);
+  background-color: var(--foreground);
+}
+[data-theme-preset='clover-journal'] .toaster [data-sonner-toast] {
+  border-color: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--journal-paper-shadow);
+}
+
+/* Home keeps its botanical cover, with ample uncoloured space around it. */
+[data-theme-preset='clover-journal'] [data-slot='home-hero-grid'] {
+  opacity: 0.08;
+}
+[data-theme-preset='clover-journal'] [data-slot='home-hero-title'] {
+  color: var(--foreground);
+}
+[data-theme-preset='clover-journal'] [data-slot='home-hero-title-accent'] {
+  background-image: none;
+  color: var(--primary);
+  -webkit-text-fill-color: var(--primary);
 }
 [data-theme-preset='clover-journal']
   :is(
-    [data-slot='select-item'],
-    [data-slot='dropdown-menu-item'],
-    [data-slot='dropdown-menu-checkbox-item'],
-    [data-slot='dropdown-menu-radio-item'],
-    [data-slot='dropdown-menu-sub-trigger']
+    [data-slot='home-hero-badge'],
+    [data-slot='home-polaroid-frame'],
+    [data-slot='home-stats'],
+    [data-slot='home-features-grid'],
+    [data-slot='home-cta-card']
   ) {
-  border-radius: 0.55rem 0.8rem 0.6rem 0.75rem;
+  border-color: var(--border);
+  border-radius: var(--journal-card-radius);
+  background-color: var(--card);
+  box-shadow: var(--journal-paper-shadow);
+}
+[data-theme-preset='clover-journal'] [data-slot='home-features-grid'] > div {
+  background-color: var(--card);
+}
+[data-theme-preset='clover-journal'] [data-slot='home-terminal'] {
+  border-color: var(--border);
+  background-color: var(--background);
 }
 [data-theme-preset='clover-journal']
-  :is([data-slot='select-separator'], [data-slot='dropdown-menu-separator']) {
-  height: 0;
+  [data-slot='home-stats']
+  :is(.journal-tape, .journal-paper-clip) {
+  display: none;
+}
+[data-theme-preset='clover-journal'] [data-slot='home-stat'] {
+  border-color: var(--border);
+}
+
+/* Model square: an aligned introduction and search, then a calm catalogue. */
+[data-theme-preset='clover-journal'] [data-slot='pricing-aura'] {
+  display: none;
+}
+[data-theme-preset='clover-journal'] [data-slot='pricing-header'] {
+  display: grid;
+  gap: 1.5rem;
+  max-width: none;
+  padding-block: 1.5rem 1.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+}
+[data-theme-preset='clover-journal'] [data-slot='pricing-heading'] {
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  font-weight: 500;
+  line-height: 1.2;
+}
+[data-theme-preset='clover-journal'] [data-slot='pricing-title-row'] {
+  justify-content: start;
+}
+[data-theme-preset='clover-journal'] [data-slot='pricing-intro'] > p {
+  margin-inline: 0;
+}
+[data-theme-preset='clover-journal'] [data-slot='pricing-search'] {
+  align-self: end;
+  margin: 0;
+  max-width: none;
+}
+[data-theme-preset='clover-journal'] [data-slot='pricing-search-input'] {
+  height: 2.75rem;
+  border-color: var(--input);
+  border-radius: var(--radius);
+  background-color: var(--card);
+}
+[data-theme-preset='clover-journal']
+  [data-slot='pricing-sidebar']:not([data-embedded]) {
+  border-color: var(--border);
+  border-radius: var(--journal-card-radius);
+  background-color: var(--card);
+  box-shadow: none;
+}
+[data-theme-preset='clover-journal'] [data-slot='pricing-toolbar'] {
+  border-width: 0 0 1px;
+  border-color: var(--border);
+  border-radius: 0;
   background-color: transparent;
-  border-top: 1px dashed
-    color-mix(in oklch, var(--border) 80%, transparent);
+  box-shadow: none;
+}
+[data-theme-preset='clover-journal'] [data-slot='price-stamp'] {
+  color: var(--primary);
+}
+[data-theme-preset='clover-journal'] [data-slot='pricing-empty'] {
+  border-color: var(--border);
+  background-color: var(--card);
+}
+@media (min-width: 1024px) {
+  [data-theme-preset='clover-journal'] [data-slot='pricing-header'] {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 28rem);
+    gap: 3rem;
+  }
 }
 
-/* Tooltips invert to an ink note (cream note at night), with a paper edge. */
-[data-theme-preset='clover-journal'] [data-slot='tooltip-content'] {
-  border-radius: 0.55rem 0.8rem 0.6rem 0.75rem;
-  background-color: var(--foreground);
-  color: var(--background);
-  box-shadow:
-    0 0 0 1px color-mix(in oklch, var(--background) 18%, transparent),
-    var(--journal-paper-shadow);
+/* A botanical cover and a single form column, with no competing offset. */
+:is([data-slot='auth-cover'], [data-slot='auth-welcome-note']):not(
+  [data-theme-preset='clover-journal'] *
+) {
+  display: none;
 }
-[data-theme-preset='clover-journal'] [data-slot='tooltip-content'] > svg {
-  background-color: var(--foreground);
-  fill: var(--foreground);
-}
-
-/* Toasts are sticky notes: same paper, slightly torn corners. */
-[data-theme-preset='clover-journal'] .toaster [data-sonner-toast] {
-  border-radius: 0.9rem 1.15rem 0.95rem 1.1rem;
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  border: 1px dashed color-mix(in oklch, var(--border) 82%, transparent);
+[data-theme-preset='clover-journal'] [data-slot='auth-form-card'] {
+  padding: 1.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--journal-card-radius);
+  background-color: var(--card);
   box-shadow: var(--journal-paper-shadow);
 }
-
-/* P3-4 — charts ---------------------------------------------------------- */
-
-/* Recharts tooltips become sticky notes; grid lines turn into dotted seams. */
-[data-theme-preset='clover-journal'] [data-slot='chart-tooltip'] {
-  border-style: dashed;
-  border-color: color-mix(in oklch, var(--border) 85%, transparent);
-  border-radius: 0.6rem 0.85rem 0.65rem 0.8rem;
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
+[data-theme-preset='clover-journal'] .journal-polaroid-frame {
+  width: 18rem;
+  max-width: 100%;
+  padding: 1rem 1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  background-color: var(--card);
+  box-shadow: 0 12px 32px -18px oklch(0.25 0.02 150 / 28%);
 }
-[data-theme-preset='clover-journal']
-  [data-slot='chart']
-  .recharts-cartesian-grid
-  line {
-  stroke-dasharray: 2 4;
-}
-[data-theme-preset='clover-journal'] [data-slot='chart-legend'] {
-  font-family: var(--font-body);
-}
-
-/* ── Clover Journal — P5 medium pages ────────────────────────────────────
- * B-level pages keep the paper surfaces already supplied by the preset and
- * gain a single narrow tape tab in the page-header padding. It never covers
- * the title, the actions or scrolling data, and unmarked calm pages do not
- * receive it. */
-[data-theme-preset='clover-journal']
-  [data-journal-level='medium']
-  [data-slot='section-page-header'] {
-  position: relative;
-}
-[data-theme-preset='clover-journal']
-  [data-journal-level='medium']
-  [data-slot='section-page-header']::before {
-  content: '';
-  position: absolute;
-  top: 0.1rem;
-  left: 1.15rem;
-  width: 4.5rem;
-  height: 0.42rem;
-  transform: rotate(-1.5deg);
-  transform-origin: left center;
-  background-color: var(--journal-tape-green);
-  background-image: repeating-linear-gradient(
-    90deg,
-    transparent 0 5px,
-    oklch(1 0 0 / 0.28) 5px 7px
+[data-theme-preset='clover-journal'] .journal-polaroid-photo {
+  background-color: var(--background);
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--primary) 4%, transparent),
+    transparent
   );
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0,
-    #000 6%,
-    #000 94%,
-    transparent 100%
-  );
-  opacity: 0.75;
-  pointer-events: none;
+}
+[data-theme-preset='clover-journal'] .journal-polaroid-photo .journal-doodle {
+  opacity: 0.72;
+  stroke-width: 0.65;
+}
+@media (min-width: 1024px) {
+  [data-theme-preset='clover-journal'] [data-slot='auth-cover'] {
+    display: flex;
+    border-inline-end: 1px solid var(--border);
+  }
+  [data-theme-preset='clover-journal'] [data-slot='auth-form-shell'] {
+    margin-inline-start: 46%;
+    padding-inline: 2.5rem;
+    padding-block: 5rem 3rem;
+  }
 }
 
-/* Model health hourly: its indigo gradients yield to the paper palette while
- * the metrics, chart and table keep their exact layout. */
+/* Overview and analytics use rules between values instead of nested boxes. */
+[data-theme-preset='clover-journal'] [data-slot='overview-summary-stat'] {
+  border-width: 0;
+  border-inline-start: 1px solid var(--border);
+  border-radius: 0;
+  background-color: transparent;
+}
+[data-theme-preset='clover-journal']
+  [data-slot='overview-summary-stat']:first-child {
+  border-inline-start-width: 0;
+}
+[data-theme-preset='clover-journal'] [data-slot='overview-balance-slip'] {
+  border-color: var(--border);
+  background-image: none;
+  background-color: var(--muted);
+}
+[data-theme-preset='clover-journal'] [data-slot='overview-health-metric'] {
+  border-radius: 0.6rem;
+  background-color: var(--muted);
+}
+[data-theme-preset='clover-journal'] [data-slot='dashboard-stat-cell'] {
+  border-color: var(--border);
+}
+[data-theme-preset='clover-journal']
+  :is(
+    [data-slot='dashboard-stat-value'],
+    [data-slot='overview-summary-stat'] .font-mono
+  ) {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+[data-theme-preset='clover-journal'] [data-slot='dashboard-performance-model'] {
+  border-radius: 0.35rem;
+  background-color: var(--muted);
+}
+[data-theme-preset='clover-journal'] [data-slot='billing-record'] {
+  border-color: var(--border);
+  background-color: var(--card);
+}
+[data-theme-preset='clover-journal'] [data-slot='wallet-stat'] {
+  border-color: var(--border);
+}
+
+/* Model health retains semantic status colours and the existing chart layout. */
 [data-theme-preset='clover-journal'] [data-slot='model-health-title'] {
   background-image: none;
   color: var(--foreground);
   -webkit-text-fill-color: var(--foreground);
 }
-[data-theme-preset='clover-journal']
-  [data-journal-slot='model-health-query'] {
+[data-theme-preset='clover-journal'] [data-journal-slot='model-health-query'] {
   --model-health-query-bg: var(--primary);
   color: var(--primary-foreground);
 }
 [data-theme-preset='clover-journal'] [data-slot='model-health-stat'] {
   --model-health-stat-bg: var(--card);
-  border: 1px solid color-mix(in oklch, var(--border) 82%, transparent);
+  border: 1px solid var(--border);
   border-radius: var(--journal-card-radius);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
   color: var(--card-foreground);
+  box-shadow: var(--journal-paper-shadow);
 }
 [data-theme-preset='clover-journal']
   [data-slot='model-health-stat']
@@ -2657,38 +1634,18 @@ For commercial licensing, please contact support@quantumnous.com
 [data-theme-preset='clover-journal']
   [data-slot='model-health-stat']
   .bg-white\/25 {
-  background-color: color-mix(in oklch, var(--primary) 12%, transparent);
+  background-color: var(--muted);
 }
-[data-theme-preset='clover-journal']
-  [data-slot='model-health-stat']
-  [data-slot='model-health-stat-glow'] {
+[data-theme-preset='clover-journal'] [data-slot='model-health-stat-glow'] {
   display: none;
 }
-[data-theme-preset='clover-journal'] [data-slot='model-health-panel'] {
-  border-radius: var(--journal-card-radius);
-  border-color: color-mix(in oklch, var(--border) 82%, transparent);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-[data-theme-preset='clover-journal']
-  [data-slot='model-health-panel-accent'] {
+[data-theme-preset='clover-journal'] [data-slot='model-health-panel-accent'] {
   background-image: none;
   background-color: var(--primary);
 }
 [data-theme-preset='clover-journal']
   [data-slot='model-health-panel-accent'][data-tone='gold'] {
   background-color: var(--chart-3);
-}
-[data-theme-preset='clover-journal'] [data-slot='model-health-public-stat'],
-[data-theme-preset='clover-journal'] [data-slot='model-health-public-card'] {
-  border-radius: var(--journal-card-radius);
-  border-color: color-mix(in oklch, var(--border) 82%, transparent);
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
 }
 [data-theme-preset='clover-journal']
   [data-journal-slot='model-health-timeline-bar'] {
@@ -2706,149 +1663,41 @@ For commercial licensing, please contact support@quantumnous.com
   [data-journal-slot='model-health-timeline-bar'][data-status='outage'] {
   background-color: var(--chart-5);
 }
-
-/* ── Clover Journal — P5-3 error pages ───────────────────────────────────
- * The error code carries a highlighter dash, the description becomes a pinned
- * paper note and a large clover wash sits behind the content. Text stays
- * horizontal; only the decorative tape is tilted. */
-[data-theme-preset='clover-journal'] [data-slot='error-page'] {
-  position: relative;
-  isolation: isolate;
-}
-[data-theme-preset='clover-journal'] [data-slot='error-page']::before {
-  content: '';
-  position: absolute;
-  top: 12%;
-  right: 7%;
-  z-index: -1;
-  width: 9rem;
-  height: 9rem;
-  background-color: var(--primary);
-  opacity: 0.07;
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23000'%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z'/%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z' transform='rotate(90 16 16)'/%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z' transform='rotate(180 16 16)'/%3E%3Cpath d='M16 16C16 16 7.5 15 6.2 10.5 5.3 7.2 7.8 4.7 10.9 5.4 14.2 6.2 16 10.7 16 16Z' transform='rotate(270 16 16)'/%3E%3C/g%3E%3C/svg%3E");
-  mask-size: contain;
-  mask-repeat: no-repeat;
-  pointer-events: none;
-}
-@media (max-width: 640px) {
-  [data-theme-preset='clover-journal'] [data-slot='error-page']::before {
-    top: 8%;
-    right: 2%;
-    width: 6rem;
-    height: 6rem;
-  }
-}
 [data-theme-preset='clover-journal'] [data-slot='error-page'] h1 {
   color: var(--primary);
-  font-family: var(--font-display);
-}
-[data-theme-preset='clover-journal'] [data-slot='error-page'] h1::after {
-  content: '';
-  display: block;
-  width: 4.5rem;
-  height: 0.28rem;
-  margin: 0.3rem auto 0;
-  border-radius: 999px;
-  background-color: color-mix(in oklch, var(--primary) 22%, transparent);
-  transform: rotate(-1.5deg);
 }
 [data-theme-preset='clover-journal'] [data-slot='error-note'] {
-  position: relative;
   width: min(34rem, calc(100vw - 2.5rem));
-  margin-top: 0.35rem;
-  padding: 1rem 1.35rem 0.95rem;
-  border: 1px dashed color-mix(in oklch, var(--border) 82%, transparent);
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
   border-radius: var(--journal-card-radius);
-  background-color: color-mix(in oklch, var(--journal-note) 55%, var(--card));
-  background-image: var(--journal-grain);
-  background-size: 160px 160px;
-  background-blend-mode: var(--journal-grain-blend);
-  box-shadow: var(--journal-paper-shadow);
-}
-[data-theme-preset='clover-journal'] [data-slot='error-note']::before {
-  content: '';
-  position: absolute;
-  top: -0.35rem;
-  left: 50%;
-  width: 3.5rem;
-  height: 0.5rem;
-  transform: translateX(-50%) rotate(-1.5deg);
-  background-color: var(--journal-tape-gold);
-  background-image: repeating-linear-gradient(
-    90deg,
-    transparent 0 5px,
-    oklch(1 0 0 / 0.28) 5px 7px
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0,
-    #000 6%,
-    #000 94%,
-    transparent 100%
-  );
-  opacity: 0.8;
-  pointer-events: none;
+  background-color: var(--card);
 }
 
-/* ── Clover Journal — P6 contrast calibration ────────────────────────────
- * Tertiary ink, semantic status text and avatars are lifted to WCAG AA in
- * both paper modes. Hues stay botanical; only lightness/alpha changes. */
-[data-theme-preset='clover-journal'] {
-  --journal-warning-ink: oklch(0.48 0.1 75);
-  --journal-danger-ink: oklch(0.5 0.16 32);
-  --journal-success-ink: oklch(0.46 0.12 155);
-  --journal-info-ink: oklch(0.5 0.08 210);
-}
-.dark [data-theme-preset='clover-journal'] {
-  --journal-warning-ink: oklch(0.84 0.12 82);
-  --journal-danger-ink: oklch(0.74 0.14 32);
-  --journal-success-ink: var(--success);
-  --journal-info-ink: var(--info);
-}
-
-/* Tertiary text keeps its size/weight hierarchy but no longer fades below
- * AA; direct hover/focus states still win because this rule excludes them. */
+/* Readable secondary ink and visible keyboard focus in both paper modes. */
 [data-theme-preset='clover-journal']
   [class*='text-muted-foreground/']:not(:hover):not(:focus-visible) {
   color: var(--muted-foreground);
 }
 [data-theme-preset='clover-journal']
   [class*='text-foreground/']:not(:hover):not(:focus-visible) {
-  color: color-mix(in oklch, var(--foreground) 80%, transparent);
+  color: color-mix(in oklch, var(--foreground) 85%, var(--background));
 }
-
-/* Random bright HSL avatar swatches made white initials unreadable; the
- * journal turns them into clover-ink paper stamps instead. */
 [data-theme-preset='clover-journal'] [data-slot='avatar-fallback'] {
-  background-color: color-mix(
-    in oklch,
-    var(--primary) 16%,
-    var(--card)
-  ) !important;
+  background-color: var(--secondary) !important;
   color: var(--primary) !important;
 }
-
-/* Inactive tabs and sidebar section labels stay readable without becoming
- * as prominent as the active tab or page title. */
-[data-theme-preset='clover-journal']
-  [data-slot='tabs-trigger']:not([data-active]):not(:hover):not(
-    :focus-visible
-  ) {
-  color: color-mix(in oklch, var(--foreground) 80%, transparent);
-}
-[data-theme-preset='clover-journal'] [data-slot='sidebar-group-label'] {
-  color: var(--muted-foreground);
-}
-
-/* Neutral status badges inherit the page ink; semantic variants below
- * replace this with their calibrated hue. */
 [data-theme-preset='clover-journal'] [data-slot='status-badge'] {
-  color: color-mix(in oklch, var(--foreground) 82%, transparent);
+  color: var(--foreground);
 }
-
-/* Hard-coded semantic utilities used by status badges and metrics. */
 [data-theme-preset='clover-journal']
-  :is(.text-success, .text-green-600, .text-green-500, .text-emerald-600, .text-emerald-500) {
+  :is(
+    .text-success,
+    .text-green-600,
+    .text-green-500,
+    .text-emerald-600,
+    .text-emerald-500
+  ) {
   color: var(--journal-success-ink);
 }
 [data-theme-preset='clover-journal']
@@ -2871,17 +1720,12 @@ For commercial licensing, please contact support@quantumnous.com
   color: var(--journal-info-ink);
 }
 [data-theme-preset='clover-journal']
-  [data-slot='badge'][data-variant='destructive'] {
-  color: var(--journal-danger-ink);
-}
+  [data-slot='badge'][data-variant='destructive'],
 [data-theme-preset='clover-journal']
   [data-slot='alert'][class*='text-destructive']
   [data-slot='alert-description'] {
   color: var(--journal-danger-ink);
 }
-
-/* Some ghost/outline buttons only reserve transparent ring slots. Give all
- * keyboard-focusable controls a visible clover outline in this preset. */
 [data-theme-preset='clover-journal']
   :is(
     button,
@@ -2896,16 +1740,11 @@ For commercial licensing, please contact support@quantumnous.com
     [role='tab'],
     [role='menuitem'],
     [role='option'],
-    [data-slot='button'],
     [data-slot='pagination-link']
   ):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
-
-/* The auto-focused dialog close control must stay visible for keyboard
- * users even when the browser does not treat programmatic focus as
- * `:focus-visible`. */
 [data-theme-preset='clover-journal']
   :is(
     [data-slot='dialog-close'],
@@ -2915,13 +1754,15 @@ For commercial licensing, please contact support@quantumnous.com
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
-
-/* Wide page-header action groups may not fit beside the title when the
- * sidebar is open at tablet widths; let them wrap inside the header instead
- * of clipping the last button. */
 [data-theme-preset='clover-journal'] [data-slot='section-page-actions'] {
   min-width: 0;
   max-width: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-theme-preset='clover-journal'] :is(.journal-tape, .journal-polaroid) {
+    transform: none !important;
+    transition: none;
+  }
 }
 
 /* ── Font axis ────────────────────────────────────────────────────────────

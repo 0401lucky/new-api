@@ -89,7 +89,7 @@ afterEach(() => {
 })
 
 describe('journal model analytics', () => {
-  it('keeps all five KPI cells readable and hides the paper decorations', async () => {
+  it('keeps all five KPI values readable without decorations in the data strip', async () => {
     render(
       <QueryClientProvider client={client}>
         <LogStatCards />
@@ -97,6 +97,7 @@ describe('journal model analytics', () => {
     )
 
     expect(await screen.findByText('Total Count')).toBeVisible()
+    expect(await screen.findByText('5')).toBeVisible()
     const strip = document.querySelector('[data-slot="dashboard-stat-strip"]')
     expect(strip).not.toBeNull()
     expect(
@@ -106,11 +107,7 @@ describe('journal model analytics', () => {
     const decorations = strip?.querySelectorAll(
       '.journal-tape, .journal-paper-clip'
     )
-    expect(decorations).toHaveLength(2)
-    decorations?.forEach((node) => {
-      expect(node).toHaveAttribute('aria-hidden', 'true')
-      expect(node).toHaveClass('pointer-events-none')
-    })
+    expect(decorations).toHaveLength(0)
   })
 
   it('keeps performance metrics and model success rates readable inside the paper card', async () => {
@@ -130,16 +127,15 @@ describe('journal model analytics', () => {
     expect(
       panel?.querySelector('[data-slot="dashboard-performance-model"]')
     ).toHaveTextContent('96.97%')
-    expect(panel?.querySelector('.journal-tape')).toHaveAttribute(
-      'aria-hidden',
-      'true'
-    )
+    expect(panel?.querySelector('.journal-tape')).toBeNull()
   })
 
   it('gives the model usage detail table its paper anchor without changing its data', () => {
     render(
       <ModelUsageTable
-        data={[{ model_name: 'alpha', created_at: 1, count: 3, token_used: 120 }]}
+        data={[
+          { model_name: 'alpha', created_at: 1, count: 3, token_used: 120 },
+        ]}
       />
     )
 

@@ -20,6 +20,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
+import { EmptyState } from '../components/empty-state'
 import { PricingSidebar } from '../components/pricing-sidebar'
 import {
   PricingToolbar,
@@ -61,6 +62,31 @@ function toolbarProps(): PricingToolbarProps {
 }
 
 describe('pricing controls', () => {
+  it('shows an empty catalogue without offering an inactive filter reset', () => {
+    render(<EmptyState hasActiveFilters={false} onClearFilters={vi.fn()} />)
+
+    expect(screen.getByText('No models found')).toBeVisible()
+    expect(
+      screen.queryByRole('button', { name: 'Clear all filters' })
+    ).toBeNull()
+  })
+
+  it('explains an unmatched search and lets the user reset it with the keyboard', async () => {
+    const onClearFilters = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <EmptyState
+        searchQuery='unavailable-model'
+        hasActiveFilters={false}
+        onClearFilters={onClearFilters}
+      />
+    )
+
+    expect(screen.getByText(/unavailable-model/)).toBeVisible()
+    screen.getByRole('button', { name: 'Clear all filters' }).focus()
+    await user.keyboard('{Enter}')
+    expect(onClearFilters).toHaveBeenCalledOnce()
+  })
   it('keeps stable journal anchors on the filter column and toolbar', () => {
     const props = toolbarProps()
     const { container } = render(

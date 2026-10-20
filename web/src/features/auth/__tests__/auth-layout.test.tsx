@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -37,6 +38,33 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 describe('AuthLayout journal cover', () => {
+  it('keeps form fields keyboard accessible and submits through the original form', async () => {
+    const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault())
+    const user = userEvent.setup()
+    render(
+      <AuthLayout>
+        <form aria-label='Sign in form' onSubmit={onSubmit}>
+          <label htmlFor='username'>Username</label>
+          <input id='username' autoComplete='username' />
+          <label htmlFor='password'>Password</label>
+          <input
+            id='password'
+            type='password'
+            autoComplete='current-password'
+          />
+          <button type='submit'>Sign in</button>
+        </form>
+      </AuthLayout>
+    )
+
+    await user.tab()
+    await user.tab()
+    expect(screen.getByLabelText('Username')).toHaveFocus()
+    await user.keyboard('journal-user{Tab}')
+    expect(screen.getByLabelText('Password')).toHaveFocus()
+    await user.keyboard('example-password{Tab}{Enter}')
+    expect(onSubmit).toHaveBeenCalledOnce()
+  })
   it('keeps decoration out of the accessibility tree and renders the form', () => {
     const { container } = render(
       <AuthLayout>

@@ -70,10 +70,13 @@ vi.mock('../hooks/use-filters', () => ({
 }))
 
 vi.mock('@/components/layout', () => ({
-  PublicLayout: (props: { children?: ReactNode }) => <div>{props.children}</div>,
+  PublicLayout: (props: { children?: ReactNode }) => (
+    <div>{props.children}</div>
+  ),
 }))
 
 vi.mock('@/components/page-transition', () => ({
+  FadeIn: (props: { children?: ReactNode }) => <div>{props.children}</div>,
   PageTransition: (props: { children?: ReactNode; className?: string }) => (
     <div className={props.className}>{props.children}</div>
   ),
@@ -83,10 +86,9 @@ describe('pricing journal composition', () => {
   it('marks the model square as immersive and keeps search, filters and empty state', () => {
     const { container } = render(<Pricing />)
 
-    expect(container.querySelector('[data-slot="pricing-page"]')).toHaveAttribute(
-      'data-journal-level',
-      'immersive'
-    )
+    expect(
+      container.querySelector('[data-slot="pricing-page"]')
+    ).toHaveAttribute('data-journal-level', 'immersive')
     expect(
       screen.getByRole('textbox', { name: 'Search models' })
     ).toBeInTheDocument()

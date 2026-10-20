@@ -16,32 +16,79 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { CSSProperties } from 'react'
+
 import { cn } from '@/lib/utils'
 
-type PaperClipProps = {
+export type PaperClipProps = {
+  tone?: 'silver' | 'brass'
+  size?: 'sm' | 'md' | 'lg'
+  rotation?: number
   className?: string
-  size?: 'sm' | 'md'
+  style?: CSSProperties
 }
 
-/** A decorative paper clip. The caller positions it over a card corner. */
+/**
+ * A realistic metallic paper clip with highlight and drop shadow.
+ * Clips neatly onto card corners and sticky notes.
+ */
 export function PaperClip(props: PaperClipProps) {
+  const {
+    tone = 'silver',
+    size = 'md',
+    rotation = -6,
+    className,
+    style,
+  } = props
+
+  const sizeClass = {
+    sm: 'w-4 h-7',
+    md: 'w-5 h-9',
+    lg: 'w-6 h-12',
+  }[size]
+
+  const isBrass = tone === 'brass'
+
   return (
     <svg
       aria-hidden='true'
       focusable='false'
-      viewBox='0 0 24 24'
-      fill='none'
-      stroke='currentColor'
-      strokeWidth='1.6'
-      strokeLinecap='round'
-      strokeLinejoin='round'
+      viewBox='0 0 24 44'
       className={cn(
-        'journal-paper-clip pointer-events-none shrink-0 select-none',
-        props.size === 'sm' ? 'size-5' : 'size-6',
-        props.className
+        'journal-paper-clip pointer-events-none shrink-0 select-none drop-shadow-[0_2px_2px_rgba(0,0,0,0.18)]',
+        sizeClass,
+        className
       )}
+      style={{
+        transform: rotation ? `rotate(${rotation}deg)` : undefined,
+        ...style,
+      }}
     >
-      <path d='M8.5 12.5 14.8 6.2a3.2 3.2 0 0 1 4.5 4.5l-7.6 7.6a5 5 0 0 1-7.1-7.1l7.2-7.2' />
+      <defs>
+        <linearGradient id='metal-silver' x1='0%' y1='0%' x2='100%' y2='0%'>
+          <stop offset='0%' stopColor='#9ca3af' />
+          <stop offset='30%' stopColor='#f3f4f6' />
+          <stop offset='55%' stopColor='#d1d5db' />
+          <stop offset='85%' stopColor='#e5e7eb' />
+          <stop offset='100%' stopColor='#6b7280' />
+        </linearGradient>
+        <linearGradient id='metal-brass' x1='0%' y1='0%' x2='100%' y2='0%'>
+          <stop offset='0%' stopColor='#b48b3e' />
+          <stop offset='30%' stopColor='#fde68a' />
+          <stop offset='55%' stopColor='#d97706' />
+          <stop offset='85%' stopColor='#fef3c7' />
+          <stop offset='100%' stopColor='#92400e' />
+        </linearGradient>
+      </defs>
+      {/* Outer loop */}
+      <path
+        d='M7 11V34C7 37.3 9.7 40 13 40C16.3 40 19 37.3 19 34V8C19 4.7 16.3 2 13 2C9.7 2 7 4.7 7 8V28C7 30.2 8.8 32 11 32C13.2 32 15 30.2 15 28V11'
+        fill='none'
+        stroke={isBrass ? 'url(#metal-brass)' : 'url(#metal-silver)'}
+        strokeWidth='2.2'
+        strokeLinecap='round'
+        strokeLinejoin='round'
+      />
     </svg>
   )
 }

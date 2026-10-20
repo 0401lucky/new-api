@@ -16,10 +16,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+export * from './clover-botanical-canvas'
 export * from './clover-doodle'
 export * from './hand-note'
 export * from './journal-page'
 export * from './paper-clip'
 export * from './paper-grain'
+export * from './polaroid'
 export * from './sticky-note'
 export * from './washi-tape'

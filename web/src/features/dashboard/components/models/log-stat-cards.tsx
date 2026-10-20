@@ -19,7 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { PaperClip, WashiTape } from '@/components/clover-journal'
 import { IconBadge } from '@/components/ui/icon-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getUserQuotaDates } from '@/features/dashboard/api'
@@ -152,16 +151,9 @@ export function LogStatCards(props: LogStatCardsProps) {
   return (
     <div
       data-slot='dashboard-stat-strip'
-      className='relative overflow-hidden rounded-lg border'
+      className='bg-card overflow-hidden rounded-xl border'
     >
-      <WashiTape
-        tone='green'
-        width='5rem'
-        rotation={-2}
-        className='top-0 left-1/2 hidden -translate-x-1/2 sm:block'
-      />
-      <PaperClip size='sm' className='absolute top-1.5 left-3 hidden sm:block' />
-      <div className='divide-border/60 grid min-w-0 grid-cols-2 divide-x sm:grid-cols-3 lg:grid-cols-5'>
+      <div className='divide-border grid min-w-0 grid-cols-2 divide-x sm:grid-cols-3 lg:grid-cols-5'>
         {items.map((it, idx) => {
           const Icon = it.icon
           let valueContent
@@ -178,7 +170,7 @@ export function LogStatCards(props: LogStatCardsProps) {
                 <div className='text-muted-foreground mt-1 font-mono text-base leading-tight font-bold tracking-tight tabular-nums sm:mt-2 sm:text-2xl sm:leading-normal'>
                   --
                 </div>
-                <div className='text-muted-foreground/40 mt-1 hidden text-xs md:block'>
+                <div className='text-muted-foreground mt-1 hidden text-xs md:block'>
                   {it.desc}
                 </div>
               </>
@@ -187,12 +179,13 @@ export function LogStatCards(props: LogStatCardsProps) {
             valueContent = (
               <>
                 <div
-                  className='text-foreground mt-1 max-w-full truncate font-mono text-base leading-tight font-bold tracking-tight tabular-nums sm:mt-2 sm:text-2xl sm:leading-normal'
+                  data-slot='dashboard-stat-value'
+                  className='text-foreground mt-1 max-w-full truncate font-mono text-base leading-tight font-semibold tracking-tight tabular-nums sm:mt-2 sm:text-2xl sm:leading-normal'
                   title={it.fullValue}
                 >
                   {it.value}
                 </div>
-                <div className='text-muted-foreground/60 mt-1 hidden text-xs md:block'>
+                <div className='text-muted-foreground mt-1 hidden text-xs md:block'>
                   {it.desc}
                 </div>
               </>
@@ -204,21 +197,21 @@ export function LogStatCards(props: LogStatCardsProps) {
               key={it.title}
               data-slot='dashboard-stat-cell'
               className={cn(
-                'min-w-0 px-2.5 py-1.5 sm:px-5 sm:py-4',
+                'min-w-0 px-3 py-3 sm:px-5 sm:py-5',
                 idx === items.length - 1 &&
                   items.length % 2 !== 0 &&
                   'col-span-2 sm:col-span-1'
               )}
             >
-              <div className='flex min-w-0 items-center gap-1.5 sm:gap-2'>
+              <div className='flex min-w-0 items-center gap-1.5 sm:gap-2.5'>
                 <IconBadge
                   tone={it.iconTone}
                   size='stat'
-                  className='size-4 rounded-sm sm:size-7 sm:rounded-md [&>svg]:size-2.5 sm:[&>svg]:size-3.5'
+                  className='size-5 rounded-md sm:size-8 sm:rounded-lg [&>svg]:size-3 sm:[&>svg]:size-4'
                 >
                   <Icon />
                 </IconBadge>
-                <div className='text-muted-foreground truncate text-[11px] leading-4 font-medium tracking-wide uppercase sm:text-xs sm:tracking-wider'>
+                <div className='text-muted-foreground truncate text-[11px] leading-4 font-medium sm:text-xs'>
                   {it.title}
                 </div>
               </div>

@@ -16,39 +16,56 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { CSSProperties } from 'react'
+
 import { cn } from '@/lib/utils'
 
-type WashiTapeTone = 'green' | 'gold' | 'clay'
+export type WashiTapeTone = 'green' | 'gold' | 'clay' | 'gingham'
 
-type WashiTapeProps = {
+export type WashiTapeProps = {
   tone?: WashiTapeTone
   rotation?: number
   width?: string
+  height?: string
   className?: string
+  style?: CSSProperties
 }
 
 const TONE_CLASS: Record<WashiTapeTone, string> = {
-  green: 'bg-[var(--journal-tape-green)]',
-  gold: 'bg-[var(--journal-tape-gold)]',
-  clay: 'bg-[var(--journal-tape-clay)]',
+  green: 'journal-tape-green',
+  gold: 'journal-tape-gold',
+  clay: 'journal-tape-clay',
+  gingham: 'journal-tape-gingham',
 }
 
 /**
- * A strip of washi tape. Position it inside a `relative` parent; it is
- * pointer-transparent so it never blocks the control underneath.
+ * A small strip of washi tape. The preset owns its colour and texture;
+ * pointer transparency keeps it clear of the surrounding controls.
  */
 export function WashiTape(props: WashiTapeProps) {
+  const {
+    tone = 'green',
+    rotation = -2,
+    width = '6rem',
+    height,
+    className,
+    style,
+  } = props
+
   return (
     <span
       aria-hidden='true'
       className={cn(
-        'journal-tape pointer-events-none absolute block h-5',
-        TONE_CLASS[props.tone ?? 'green'],
-        props.className
+        'journal-tape pointer-events-none absolute block select-none',
+        TONE_CLASS[tone],
+        'h-4',
+        className
       )}
       style={{
-        width: props.width ?? '6rem',
-        transform: `rotate(${props.rotation ?? -2}deg)`,
+        width,
+        height,
+        transform: `rotate(${rotation}deg)`,
+        ...style,
       }}
     />
   )

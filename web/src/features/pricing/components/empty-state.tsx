@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { CloverDoodle } from '@/components/clover-journal'
+import { EmptyState as SharedEmptyState } from '@/components/empty-state'
 import { Button } from '@/components/ui/button'
 
 export interface EmptyStateProps {
@@ -33,37 +33,29 @@ export function EmptyState(props: EmptyStateProps) {
   const hasSearch = Boolean(props.searchQuery?.trim())
 
   return (
-    <div
-      data-slot='pricing-empty'
-      className='flex min-h-[320px] flex-col items-center justify-center rounded-lg border border-dashed px-6 py-12 text-center'
-    >
-      <div className='relative mb-3'>
-        <Search className='text-muted-foreground/40 size-10' />
-        <CloverDoodle
-          variant='sprig'
-          size='sm'
-          className='absolute -right-5 -bottom-2 rotate-12'
-        />
-      </div>
-
-      <h3 className='text-foreground mb-1 text-base font-semibold'>
-        {t('No models found')}
-      </h3>
-
-      <p className='text-muted-foreground mb-5 max-w-xs text-sm'>
-        {hasSearch
-          ? t(
-              'No results for "{{query}}". Try adjusting your search or filters.',
-              { query: props.searchQuery }
-            )
-          : t('No models match your current filters.')}
-      </p>
-
-      {(props.hasActiveFilters || hasSearch) && (
-        <Button variant='outline' size='sm' onClick={props.onClearFilters}>
-          {t('Clear all filters')}
-        </Button>
-      )}
+    <div data-slot='pricing-empty' className='bg-card rounded-xl border'>
+      <SharedEmptyState
+        icon={Search}
+        title={t('No models found')}
+        description={
+          hasSearch
+            ? t(
+                'No results for "{{query}}". Try adjusting your search or filters.',
+                {
+                  query: props.searchQuery,
+                }
+              )
+            : t('No models match your current filters.')
+        }
+        className='min-h-[360px] px-6 py-12'
+        action={
+          props.hasActiveFilters || hasSearch ? (
+            <Button variant='outline' size='sm' onClick={props.onClearFilters}>
+              {t('Clear all filters')}
+            </Button>
+          ) : undefined
+        }
+      />
     </div>
   )
 }

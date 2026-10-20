@@ -19,11 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import {
-  CloverDoodle,
-  HandNote,
-  WashiTape,
-} from '@/components/clover-journal'
+import { CloverDoodle, HandNote } from '@/components/clover-journal'
 import { PublicLayout } from '@/components/layout'
 import { PageTransition } from '@/components/page-transition'
 
@@ -168,7 +164,7 @@ export function Pricing() {
       <div
         data-slot='pricing-page'
         data-journal-level='immersive'
-        className='relative'
+        className='relative min-h-svh overflow-hidden'
       >
         <div
           aria-hidden
@@ -186,43 +182,38 @@ export function Pricing() {
               'linear-gradient(to bottom, black 40%, transparent 100%)',
           }}
         />
-        <CloverDoodle
-          variant='sprig'
-          size='lg'
-          className='absolute top-28 left-2 hidden opacity-40 xl:block'
-        />
-        <CloverDoodle
-          variant='four-leaf'
-          size='lg'
-          className='absolute top-64 right-3 hidden opacity-35 2xl:block'
-        />
-        <PageTransition className='relative mx-auto w-full max-w-[1800px] px-3 pt-16 pb-8 sm:px-6 sm:pt-20 sm:pb-10 xl:px-8'>
-          <header className='relative mx-auto mb-5 max-w-3xl pt-5 text-center sm:mb-10 sm:pt-10'>
-            <WashiTape
-              className='top-0 left-[calc(50%-4rem)] hidden sm:block'
-              tone='gold'
-              width='8rem'
-              rotation={-2}
-            />
-            <h1
-              data-slot='pricing-heading'
-              className='text-[clamp(2rem,5.5vw,3.5rem)] leading-[1.15] font-bold tracking-tight'
-            >
-              {t('Model Square')}
-            </h1>
-            <p className='text-muted-foreground/80 mt-3 text-sm sm:mt-4 sm:text-base'>
-              {t('This site currently has {{count}} models enabled', {
-                count: models?.length || 0,
-              })}
-            </p>
-            <p className='text-muted-foreground/60 mx-auto mt-2 max-w-2xl text-xs leading-relaxed sm:text-sm'>
-              {t(
-                'Discover curated AI models, compare pricing and capabilities, and choose the right model for every scenario.'
-              )}
-            </p>
-            <HandNote className='mt-2 block text-base'>
-              {t('Better models start here')}
-            </HandNote>
+        <PageTransition className='relative z-1 mx-auto w-full max-w-[1800px] px-3 pt-16 pb-8 sm:px-6 sm:pt-20 sm:pb-10 xl:px-8'>
+          <header
+            data-slot='pricing-header'
+            className='relative mx-auto mb-6 max-w-3xl pt-5 text-center sm:mb-10 sm:pt-10'
+          >
+            <div data-slot='pricing-intro'>
+              <div
+                data-slot='pricing-title-row'
+                className='flex items-center justify-center gap-3'
+              >
+                <h1
+                  data-slot='pricing-heading'
+                  className='text-foreground text-[clamp(2rem,5vw,3.5rem)] leading-tight font-bold tracking-tight'
+                >
+                  {t('Model Square')}
+                </h1>
+                <CloverDoodle variant='four-leaf' size='md' />
+              </div>
+              <p className='text-muted-foreground mt-3 text-sm sm:text-base'>
+                {t('This site currently has {{count}} models enabled', {
+                  count: models?.length || 0,
+                })}
+              </p>
+              <p className='text-muted-foreground mx-auto mt-2 max-w-2xl text-xs leading-relaxed sm:text-sm'>
+                {t(
+                  'Discover curated AI models, compare pricing and capabilities, and choose the right model for every scenario.'
+                )}
+              </p>
+              <HandNote className='mt-3 inline-block text-sm'>
+                {t('Better models start here')}
+              </HandNote>
+            </div>
             <SearchBar
               value={searchInput}
               onChange={setSearchInput}
@@ -230,7 +221,7 @@ export function Pricing() {
               placeholder={t(
                 'Search model name, provider, endpoint, or tag...'
               )}
-              className='mx-auto mt-4 max-w-2xl sm:mt-6'
+              className='mx-auto mt-4 w-full max-w-2xl sm:mt-6'
             />
           </header>
 
