@@ -50,6 +50,8 @@ beforeEach(() => {
               count: 5,
               quota: 100,
               token_used: 1000,
+              cache_read_tokens: 800,
+              cache_creation_tokens: 120,
             },
           ],
         },
@@ -89,7 +91,7 @@ afterEach(() => {
 })
 
 describe('journal model analytics', () => {
-  it('keeps all five KPI values readable without decorations in the data strip', async () => {
+  it('keeps all seven KPI values and cache totals readable without decorations in the data strip', async () => {
     render(
       <QueryClientProvider client={client}>
         <LogStatCards />
@@ -102,7 +104,13 @@ describe('journal model analytics', () => {
     expect(strip).not.toBeNull()
     expect(
       strip?.querySelectorAll('[data-slot="dashboard-stat-cell"]')
-    ).toHaveLength(5)
+    ).toHaveLength(7)
+    expect(screen.getByRole('group', { name: 'Cache Read' })).toHaveTextContent(
+      '800'
+    )
+    expect(
+      screen.getByRole('group', { name: 'Cache Write' })
+    ).toHaveTextContent('120')
 
     const decorations = strip?.querySelectorAll(
       '.journal-tape, .journal-paper-clip'

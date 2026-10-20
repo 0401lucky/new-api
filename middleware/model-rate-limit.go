@@ -12,6 +12,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/common/limiter"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/i18n"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting"
 
@@ -223,6 +224,14 @@ type rateLimitLayer struct {
 	concurrencyMaxCount int
 }
 
+func userRateLimitIdentity(userID int, group string, independent bool) string {
+	identity := strconv.Itoa(userID)
+	if independent {
+		identity += ":" + group
+	}
+	return identity
+}
+
 func (l rateLimitLayer) successRedisKey() string {
 	return fmt.Sprintf("rateLimit:%s:%s", ModelRequestRateLimitSuccessCountMark, l.identity)
 }
@@ -328,8 +337,7 @@ func memoryRateLimitHandler(duration int64, layers []rateLimitLayer) gin.Handler
 
 		for _, layer := range layers {
 			if layer.totalMaxCount > 0 && !inMemoryRateLimiter.Request(layer.totalMemoryKey(), layer.totalMaxCount, duration) {
-				c.Status(http.StatusTooManyRequests)
-				c.Abort()
+				abortWithOpenAiMessage(c, http.StatusTooManyRequests, i18n.T(c, i18n.MsgRateLimitTotalReached, map[string]any{"Minutes": setting.ModelRequestRateLimitDurationMinutes, "Max": layer.totalMaxCount}))
 				return
 			}
 
@@ -337,7 +345,7 @@ func memoryRateLimitHandler(duration int64, layers []rateLimitLayer) gin.Handler
 			if layer.successMaxCount > 0 {
 				reservation := inMemoryRateLimiter.Reserve(layer.successMemoryKey(), layer.successMaxCount, duration)
 				if reservation == nil {
-					c.AbortWithStatus(http.StatusTooManyRequests)
+					abortWithOpenAiMessage(c, http.StatusTooManyRequests, i18n.T(c, i18n.MsgRateLimitReached, map[string]any{"Minutes": setting.ModelRequestRateLimitDurationMinutes, "Max": layer.successMaxCount}))
 					return
 				}
 				reservations = append(reservations, reservation)
@@ -349,8 +357,7 @@ func memoryRateLimitHandler(duration int64, layers []rateLimitLayer) gin.Handler
 				return
 			}
 			if !allowed {
-				c.Status(http.StatusTooManyRequests)
-				c.Abort()
+				abortWithOpenAiMessage(c, http.StatusTooManyRequests, fmt.Sprintf("您已达到并发请求数限制：最多同时处理%d个请求", layer.concurrencyMaxCount))
 				return
 			}
 			releases = append(releases, release)
@@ -440,7 +447,7 @@ func ModelRequestRateLimit() func(c *gin.Context) {
 		// 用户层：全局限流开启且用户未豁免时生效
 		if globalEnabled && !bypassUser {
 			layers = append(layers, rateLimitLayer{
-				identity:            strconv.Itoa(userID),
+				identity:            userRateLimitIdentity(userID, group, found),
 				totalMaxCount:       totalMaxCount,
 				successMaxCount:     successMaxCount,
 				concurrencyMaxCount: concurrencyMaxCount,

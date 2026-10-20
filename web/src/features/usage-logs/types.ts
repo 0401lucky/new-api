@@ -116,6 +116,10 @@ export interface ToolSurchargeItem {
 }
 
 export interface LogOtherData {
+  content_parts?: {
+    key: string
+    params?: Record<string, string | number | boolean>
+  }[]
   admin_info?: {
     request_policy?: PolicyEvent[]
     is_multi_key?: boolean

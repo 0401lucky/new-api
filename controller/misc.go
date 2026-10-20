@@ -128,6 +128,8 @@ func GetStatus(c *gin.Context) {
 		"privacy_policy_enabled":      legalSetting.PrivacyPolicy != "",
 		"checkin_enabled":             operation_setting.GetCheckinSetting().Enabled,
 		"checkin_timezone":            common.CheckinTimezoneName(),
+		"log_export_enabled":          operation_setting.GetLogSetting().UserExportEnabled,
+		"log_max_range_days":          operation_setting.GetLogSetting().MaxRangeDays,
 	}
 
 	// 根据启用状态注入可选内容

@@ -24,6 +24,7 @@ import {
   CanceledError,
   type AxiosAdapter,
 } from 'axios'
+import i18next from 'i18next'
 import { createElement, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -47,6 +48,31 @@ afterEach(() => {
   vi.restoreAllMocks()
   useAuthStore.getState().auth.reset()
   window.history.replaceState({}, '', '/')
+})
+
+it('renders structured log export errors in the current interface language', async () => {
+  const originalLanguage = i18next.language
+  i18next.addResourceBundle('zh', 'translation', {
+    'The time range cannot exceed {{days}} days':
+      '时间跨度不能超过 {{days}} 天',
+  })
+  try {
+    await i18next.changeLanguage('zh')
+    expect(
+      getServerErrorMessage({
+        response: {
+          data: {
+            success: false,
+            message: 'The time range cannot exceed 365 days',
+            message_key: 'The time range cannot exceed {{days}} days',
+            message_params: { days: 365 },
+          },
+        },
+      })
+    ).toBe('时间跨度不能超过 365 天')
+  } finally {
+    await i18next.changeLanguage(originalLanguage)
+  }
 })
 
 it('reports the pricing rejection once when the request error reaches multiple handlers', async () => {

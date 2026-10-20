@@ -31,6 +31,23 @@ import { buildQuotaAuditOperation } from './quota-audit-operation'
 
 export { normalizeTierLabel }
 
+export function renderLogContent(
+  other: LogOtherData | null | undefined,
+  t: (key: string, opts?: Record<string, unknown>) => string
+): string | null {
+  if (!other?.content_parts?.length) return null
+  return other.content_parts.map((part) => t(part.key, part.params)).join(', ')
+}
+
+export function logTokenName(
+  log: Pick<UsageLog, 'token_id' | 'token_name'>,
+  t: (key: string, opts?: Record<string, unknown>) => string
+): string {
+  return log.token_id === 0
+    ? t(log.token_name, { skipInterpolation: true })
+    : log.token_name
+}
+
 const PARAM_OVERRIDE_ACTION_MAP: Record<string, string> = {
   set: 'Set',
   delete: 'Delete',

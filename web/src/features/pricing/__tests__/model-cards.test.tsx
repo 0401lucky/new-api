@@ -193,9 +193,9 @@ describe('model cards', () => {
     expect(
       container.querySelector('[data-slot="model-card-pricing"]')
     ).toBeInTheDocument()
-    expect(container.querySelectorAll('[data-slot="price-stamp"]')).toHaveLength(
-      2
-    )
+    expect(
+      container.querySelectorAll('[data-slot="price-stamp"]')
+    ).toHaveLength(2)
     expect(screen.getByText('Input')).toBeVisible()
     expect(screen.getByText('Output')).toBeVisible()
   })
@@ -355,6 +355,68 @@ describe('model cards', () => {
     )
     expect(screen.getByText('Output').parentElement).toHaveTextContent(
       /\$0.0225\s*\/\s*1K/
+    )
+  })
+
+  it('shows the cache read price of an expression model after its input and output prices', () => {
+    render(
+      <ModelCard
+        model={pricingModel({
+          billing_mode: 'tiered_expr',
+          billing_expr: 'tier("base", p * 0.15 + c * 0.6 + cr * 0.003)',
+        })}
+        onClick={vi.fn()}
+        tokenUnit='M'
+        selectedGroup='default'
+      />
+    )
+    expect(screen.getByText('Input').parentElement).toHaveTextContent(
+      /\$0.15\s*\/\s*1M/
+    )
+    expect(screen.getByText('Output').parentElement).toHaveTextContent(
+      /\$0.6\s*\/\s*1M/
+    )
+    expect(screen.getByText('Cache Read').parentElement).toHaveTextContent(
+      /\$0.003\s*\/\s*1M/
+    )
+  })
+
+  it('shows the cache read price once when a plugin provider already lists it as a main price', () => {
+    render(
+      <ModelCard
+        model={pricingModel({
+          billing_plugin_variants: [
+            {
+              plugin_key: 'alpha',
+              plugin_name: 'Alpha',
+              billing_mode: 'tiered_expr',
+              billing_expr: 'tier("base", p * 1 + c * 2 + cr * 0.5)',
+              billing_usage_schema: {},
+            },
+          ],
+        })}
+        onClick={vi.fn()}
+        tokenUnit='M'
+        selectedGroup='default'
+      />
+    )
+    expect(screen.getAllByText('Cache Read')).toHaveLength(1)
+  })
+
+  it('shows the cache read price of an expression model that prices nothing else', () => {
+    render(
+      <ModelCard
+        model={pricingModel({
+          billing_mode: 'tiered_expr',
+          billing_expr: 'tier("base", cr * 0.5)',
+        })}
+        onClick={vi.fn()}
+        tokenUnit='M'
+        selectedGroup='default'
+      />
+    )
+    expect(screen.getByText('Cache Read').parentElement).toHaveTextContent(
+      /\$0.5\s*\/\s*1M/
     )
   })
 

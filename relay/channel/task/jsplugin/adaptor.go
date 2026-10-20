@@ -93,6 +93,13 @@ type TaskAdaptor struct {
 func New(plugin *pluginruntime.LoadedPlugin) *TaskAdaptor { return &TaskAdaptor{plugin: plugin} }
 func (a *TaskAdaptor) Init(info *relaycommon.RelayInfo)   { a.info = info }
 
+func (a *TaskAdaptor) channelSetting() kitdto.ChannelSettings {
+	if a.info == nil || a.info.ChannelMeta == nil {
+		return kitdto.ChannelSettings{}
+	}
+	return a.info.ChannelSetting
+}
+
 func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycommon.RelayInfo) *dto.TaskError {
 	if pinnedValue, exists := c.Get(pluginruntime.ContextKeyPinnedEndpoint); exists {
 		if pinned, ok := pinnedValue.(pluginruntime.PinnedEndpoint); ok && pinned.Plugin == a.plugin {
@@ -228,12 +235,17 @@ func (a *TaskAdaptor) BuildRequestURL(info *relaycommon.RelayInfo) (string, erro
 	return a.submit.URL, pluginruntime.ValidateRequestURL(a.submit.URL, info.ChannelBaseUrl, a.plugin.Meta.AllowedHosts)
 }
 
-func (a *TaskAdaptor) BuildRequestHeader(_ *gin.Context, req *http.Request, _ *relaycommon.RelayInfo) error {
+func (a *TaskAdaptor) BuildRequestHeader(c *gin.Context, req *http.Request, _ *relaycommon.RelayInfo) error {
 	if a.submit == nil {
 		return fmt.Errorf("plugin submit request was not built")
 	}
 	for name, value := range a.submit.Headers {
 		req.Header.Set(name, value)
+	}
+	// BuildRequestBody rebuilt the multipart body with a new boundary and put its
+	// Content-Type on the client request; a plugin's own Content-Type cannot match it.
+	if a.submit.BodyType == "multipart" {
+		req.Header.Set("Content-Type", c.Request.Header.Get("Content-Type"))
 	}
 	return nil
 }
@@ -598,10 +610,13 @@ func (a *TaskAdaptor) FetchBatchTasks(baseURL, key string, tasks []*model.Task, 
 	if err = a.plugin.Engine.CallInto(context.Background(), &descriptor, "buildBatchQueryRequest", ctx, taskContexts); err != nil {
 		return nil, err
 	}
-	return a.doFetchDescriptor(baseURL, proxy, descriptor)
+	return a.doFetchDescriptor(baseURL, key, proxy, descriptor)
 }
 
 func (a *TaskAdaptor) FetchTask(baseURL, key string, task *model.Task, proxy string) (*http.Response, error) {
+	if task != nil && task.PrivateData.Key != "" {
+		key = task.PrivateData.Key
+	}
 	ctx, err := a.queryContext(task, key, baseURL, proxy)
 	if err != nil {
 		return nil, err
@@ -610,10 +625,10 @@ func (a *TaskAdaptor) FetchTask(baseURL, key string, task *model.Task, proxy str
 	if err = a.plugin.Engine.CallInto(context.Background(), &descriptor, "buildQueryRequest", ctx); err != nil {
 		return nil, err
 	}
-	return a.doFetchDescriptor(baseURL, proxy, descriptor)
+	return a.doFetchDescriptor(baseURL, key, proxy, descriptor)
 }
 
-func (a *TaskAdaptor) doFetchDescriptor(baseURL, proxy string, descriptor requestDescriptor) (*http.Response, error) {
+func (a *TaskAdaptor) doFetchDescriptor(baseURL, key, proxy string, descriptor requestDescriptor) (*http.Response, error) {
 	if err := pluginruntime.ValidateRequestURL(descriptor.URL, baseURL, a.plugin.Meta.AllowedHosts); err != nil {
 		return nil, err
 	}
@@ -640,12 +655,76 @@ func (a *TaskAdaptor) doFetchDescriptor(baseURL, proxy string, descriptor reques
 	for name, value := range descriptor.Headers {
 		req.Header.Set(name, value)
 	}
-	client, err := service.GetHttpClientWithProxy(proxy)
+	if err := channel.ApplyHeaderOverride(a.headerOverrideInfo(key), nil, req); err != nil {
+		return nil, err
+	}
+	client, err := service.GetHttpClientWithProxySettings(proxy, a.channelSetting())
 	if err != nil {
 		return nil, err
 	}
+	// Clients are cached across channels. Keep the redirect policy and its
+	// credential state local to this query, while reusing the transport.
+	queryClient := *client
+	credentialsStripped := false
+	var redirectPolicyErr error
+	queryClient.CheckRedirect = func(next *http.Request, via []*http.Request) error {
+		if strings.EqualFold(via[len(via)-1].URL.Scheme, "https") && !strings.EqualFold(next.URL.Scheme, "https") {
+			redirectPolicyErr = fmt.Errorf("task query redirect cannot downgrade HTTPS")
+			return redirectPolicyErr
+		}
+		// Redirects use the same credential recipients as direct plugin
+		// requests: the channel base host and the plugin's allowedHosts.
+		if pluginruntime.ValidateRequestURL(next.URL.String(), baseURL, a.plugin.Meta.AllowedHosts) != nil {
+			credentialsStripped = true
+		}
+		if credentialsStripped {
+			// A 307/308 can replay credentials or private task data in the
+			// body even after the credential headers have been removed.
+			if next.Body != nil && next.Body != http.NoBody {
+				redirectPolicyErr = fmt.Errorf("task query redirect cannot replay a body to an origin without credential authorization")
+				return redirectPolicyErr
+			}
+			// Plugin and channel headers can use arbitrary credential names.
+			// Keep only representation preferences, and do this on every
+			// later hop: net/http copies headers from the initial request.
+			for name := range next.Header {
+				switch http.CanonicalHeaderKey(name) {
+				case "Accept", "Accept-Language":
+				default:
+					delete(next.Header, name)
+				}
+			}
+			next.Host = ""
+			next.URL.User = nil
+		} else {
+			// net/http may have already removed standard credentials for a
+			// different domain. Restore them only along an authorized chain;
+			// crossing an untrusted origin can never restore credentials later.
+			for _, name := range []string{"Authorization", "Www-Authenticate", "Cookie", "Cookie2", "Proxy-Authorization", "Proxy-Authenticate"} {
+				if values, ok := req.Header[name]; ok {
+					next.Header[name] = slices.Clone(values)
+				}
+			}
+		}
+		if client.CheckRedirect != nil {
+			if err := client.CheckRedirect(next, via); err != nil {
+				if err == http.ErrUseLastResponse {
+					return err
+				}
+				// The shared SSRF policy includes the target URL in errors.
+				// Keep its diagnostic reason without exposing signed URLs.
+				redirectPolicyErr = errors.New(strings.ReplaceAll(err.Error(), next.URL.String(), next.URL.Scheme+"://"+next.URL.Host))
+				return redirectPolicyErr
+			}
+			return nil
+		}
+		if len(via) >= 10 {
+			return fmt.Errorf("stopped after 10 redirects")
+		}
+		return service.ValidateSSRFProtectedFetchURL(next.URL.String())
+	}
 	started := time.Now()
-	resp, err := client.Do(req)
+	resp, err := queryClient.Do(req)
 	if err != nil {
 		logger.LogDebug(
 			context.Background(),
@@ -654,6 +733,11 @@ func (a *TaskAdaptor) doFetchDescriptor(baseURL, proxy string, descriptor reques
 			method,
 			time.Since(started).Milliseconds(),
 		)
+		if redirectPolicyErr != nil {
+			// net/http wraps redirect errors with the Location URL, which
+			// may contain credentials. Polling logs only the policy reason.
+			return nil, redirectPolicyErr
+		}
 		return nil, err
 	}
 	logger.LogDebug(
@@ -968,13 +1052,41 @@ func (a *TaskAdaptor) BuildContentRequest(task *model.Task, artifactKey string, 
 			}
 		}
 	}
+	headers := descriptor.Headers
+	if !descriptor.Credentialless {
+		var overrides map[string]string
+		if overrides, err = channel.ResolveHeaderOverride(a.headerOverrideInfo(a.info.ApiKey), nil); err != nil {
+			return nil, err
+		}
+		if len(overrides) > 0 {
+			headers = make(map[string]string, len(descriptor.Headers)+len(overrides))
+			for name, value := range descriptor.Headers {
+				headers[http.CanonicalHeaderKey(strings.TrimSpace(name))] = value
+			}
+			for name, value := range overrides {
+				// A content request keeps the host of its URL.
+				if name != "host" {
+					headers[http.CanonicalHeaderKey(name)] = value
+				}
+			}
+		}
+	}
 	return &channel.TaskContentRequest{
 		URL:            descriptor.URL,
 		Method:         method,
-		Headers:        descriptor.Headers,
+		Headers:        headers,
 		Body:           body,
 		Credentialless: descriptor.Credentialless,
 	}, nil
+}
+
+// headerOverrideInfo carries the channel's Request Header Override for a
+// request built outside the client request, with {api_key} set to key.
+func (a *TaskAdaptor) headerOverrideInfo(key string) *relaycommon.RelayInfo {
+	return &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{
+		ApiKey:          key,
+		HeadersOverride: relaycommon.GetEffectiveHeaderOverride(a.info),
+	}}
 }
 
 func taskArtifactContext(task *model.Task) (map[string]any, error) {

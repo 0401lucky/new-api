@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"maps"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -197,10 +198,19 @@ func GetContextKeyType[T any](c *gin.Context, key constant.ContextKey) (T, bool)
 }
 
 func ApiError(c *gin.Context, err error) {
-	c.JSON(http.StatusOK, gin.H{
+	body := gin.H{
 		"success": false,
 		"message": err.Error(),
-	})
+	}
+	var message *Message
+	if errors.As(err, &message) {
+		maps.Copy(body, message.Fields())
+	}
+	c.JSON(http.StatusOK, body)
+}
+
+func ApiErrorT(c *gin.Context, key string, params ...map[string]any) {
+	ApiError(c, NewMessage(key, params...))
 }
 
 func ApiErrorMsg(c *gin.Context, msg string) {

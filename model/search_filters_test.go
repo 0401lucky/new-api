@@ -74,7 +74,7 @@ func TestGetAllLogsFiltersByExactUserID(t *testing.T) {
 		require.NoError(t, DB.Create(&logs[i]).Error)
 	}
 
-	matched, total, err := GetAllLogs(LogTypeUnknown, 0, 0, "", "", 3, "", 0, 20, 0, "", "", "", false)
+	matched, total, err := GetAllLogs(LogFilter{UserId: 3}, 0, 20)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), total)
 	require.Len(t, matched, 1)
@@ -111,7 +111,7 @@ func TestGetAllLogsFiltersNumericUsername(t *testing.T) {
 		require.NoError(t, DB.Create(&logs[i]).Error)
 	}
 
-	matched, total, err := GetAllLogs(LogTypeUnknown, 0, 0, "", "3", 0, "", 0, 20, 0, "", "", "", false)
+	matched, total, err := GetAllLogs(LogFilter{Username: "3"}, 0, 20)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), total)
 	require.Len(t, matched, 1)
@@ -151,7 +151,7 @@ func TestGetAllLogsFiltersPromptCheckEntries(t *testing.T) {
 		require.NoError(t, DB.Create(&logs[i]).Error)
 	}
 
-	matched, total, err := GetAllLogs(LogTypeError, 0, 0, "", "", 0, "", 0, 20, 0, "", "", "", true)
+	matched, total, err := GetAllLogs(LogFilter{Type: LogTypeError, PromptCheckOnly: true}, 0, 20)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), total)
 	require.Len(t, matched, 1)

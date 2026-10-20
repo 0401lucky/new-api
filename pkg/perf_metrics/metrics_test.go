@@ -93,6 +93,32 @@ func TestClientCancellationDuringUpstreamRead(t *testing.T) {
 	assert.Equal(t, OutcomeFailure, ClassifyRelayOutcome(context.Background(), &relaycommon.RelayInfo{StreamStatus: deadline}, nil))
 }
 
+func TestCompletedStreamRemainsAHealthSampleAfterContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	for _, tc := range []struct {
+		name   string
+		end    relaycommon.StreamEndReason
+		failed bool
+		want   Outcome
+	}{
+		{"completed EOF", relaycommon.StreamEndReasonEOF, false, OutcomeSuccess},
+		{"completed DONE", relaycommon.StreamEndReasonDone, false, OutcomeSuccess},
+		{"cancelled before completion", relaycommon.StreamEndReasonClientGone, false, OutcomeIgnored},
+		{"error after completion", relaycommon.StreamEndReasonEOF, true, OutcomeIgnored},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stream := relaycommon.NewStreamStatus()
+			stream.MarkCompleted()
+			if tc.failed {
+				stream.MarkFailed("", "server_error", 500)
+			}
+			stream.SetEndReason(tc.end, nil)
+			assert.Equal(t, tc.want, ClassifyRelayOutcome(ctx, &relaycommon.RelayInfo{IsStream: true, StreamStatus: stream}, nil))
+		})
+	}
+}
+
 func TestPerformanceWindowIncludesCurrentHour(t *testing.T) {
 	now := time.Date(2026, 9, 14, 12, 37, 0, 0, time.UTC)
 	start, end := queryWindow(now, 24)

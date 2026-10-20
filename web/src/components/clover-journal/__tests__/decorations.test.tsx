@@ -48,7 +48,37 @@ afterEach(() => {
   cleanup()
   style.remove()
   document.body.removeAttribute('data-theme-preset')
+  document.documentElement.classList.remove('dark')
 })
+
+function luminance(hex: string): number {
+  const channels = [1, 3, 5].map((start) => {
+    const value = Number.parseInt(hex.slice(start, start + 2), 16) / 255
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+  })
+  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722
+}
+
+it.each(['light', 'dark'])(
+  'keeps journal reading text, secondary text and primary buttons readable in %s mode',
+  (mode) => {
+    document.body.dataset.themePreset = 'clover-journal'
+    document.documentElement.classList.toggle('dark', mode === 'dark')
+    const colors = getComputedStyle(document.body)
+    for (const [text, surface] of [
+      ['--foreground', '--background'],
+      ['--muted-foreground', '--card'],
+      ['--primary-foreground', '--primary'],
+    ]) {
+      const foreground = luminance(colors.getPropertyValue(text).trim())
+      const background = luminance(colors.getPropertyValue(surface).trim())
+      const contrast =
+        (Math.max(foreground, background) + 0.05) /
+        (Math.min(foreground, background) + 0.05)
+      expect(contrast, `${text} on ${surface}`).toBeGreaterThanOrEqual(4.5)
+    }
+  }
+)
 
 describe('clover journal decorations', () => {
   it('hides decorative primitives from assistive technology and pointer events', () => {

@@ -1,13 +1,19 @@
 package service
 
 import (
+	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func seedTemporaryCheckin(t *testing.T, userId, remaining int, expiresAt int64) *model.Checkin {
@@ -36,6 +42,77 @@ func TestWalletFunding_PreConsumeTemporaryFirst(t *testing.T) {
 	assert.Equal(t, 3000, funding.tempConsumed)
 	assert.Equal(t, 2000, funding.permConsumed)
 	assert.Equal(t, 5000, funding.consumed)
+}
+
+func TestWalletFundingRepeatedPreConsumeRefundPreservesAllBuckets(t *testing.T) {
+	for _, dialect := range []string{"sqlite", "mysql", "postgres"} {
+		t.Run(dialect, func(t *testing.T) {
+			var driver gorm.Dialector
+			switch dialect {
+			case "sqlite":
+				driver = sqlite.Open(":memory:")
+			case "mysql":
+				dsn := os.Getenv("TEST_WALLET_MYSQL_DSN")
+				if dsn == "" {
+					t.Skip("TEST_WALLET_MYSQL_DSN is not configured")
+				}
+				driver = mysql.Open(dsn)
+			case "postgres":
+				dsn := os.Getenv("TEST_WALLET_POSTGRES_DSN")
+				if dsn == "" {
+					t.Skip("TEST_WALLET_POSTGRES_DSN is not configured")
+				}
+				driver = postgres.Open(dsn)
+			}
+			db, err := gorm.Open(driver, &gorm.Config{})
+			require.NoError(t, err)
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			sqlDB.SetMaxOpenConns(1)
+			previousDB, previousType := model.DB, common.MainDatabaseType()
+			model.DB = db
+			common.SetMainDatabaseType(common.DatabaseType(dialect))
+			t.Cleanup(func() {
+				model.DB = previousDB
+				common.SetMainDatabaseType(previousType)
+				require.NoError(t, sqlDB.Close())
+			})
+			for _, expireFirst := range []bool{false, true} {
+				t.Run(fmt.Sprintf("expire_first=%t", expireFirst), func(t *testing.T) {
+					require.NoError(t, db.Migrator().DropTable(&model.User{}, &model.Checkin{}))
+					require.NoError(t, db.AutoMigrate(&model.User{}, &model.Checkin{}))
+					t.Cleanup(func() { require.NoError(t, db.Migrator().DropTable(&model.User{}, &model.Checkin{})) })
+					seedUser(t, 1, 10000)
+					now := common.NowInCheckinTimezone().Unix()
+					first := seedTemporaryCheckinOn(t, 1, 1000, now+3600, "2026-10-18")
+					second := seedTemporaryCheckinOn(t, 1, 2000, now+7200, "2026-10-19")
+					funding := &WalletFunding{userId: 1}
+					require.NoError(t, funding.PreConsume(700))
+					require.NoError(t, funding.PreConsume(4300))
+					assert.Equal(t, 5000, funding.consumed)
+					assert.Equal(t, 3000, funding.tempConsumed)
+					assert.Equal(t, 2000, funding.permConsumed)
+					if expireFirst {
+						require.NoError(t, model.DB.Model(first).Update("quota_expires_at", now-1).Error)
+					}
+					require.NoError(t, funding.Refund())
+					require.NoError(t, funding.Refund())
+					var user model.User
+					require.NoError(t, model.DB.First(&user, 1).Error)
+					assert.Equal(t, 10000, user.Quota)
+					require.NoError(t, model.DB.First(second, second.Id).Error)
+					assert.Equal(t, 2000, second.QuotaRemaining)
+					active, err := model.GetActiveTemporaryQuota(1)
+					require.NoError(t, err)
+					want := 3000
+					if expireFirst {
+						want = 2000
+					}
+					assert.Equal(t, want, active)
+				})
+			}
+		})
+	}
 }
 
 func TestWalletFunding_SettleTopUpAndPartialRefund(t *testing.T) {

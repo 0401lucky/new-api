@@ -903,20 +903,20 @@ For commercial licensing, please contact support@quantumnous.com
  * below can keep working independently.
  */
 [data-theme-preset='clover-journal'] {
-  --background: #f6f1df;
-  --foreground: #30412c;
-  --card: #fffcf0;
+  --background: #f6f7f2;
+  --foreground: #29392f;
+  --card: #fffefa;
   --card-foreground: var(--foreground);
   --popover: var(--card);
   --popover-foreground: var(--foreground);
 
-  --primary: #456638;
-  --primary-foreground: #fffdf2;
-  --secondary: #e9edcf;
-  --secondary-foreground: #485e37;
-  --muted: #eee9d3;
-  --muted-foreground: #626b4c;
-  --accent: #e0e7bf;
+  --primary: #3e6748;
+  --primary-foreground: #fffdf7;
+  --secondary: #eaf0e5;
+  --secondary-foreground: #3e5743;
+  --muted: #eef1e9;
+  --muted-foreground: #59665b;
+  --accent: #e3eddd;
   --accent-foreground: var(--foreground);
 
   --destructive: oklch(0.55 0.14 32);
@@ -930,9 +930,9 @@ For commercial licensing, please contact support@quantumnous.com
   --neutral: var(--muted-foreground);
   --neutral-foreground: var(--primary-foreground);
 
-  --border: #d8d3b3;
-  --input: #7d8d62;
-  --ring: #779557;
+  --border: #dce2d5;
+  --input: #cad5c4;
+  --ring: #6c9166;
 
   --chart-1: #51783f;
   --chart-2: #92aa65;
@@ -940,11 +940,11 @@ For commercial licensing, please contact support@quantumnous.com
   --chart-4: oklch(0.61 0.05 205);
   --chart-5: oklch(0.6 0.09 38);
 
-  --sidebar: #f0ecd7;
+  --sidebar: #f0f2ec;
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: #dfe7bd;
+  --sidebar-accent: #e1ebd9;
   --sidebar-accent-foreground: var(--primary);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
@@ -971,7 +971,7 @@ For commercial licensing, please contact support@quantumnous.com
   --journal-tape-green: oklch(0.82 0.08 124 / 75%);
   --journal-tape-gold: oklch(0.87 0.07 88 / 75%);
   --journal-tape-clay: oklch(0.86 0.035 45 / 65%);
-  --journal-note: #f1edcc;
+  --journal-note: #f0eedb;
   --journal-doodle-opacity: 0.5;
   --journal-warning-ink: oklch(0.47 0.085 75);
   --journal-danger-ink: oklch(0.5 0.13 32);
@@ -991,16 +991,16 @@ For commercial licensing, please contact support@quantumnous.com
 }
 
 .dark [data-theme-preset='clover-journal'] {
-  --background: #22271e;
-  --foreground: #f0ecd9;
-  --card: #2a3024;
-  --primary: #b7cd8b;
-  --primary-foreground: #26351f;
-  --secondary: #343d2b;
+  --background: #1f2521;
+  --foreground: #e7eee5;
+  --card: #272f29;
+  --primary: #a9c99b;
+  --primary-foreground: #1f3221;
+  --secondary: #303d31;
   --secondary-foreground: var(--foreground);
-  --muted: #303729;
-  --muted-foreground: #bbc1a5;
-  --accent: #3a452e;
+  --muted: #2f3831;
+  --muted-foreground: #b0bdae;
+  --accent: #364638;
   --accent-foreground: var(--foreground);
 
   --destructive: oklch(0.73 0.12 32);
@@ -1013,16 +1013,16 @@ For commercial licensing, please contact support@quantumnous.com
   --info-foreground: var(--primary-foreground);
   --neutral-foreground: var(--primary-foreground);
 
-  --border: #48513c;
-  --input: #7d8d62;
+  --border: #3e4b40;
+  --input: #54634f;
   --ring: var(--primary);
   --chart-1: var(--primary);
   --chart-2: oklch(0.64 0.065 135);
   --chart-3: var(--warning);
   --chart-4: var(--info);
   --chart-5: oklch(0.72 0.09 38);
-  --sidebar: #252c20;
-  --sidebar-accent: #3a452e;
+  --sidebar: #222b24;
+  --sidebar-accent: #364638;
   --table-header: var(--muted);
   --table-disabled: var(--background);
 

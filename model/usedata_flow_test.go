@@ -2,14 +2,140 @@ package model
 
 import (
 	"errors"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/glebarez/sqlite"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
+
+// Snapshot of QuotaData from v1.0.0-rc.45, before cache statistics were added.
+type releasedQuotaData struct {
+	Id        int
+	UserID    int    `gorm:"index"`
+	Username  string `gorm:"index:idx_qdt_model_user_name,priority:2;size:64;default:''"`
+	ModelName string `gorm:"index:idx_qdt_model_user_name,priority:1;size:64;default:''"`
+	CreatedAt int64  `gorm:"bigint;index:idx_qdt_created_at,priority:2"`
+	UseGroup  string `gorm:"index;size:64;default:''"`
+	TokenID   int    `gorm:"index;default:0"`
+	ChannelID int    `gorm:"index;default:0"`
+	NodeName  string `gorm:"index;size:64;default:''"`
+	TokenUsed int    `gorm:"default:0"`
+	Count     int    `gorm:"default:0"`
+	Quota     int    `gorm:"default:0"`
+}
+
+func (releasedQuotaData) TableName() string { return "quota_data" }
+
+func TestQuotaDataCacheStatisticsDatabaseMatrix(t *testing.T) {
+	for _, dialect := range []string{"sqlite", "mysql", "postgres"} {
+		t.Run(dialect, func(t *testing.T) {
+			var driver gorm.Dialector
+			switch dialect {
+			case "sqlite":
+				driver = sqlite.Open(":memory:")
+			case "mysql":
+				dsn := os.Getenv("TEST_CACHE_MYSQL_DSN")
+				if dsn == "" {
+					t.Skip("TEST_CACHE_MYSQL_DSN is not configured")
+				}
+				driver = mysql.Open(dsn)
+			case "postgres":
+				dsn := os.Getenv("TEST_CACHE_POSTGRES_DSN")
+				if dsn == "" {
+					t.Skip("TEST_CACHE_POSTGRES_DSN is not configured")
+				}
+				driver = postgres.New(postgres.Config{DSN: dsn, PreferSimpleProtocol: true})
+			}
+			db, err := gorm.Open(driver, &gorm.Config{})
+			require.NoError(t, err)
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			sqlDB.SetMaxOpenConns(1)
+			previousDB, previousType := DB, common.MainDatabaseType()
+			DB = db
+			common.SetMainDatabaseType(common.DatabaseType(dialect))
+			initCol()
+			t.Cleanup(func() {
+				DB = previousDB
+				common.SetMainDatabaseType(previousType)
+				initCol()
+				require.NoError(t, sqlDB.Close())
+			})
+			var version string
+			versionSQL := "SELECT version()"
+			if dialect == "sqlite" {
+				versionSQL = "SELECT sqlite_version()"
+			}
+			require.NoError(t, db.Raw(versionSQL).Scan(&version).Error)
+			t.Logf("cache statistics database: %s %s", dialect, version)
+			for _, upgrade := range []bool{false, true} {
+				name := "fresh"
+				if upgrade {
+					name = "upgrade_rc45"
+				}
+				t.Run(name, func(t *testing.T) {
+					require.NoError(t, db.Migrator().DropTable(&QuotaData{}))
+					if upgrade {
+						require.NoError(t, db.AutoMigrate(&releasedQuotaData{}))
+						require.NoError(t, db.Create(&releasedQuotaData{Id: 7, UserID: 2, Username: "legacy", ModelName: "legacy-model", CreatedAt: 3600, Count: 3, Quota: 90, TokenUsed: 120}).Error)
+					}
+					for range 2 {
+						require.NoError(t, db.AutoMigrate(&QuotaData{}))
+					}
+					if upgrade {
+						var old QuotaData
+						require.NoError(t, db.First(&old, 7).Error)
+						assert.Equal(t, 3, old.Count)
+						assert.Equal(t, 90, old.Quota)
+						assert.Equal(t, 120, old.TokenUsed)
+						assert.Zero(t, old.CacheReadTokens)
+						assert.Zero(t, old.CacheCreationTokens)
+					}
+					CacheQuotaDataLock.Lock()
+					previousCache := CacheQuotaData
+					CacheQuotaData = make(map[string]*QuotaData)
+					CacheQuotaDataLock.Unlock()
+					t.Cleanup(func() {
+						CacheQuotaDataLock.Lock()
+						CacheQuotaData = previousCache
+						CacheQuotaDataLock.Unlock()
+					})
+					for range 2 {
+						LogQuotaData(QuotaDataLogParams{UserID: 3, Username: "cache-owner", ModelName: "cached-model", CreatedAt: 7201, Quota: 11, TokenUsed: 120, CacheReadTokens: 80, CacheCreationTokens: 20, UseGroup: "vip", TokenID: 5, ChannelID: 9, NodeName: "primary"})
+						SaveQuotaDataCache()
+					}
+					for range 2 {
+						require.NoError(t, db.AutoMigrate(&QuotaData{}))
+					}
+					rows, err := GetQuotaDataByUserId(3, 7200, 10800)
+					require.NoError(t, err)
+					require.Len(t, rows, 1)
+					assert.Equal(t, 2, rows[0].Count)
+					assert.Equal(t, 22, rows[0].Quota)
+					assert.Equal(t, 240, rows[0].TokenUsed)
+					assert.EqualValues(t, 160, rows[0].CacheReadTokens)
+					assert.EqualValues(t, 40, rows[0].CacheCreationTokens)
+					grouped, err := GetQuotaDataGroupByUser(7200, 10800)
+					require.NoError(t, err)
+					require.Len(t, grouped, 1)
+					assert.Equal(t, 3, grouped[0].UserID)
+					assert.EqualValues(t, 160, grouped[0].CacheReadTokens)
+					assert.True(t, db.Migrator().HasIndex(&QuotaData{}, "idx_qdt_model_user_name"))
+					assert.True(t, db.Migrator().HasIndex(&QuotaData{}, "idx_qdt_created_at"))
+					require.NoError(t, db.Migrator().DropTable(&QuotaData{}))
+				})
+			}
+		})
+	}
+}
 
 func seedFlowQuotaData(t *testing.T, quotaData QuotaData) {
 	t.Helper()

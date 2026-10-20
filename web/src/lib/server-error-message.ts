@@ -154,6 +154,17 @@ function messageText(value: unknown): string | undefined {
   return value
 }
 
+export function getServerMessage(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined
+  if (typeof value.message_key === 'string' && value.message_key) {
+    return i18next.t(
+      value.message_key,
+      isRecord(value.message_params) ? value.message_params : undefined
+    )
+  }
+  return messageText(value.message)
+}
+
 export function getServerErrorMessage(
   value: unknown,
   fallback?: string
@@ -184,7 +195,7 @@ export function getServerErrorMessage(
       ? messageText(source.error.message)
       : messageText(source.error)
     const message =
-      messageText(source.message) || detail || messageText(source.title)
+      getServerMessage(source) || detail || messageText(source.title)
     if (message) return message
   }
   const status = getServerErrorStatus(value)
