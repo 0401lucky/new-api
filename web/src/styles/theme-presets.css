@@ -903,20 +903,20 @@ For commercial licensing, please contact support@quantumnous.com
  * below can keep working independently.
  */
 [data-theme-preset='clover-journal'] {
-  --background: oklch(0.974 0.008 100);
-  --foreground: oklch(0.31 0.025 150);
-  --card: oklch(0.994 0.004 100);
+  --background: #f6f1df;
+  --foreground: #30412c;
+  --card: #fffcf0;
   --card-foreground: var(--foreground);
   --popover: var(--card);
   --popover-foreground: var(--foreground);
 
-  --primary: oklch(0.445 0.065 153);
-  --primary-foreground: oklch(0.99 0.006 100);
-  --secondary: oklch(0.946 0.014 140);
-  --secondary-foreground: oklch(0.37 0.035 150);
-  --muted: oklch(0.948 0.009 110);
-  --muted-foreground: oklch(0.49 0.018 145);
-  --accent: oklch(0.93 0.023 140);
+  --primary: #456638;
+  --primary-foreground: #fffdf2;
+  --secondary: #e9edcf;
+  --secondary-foreground: #485e37;
+  --muted: #eee9d3;
+  --muted-foreground: #626b4c;
+  --accent: #e0e7bf;
   --accent-foreground: var(--foreground);
 
   --destructive: oklch(0.55 0.14 32);
@@ -930,21 +930,21 @@ For commercial licensing, please contact support@quantumnous.com
   --neutral: var(--muted-foreground);
   --neutral-foreground: var(--primary-foreground);
 
-  --border: oklch(0.89 0.012 125);
-  --input: oklch(0.85 0.015 135);
-  --ring: oklch(0.53 0.075 150);
+  --border: #d8d3b3;
+  --input: #7d8d62;
+  --ring: #779557;
 
-  --chart-1: oklch(0.49 0.075 153);
-  --chart-2: oklch(0.63 0.07 140);
+  --chart-1: #51783f;
+  --chart-2: #92aa65;
   --chart-3: oklch(0.66 0.09 82);
   --chart-4: oklch(0.61 0.05 205);
   --chart-5: oklch(0.6 0.09 38);
 
-  --sidebar: oklch(0.958 0.009 110);
+  --sidebar: #f0ecd7;
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.916 0.023 140);
+  --sidebar-accent: #dfe7bd;
   --sidebar-accent-foreground: var(--primary);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
@@ -961,18 +961,18 @@ For commercial licensing, please contact support@quantumnous.com
   --radius: 0.8rem;
   --journal-card-radius: var(--radius);
   --journal-paper-shadow:
-    0 1px 2px oklch(0.2 0.015 150 / 3%),
-    0 8px 24px -18px oklch(0.2 0.015 150 / 16%);
+    0 1px 3px oklch(0.35 0.04 100 / 6%),
+    0 8px 24px -16px oklch(0.35 0.04 100 / 22%);
   --journal-paper-shadow-hover:
-    0 2px 4px oklch(0.2 0.015 150 / 4%),
-    0 12px 28px -18px oklch(0.2 0.015 150 / 20%);
+    0 2px 4px oklch(0.35 0.04 100 / 8%),
+    0 12px 28px -16px oklch(0.35 0.04 100 / 26%);
   --journal-grain-blend: multiply;
-  --journal-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
-  --journal-tape-green: oklch(0.87 0.035 140 / 70%);
-  --journal-tape-gold: oklch(0.9 0.035 88 / 70%);
+  --journal-grain: url('../assets/clover-journal/paper-grain.webp');
+  --journal-tape-green: oklch(0.82 0.08 124 / 75%);
+  --journal-tape-gold: oklch(0.87 0.07 88 / 75%);
   --journal-tape-clay: oklch(0.86 0.035 45 / 65%);
-  --journal-note: oklch(0.96 0.025 92);
-  --journal-doodle-opacity: 0.4;
+  --journal-note: #f1edcc;
+  --journal-doodle-opacity: 0.5;
   --journal-warning-ink: oklch(0.47 0.085 75);
   --journal-danger-ink: oklch(0.5 0.13 32);
   --journal-success-ink: oklch(0.46 0.085 153);
@@ -991,16 +991,16 @@ For commercial licensing, please contact support@quantumnous.com
 }
 
 .dark [data-theme-preset='clover-journal'] {
-  --background: oklch(0.205 0.012 150);
-  --foreground: oklch(0.92 0.01 100);
-  --card: oklch(0.25 0.014 150);
-  --primary: oklch(0.76 0.065 145);
-  --primary-foreground: oklch(0.21 0.022 150);
-  --secondary: oklch(0.3 0.016 145);
+  --background: #22271e;
+  --foreground: #f0ecd9;
+  --card: #2a3024;
+  --primary: #b7cd8b;
+  --primary-foreground: #26351f;
+  --secondary: #343d2b;
   --secondary-foreground: var(--foreground);
-  --muted: oklch(0.285 0.013 150);
-  --muted-foreground: oklch(0.74 0.015 125);
-  --accent: oklch(0.325 0.025 145);
+  --muted: #303729;
+  --muted-foreground: #bbc1a5;
+  --accent: #3a452e;
   --accent-foreground: var(--foreground);
 
   --destructive: oklch(0.73 0.12 32);
@@ -1013,26 +1013,26 @@ For commercial licensing, please contact support@quantumnous.com
   --info-foreground: var(--primary-foreground);
   --neutral-foreground: var(--primary-foreground);
 
-  --border: oklch(0.355 0.014 145);
-  --input: oklch(0.41 0.019 145);
+  --border: #48513c;
+  --input: #7d8d62;
   --ring: var(--primary);
   --chart-1: var(--primary);
   --chart-2: oklch(0.64 0.065 135);
   --chart-3: var(--warning);
   --chart-4: var(--info);
   --chart-5: oklch(0.72 0.09 38);
-  --sidebar: oklch(0.225 0.012 150);
-  --sidebar-accent: oklch(0.315 0.024 145);
+  --sidebar: #252c20;
+  --sidebar-accent: #3a452e;
   --table-header: var(--muted);
   --table-disabled: var(--background);
 
   --journal-paper-shadow: 0 3px 16px -10px oklch(0.1 0.01 150 / 45%);
   --journal-paper-shadow-hover: 0 6px 22px -12px oklch(0.1 0.01 150 / 55%);
   --journal-grain-blend: screen;
-  --journal-tape-green: oklch(0.51 0.035 140 / 60%);
+  --journal-tape-green: oklch(0.51 0.06 124 / 70%);
   --journal-tape-gold: oklch(0.53 0.035 88 / 55%);
   --journal-tape-clay: oklch(0.5 0.035 45 / 55%);
-  --journal-note: oklch(0.315 0.022 92);
+  --journal-note: #3b402b;
   --journal-warning-ink: var(--warning);
   --journal-danger-ink: var(--destructive);
   --journal-success-ink: var(--success);
@@ -1106,7 +1106,8 @@ For commercial licensing, please contact support@quantumnous.com
   .journal-grain,
   .journal-paper-clip,
   .journal-botanical-canvas,
-  .journal-polaroid
+  .journal-polaroid,
+  [data-slot='section-page-decoration']
 ):not([data-theme-preset='clover-journal'] *) {
   display: none;
 }
@@ -1124,7 +1125,7 @@ For commercial licensing, please contact support@quantumnous.com
   ) {
   display: none;
 }
-/* Data is never decorated, including the overview's immersive page. */
+/* Keep data clear; a few overview heading details are enabled below. */
 [data-theme-preset='clover-journal']
   :is(
     [data-slot='overview-summary'],
@@ -1144,7 +1145,8 @@ For commercial licensing, please contact support@quantumnous.com
   opacity: var(--journal-doodle-opacity);
 }
 [data-theme-preset='clover-journal'] .journal-botanical-canvas .journal-doodle {
-  opacity: 0.22;
+  fill: color-mix(in oklch, var(--primary) 14%, transparent);
+  opacity: 0.3;
 }
 [data-theme-preset='clover-journal'] .journal-tape {
   background-color: var(--journal-tape-green);
@@ -1515,18 +1517,134 @@ For commercial licensing, please contact support@quantumnous.com
   }
 }
 
-/* A botanical cover and a single form column, with no competing offset. */
-:is([data-slot='auth-cover'], [data-slot='auth-welcome-note']):not(
-  [data-theme-preset='clover-journal'] *
-) {
+/* The artwork and paper details only load and appear with the journal preset. */
+:is(
+  [data-slot='auth-cover'],
+  [data-slot='auth-welcome-note'],
+  [data-slot='auth-paper-marker'],
+  [data-slot='auth-paper-botanical']
+):not([data-theme-preset='clover-journal'] *) {
   display: none;
 }
+[data-theme-preset='clover-journal'] [data-slot='auth-layout'] {
+  background-image:
+    var(--journal-grain),
+    radial-gradient(
+      ellipse at 4% 65%,
+      color-mix(in oklch, var(--accent) 55%, transparent),
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse at 98% 10%,
+      color-mix(in oklch, var(--secondary) 70%, transparent),
+      transparent 40%
+    );
+  background-size:
+    160px 160px,
+    auto,
+    auto;
+  background-blend-mode: var(--journal-grain-blend), normal, normal;
+}
+[data-theme-preset='clover-journal'] [data-slot='auth-form-column'] {
+  max-width: 31rem;
+}
+[data-theme-preset='clover-journal'] [data-slot='auth-illustration'] {
+  aspect-ratio: 1;
+  max-width: 42rem;
+  background-image: url('../assets/clover-journal/meadow-collage.webp');
+  background-repeat: no-repeat;
+  background-size: contain;
+  mask-image: radial-gradient(
+    ellipse 68% 66% at center,
+    #000 48%,
+    transparent 76%
+  );
+}
+[data-theme-preset='clover-journal'] [data-slot='auth-cover-caption'] {
+  margin-top: -1rem;
+}
+[data-theme-preset='clover-journal']
+  [data-slot='auth-cover-caption']
+  .journal-hand {
+  color: var(--primary);
+}
 [data-theme-preset='clover-journal'] [data-slot='auth-form-card'] {
-  padding: 1.75rem;
+  padding: 2rem 1.5rem;
   border: 1px solid var(--border);
-  border-radius: var(--journal-card-radius);
+  border-radius: calc(var(--journal-card-radius) * 0.45)
+    calc(var(--journal-card-radius) * 0.9)
+    calc(var(--journal-card-radius) * 0.65)
+    calc(var(--journal-card-radius) * 0.75);
   background-color: var(--card);
+  background-image: var(--journal-grain);
+  background-size: 160px 160px;
+  background-blend-mode: var(--journal-grain-blend);
+  box-shadow:
+    0 3px 5px -3px color-mix(in oklch, var(--primary) 16%, transparent),
+    0 18px 48px -28px color-mix(in oklch, var(--primary) 24%, transparent);
+}
+[data-theme-preset='clover-journal'] [data-slot='auth-form-card']::before {
+  content: '';
+  position: absolute;
+  inset: 0.65rem -0.4rem -0.5rem 0.5rem;
+  z-index: -1;
+  transform: rotate(1.2deg);
+  border: 1px solid var(--border);
+  border-radius: inherit;
+  background-color: var(--journal-note);
   box-shadow: var(--journal-paper-shadow);
+  pointer-events: none;
+}
+[data-theme-preset='clover-journal'] [data-slot='auth-form-shell'] {
+  isolation: isolate;
+  padding-inline: 1.5rem;
+  padding-block: 7rem 3rem;
+}
+[data-theme-preset='clover-journal'] [data-slot='auth-form-card'] h2 {
+  font-size: 1.875rem;
+  line-height: 1.3;
+  text-align: start;
+  color: var(--foreground);
+}
+[data-theme-preset='clover-journal']
+  [data-slot='auth-paper-marker']
+  .journal-doodle {
+  fill: var(--accent);
+  opacity: 0.85;
+}
+[data-theme-preset='clover-journal']
+  [data-slot='auth-paper-botanical']
+  .journal-doodle {
+  fill: var(--accent);
+  stroke-width: 1;
+  opacity: 0.7;
+}
+[data-theme-preset='clover-journal']
+  [data-slot='auth-form-card']
+  :is([data-slot='input'], [data-slot='input-group']) {
+  min-height: 2.75rem;
+  border-radius: var(--journal-card-radius);
+  background-color: color-mix(in oklch, var(--background) 45%, var(--card));
+}
+[data-theme-preset='clover-journal']
+  [data-slot='auth-form-card']
+  input:-webkit-autofill {
+  -webkit-text-fill-color: var(--foreground);
+  box-shadow: 0 0 0 1000px var(--card) inset;
+}
+[data-theme-preset='clover-journal']
+  [data-slot='auth-form-card']
+  input:-webkit-autofill:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+[data-theme-preset='clover-journal']
+  [data-slot='auth-form-card']
+  [data-slot='button'][type='submit'] {
+  min-height: 2.75rem;
+  border-radius: var(--journal-card-radius);
+  box-shadow: 0 3px 6px -4px
+    color-mix(in oklch, var(--primary) 50%, transparent);
 }
 [data-theme-preset='clover-journal'] .journal-polaroid-frame {
   width: 18rem;
@@ -1550,15 +1668,32 @@ For commercial licensing, please contact support@quantumnous.com
   stroke-width: 0.65;
 }
 @media (min-width: 1024px) {
+  [data-theme-preset='clover-journal'] [data-slot='auth-content'] {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(1.5rem, 3vw, 3.5rem);
+    max-width: 92rem;
+    min-height: 100svh;
+    margin-inline: auto;
+    padding: 7rem 3.5rem 4rem;
+  }
   [data-theme-preset='clover-journal'] [data-slot='auth-cover'] {
     display: flex;
-    border-inline-end: 1px solid var(--border);
   }
   [data-theme-preset='clover-journal'] [data-slot='auth-form-shell'] {
-    margin-inline-start: 46%;
-    padding-inline: 2.5rem;
-    padding-block: 5rem 3rem;
+    min-height: 0;
+    padding: 1rem 0;
   }
+}
+@media (min-width: 640px) {
+  [data-theme-preset='clover-journal'] [data-slot='auth-form-card'] {
+    padding: 2.5rem 2.75rem;
+  }
+}
+.dark [data-theme-preset='clover-journal'] [data-slot='auth-illustration'] {
+  filter: brightness(0.82) saturate(0.75);
+  opacity: 0.9;
 }
 
 /* Overview and analytics use rules between values instead of nested boxes. */
@@ -1595,6 +1730,172 @@ For commercial licensing, please contact support@quantumnous.com
 [data-theme-preset='clover-journal'] [data-slot='dashboard-performance-model'] {
   border-radius: 0.35rem;
   background-color: var(--muted);
+}
+
+/* Notebook labels and small ink stamps give the console its journal character. */
+[data-theme-preset='clover-journal']
+  [data-journal-level='immersive']
+  [data-slot='section-page-heading'] {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 0.35) calc(var(--radius) * 0.6)
+    calc(var(--radius) * 0.4) calc(var(--radius) * 0.7);
+  background-color: var(--card);
+  background-image: var(--journal-grain);
+  background-size: 160px 160px;
+  background-blend-mode: var(--journal-grain-blend);
+  box-shadow: 2px 2px 0 color-mix(in oklch, var(--border) 50%, transparent);
+}
+[data-theme-preset='clover-journal']
+  [data-journal-level='immersive']
+  [data-slot='section-page-title'] {
+  padding-inline-end: 1.5rem;
+}
+[data-theme-preset='clover-journal']
+  [data-slot='section-page-decoration']
+  .journal-doodle {
+  fill: var(--accent);
+  stroke-width: 1;
+  opacity: 0.8;
+}
+[data-theme-preset='clover-journal']
+  [data-slot='main']
+  [data-slot='icon-badge'] {
+  border: 1px solid color-mix(in oklch, currentColor 22%, transparent);
+  border-radius: 42% 54% 46% 58% / 55% 42% 58% 45%;
+  box-shadow: inset 0 1px 0 color-mix(in oklch, var(--card) 70%, transparent);
+}
+[data-theme-preset='clover-journal']
+  :is(
+    [data-slot='dashboard-stat-cell'],
+    [data-slot='overview-summary-stat']
+  ):nth-child(even)
+  [data-slot='icon-badge'] {
+  border-radius: 56% 42% 58% 44% / 44% 58% 42% 56%;
+}
+[data-theme-preset='clover-journal']
+  :is([data-slot='overview-summary-stat'], [data-slot='dashboard-stat-cell']) {
+  border-inline-start-style: dashed;
+  border-inline-end-style: dashed;
+}
+[data-theme-preset='clover-journal'] [data-slot='dashboard-stat-strip'] {
+  background-image: linear-gradient(
+    115deg,
+    color-mix(in oklch, var(--secondary) 32%, transparent),
+    transparent 55%
+  );
+}
+[data-theme-preset='clover-journal']
+  :is(
+    [data-slot='overview-summary-heading'] h3,
+    [data-slot='overview-panel-title'],
+    [data-slot='overview-actions-panel'] h3
+  ) {
+  width: fit-content;
+  max-width: 100%;
+  background-image: linear-gradient(
+    transparent 62%,
+    color-mix(in oklch, var(--accent) 70%, transparent) 62%,
+    color-mix(in oklch, var(--accent) 40%, transparent) 94%,
+    transparent 94%
+  );
+}
+[data-theme-preset='clover-journal']
+  :is(
+    [data-slot='overview-panel-header'],
+    [data-slot='dashboard-chart-card'] > :first-child
+  ) {
+  border-bottom-style: dashed;
+  background-image: linear-gradient(
+    100deg,
+    color-mix(in oklch, var(--secondary) 32%, transparent),
+    transparent 75%
+  );
+}
+[data-theme-preset='clover-journal']
+  :is(
+    [data-slot='overview-balance-slip'],
+    [data-slot='overview-actions-panel']
+  ) {
+  background-image: var(--journal-grain);
+  background-size: 160px 160px;
+  background-blend-mode: var(--journal-grain-blend);
+}
+[data-theme-preset='clover-journal']
+  [data-slot='overview-actions-panel']
+  > .journal-doodle {
+  fill: color-mix(in oklch, var(--primary) 16%, transparent);
+}
+[data-theme-preset='clover-journal'] [data-slot='overview-actions-heading'] {
+  padding-inline-end: 2.5rem;
+}
+[data-theme-preset='clover-journal'] [data-journal-slot='quick-action'] {
+  gap: 0.75rem;
+  border-style: dashed;
+  border-radius: calc(var(--radius) * 0.8) calc(var(--radius) * 1.3)
+    calc(var(--radius) * 0.8) calc(var(--radius) * 1.3);
+  background-color: color-mix(in oklch, var(--secondary) 32%, var(--card));
+  box-shadow: 0 2px 0 color-mix(in oklch, var(--border) 40%, transparent);
+}
+[data-theme-preset='clover-journal']
+  [data-journal-slot='quick-action']:nth-child(even) {
+  background-color: color-mix(in oklch, var(--journal-note) 40%, var(--card));
+}
+[data-theme-preset='clover-journal'] [data-journal-slot='quick-action-icon'] {
+  border: 1px solid color-mix(in oklch, var(--primary) 25%, var(--border));
+  border-radius: 48% 52% 44% 56% / 55% 43% 57% 45%;
+  background-color: var(--card);
+  color: var(--primary);
+  box-shadow: inset 0 0 0 3px
+    color-mix(in oklch, var(--secondary) 55%, var(--card));
+}
+[data-theme-preset='clover-journal'] [data-journal-slot='quick-action-arrow'] {
+  color: var(--primary);
+}
+[data-journal-slot='quick-action-arrow']:not(
+  [data-theme-preset='clover-journal'] *
+) {
+  display: none;
+}
+[data-theme-preset='clover-journal']
+  [data-slot='dashboard-section-toolbar']
+  [data-slot='tabs-list'] {
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  background-color: color-mix(in oklch, var(--secondary) 70%, var(--card));
+}
+[data-theme-preset='clover-journal']
+  [data-slot='dashboard-section-toolbar']
+  [data-slot='tabs-trigger'] {
+  border-radius: calc(var(--radius) * 0.45) calc(var(--radius) * 0.9)
+    calc(var(--radius) * 0.5) calc(var(--radius) * 0.85);
+}
+@media (min-width: 640px) {
+  [data-theme-preset='clover-journal']
+    [data-slot='overview-summary']
+    > .journal-paper-clip {
+    display: block;
+  }
+  [data-theme-preset='clover-journal']
+    [data-slot='overview-summary-heading']
+    .journal-hand {
+    display: inline-block;
+  }
+}
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  [data-theme-preset='clover-journal'] [data-journal-slot='quick-action'] {
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      translate 150ms ease;
+  }
+  [data-theme-preset='clover-journal']
+    [data-journal-slot='quick-action']:hover {
+    translate: 0 -1px;
+    border-color: var(--input);
+  }
 }
 [data-theme-preset='clover-journal'] [data-slot='billing-record'] {
   border-color: var(--border);

@@ -24,7 +24,8 @@ import {
   CloverBotanicalCanvas,
   CloverDoodle,
   HandNote,
-  Polaroid,
+  PaperClip,
+  StickyNote,
   WashiTape,
 } from '@/components/clover-journal'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -44,7 +45,7 @@ export function AuthLayout(props: AuthLayoutProps) {
       data-journal-level='immersive'
       className='bg-background relative min-h-svh overflow-hidden'
     >
-      <CloverBotanicalCanvas showNotes={false} showBottomRight={false} />
+      <CloverBotanicalCanvas showNotes={false} showTopLeft={false} />
       <Link
         to='/'
         className='absolute top-5 left-5 z-20 flex items-center gap-2.5 transition-opacity hover:opacity-80 sm:top-8 sm:left-8'
@@ -74,21 +75,6 @@ export function AuthLayout(props: AuthLayoutProps) {
 
       <div
         aria-hidden='true'
-        data-slot='auth-cover'
-        className='pointer-events-none absolute inset-y-0 left-0 hidden w-[46%] items-center justify-center overflow-hidden px-10'
-      >
-        <div className='relative max-w-full'>
-          <Polaroid rotation={-3} caption={t('Record every valuable call')} />
-          <CloverDoodle
-            variant='leaf'
-            size='lg'
-            className='absolute -right-12 -bottom-8 size-16 rotate-15'
-          />
-        </div>
-      </div>
-
-      <div
-        aria-hidden='true'
         data-slot='auth-corner-plants'
         className='pointer-events-none absolute inset-0 lg:hidden'
       >
@@ -104,31 +90,86 @@ export function AuthLayout(props: AuthLayoutProps) {
         />
       </div>
 
-      <div
-        data-slot='auth-form-shell'
-        className='relative flex min-h-svh items-center justify-center px-4 pt-24 pb-10'
-      >
-        <div className='relative w-full max-w-[420px]'>
-          <div data-slot='auth-form-card' className='relative w-full'>
-            <WashiTape
-              className='-top-2 left-7'
-              tone='green'
-              width='4.5rem'
-              rotation={-2}
-            />
-            <div
-              data-slot='auth-welcome-note'
-              className='mb-5 flex justify-end'
-            >
-              <HandNote className='text-sm' rotation={-1}>
-                {t('A little luck for your journey')}
-              </HandNote>
-            </div>
-            {props.children}
+      <div data-slot='auth-content' className='relative'>
+        <div
+          aria-hidden='true'
+          data-slot='auth-cover'
+          className='pointer-events-none relative hidden min-w-0 flex-col items-center justify-center'
+        >
+          <div data-slot='auth-illustration' className='w-full' />
+          <div
+            data-slot='auth-cover-caption'
+            className='relative flex items-center justify-center gap-3 px-5'
+          >
+            <CloverDoodle variant='four-leaf' size='md' />
+            <HandNote className='text-center text-xl' rotation={-2}>
+              {t('Record every valuable call')}
+            </HandNote>
           </div>
-          <HandNote className='mt-6 block text-center text-sm'>
-            {t('Good things are always around you')}
-          </HandNote>
+        </div>
+
+        <div
+          data-slot='auth-form-shell'
+          className='relative flex min-h-svh items-center justify-center px-4 pt-24 pb-10'
+        >
+          <div
+            data-slot='auth-form-column'
+            className='relative w-full max-w-[420px]'
+          >
+            <div data-slot='auth-form-card' className='relative w-full'>
+              <WashiTape
+                className='-top-2 left-7'
+                tone='gingham'
+                width='6rem'
+                height='1.25rem'
+                rotation={-12}
+              />
+              <div
+                data-slot='auth-welcome-note'
+                className='pointer-events-none absolute -top-5 right-5 max-w-[60%]'
+              >
+                <StickyNote rotation={4}>
+                  <PaperClip
+                    tone='brass'
+                    size='sm'
+                    rotation={12}
+                    className='absolute -top-4 right-1'
+                  />
+                  <HandNote className='text-sm'>
+                    {t('A little luck for your journey')}
+                  </HandNote>
+                </StickyNote>
+              </div>
+              <div
+                aria-hidden='true'
+                data-slot='auth-paper-marker'
+                className='pointer-events-none mb-5 flex items-center gap-3'
+              >
+                <CloverDoodle variant='four-leaf' size='md' />
+                <span className='bg-border h-px w-12' />
+              </div>
+              {props.children}
+              <div
+                aria-hidden='true'
+                data-slot='auth-paper-botanical'
+                className='pointer-events-none absolute -right-7 -bottom-6 flex items-end'
+              >
+                <CloverDoodle
+                  variant='sprig'
+                  size='lg'
+                  className='size-16 -rotate-20'
+                />
+                <CloverDoodle
+                  variant='four-leaf'
+                  size='lg'
+                  className='-ml-5 size-12 rotate-15'
+                />
+              </div>
+            </div>
+            <HandNote className='mt-7 block text-center text-base'>
+              {t('Good things are always around you')}
+            </HandNote>
+          </div>
         </div>
       </div>
     </div>

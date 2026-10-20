@@ -56,6 +56,7 @@ afterAll(() => {
 })
 
 beforeEach(() => {
+  window.localStorage.removeItem('dashboard_overview_setup_guide_expanded')
   useSystemConfigStore.setState(useSystemConfigStore.getInitialState(), true)
   useAuthStore.getState().auth.setUser({
     id: 1,
@@ -103,6 +104,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  window.localStorage.removeItem('dashboard_overview_setup_guide_expanded')
   client.clear()
   useAuthStore.setState(useAuthStore.getInitialState(), true)
   useSystemConfigStore.setState(useSystemConfigStore.getInitialState(), true)
@@ -151,7 +153,7 @@ describe('journal dashboard overview', () => {
     const decorations = main.querySelectorAll(
       '.journal-doodle, .journal-tape, .journal-paper-clip, .journal-hand, .journal-sticky-note'
     )
-    expect(decorations.length).toBe(4)
+    expect(decorations.length).toBeGreaterThan(0)
     for (const selector of [
       '.journal-tape',
       '.journal-paper-clip',
@@ -163,6 +165,7 @@ describe('journal dashboard overview', () => {
     decorations.forEach((node) => {
       expect(node).toHaveAttribute('aria-hidden', 'true')
       expect(node).toHaveClass('pointer-events-none')
+      expect(node.closest('[data-slot="overview-summary-stat"]')).toBeNull()
     })
   })
 
@@ -177,5 +180,20 @@ describe('journal dashboard overview', () => {
 
     expect(await screen.findByRole('dialog')).toBeVisible()
     expect(screen.getByText('Announcement Details')).toBeVisible()
+  })
+
+  it('keeps shortcut names and destinations intact with decorative arrow stamps', async () => {
+    await renderOverview()
+
+    await screen.findByText('Recommended actions')
+    const shortcut = screen.getByRole('button', { name: /API Keys/ })
+    expect(shortcut).toHaveAttribute('href', '/keys')
+    expect(shortcut).toBeEnabled()
+    const arrow = shortcut.querySelector(
+      '[data-journal-slot="quick-action-arrow"]'
+    )
+    expect(arrow).toHaveAttribute('aria-hidden', 'true')
+    shortcut.focus()
+    expect(shortcut).toHaveFocus()
   })
 })

@@ -16,10 +16,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { readFileSync } from 'node:fs'
+
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AuthLayout } from '../auth-layout'
 
@@ -37,8 +39,24 @@ vi.mock('@tanstack/react-router', () => ({
   ),
 }))
 
+const presetStyles = readFileSync('src/styles/theme-presets.css', 'utf8')
+let style: HTMLStyleElement
+
+beforeEach(() => {
+  document.body.removeAttribute('data-theme-preset')
+  style = document.createElement('style')
+  style.textContent = presetStyles
+  document.head.append(style)
+})
+
+afterEach(() => {
+  style.remove()
+  document.body.removeAttribute('data-theme-preset')
+})
+
 describe('AuthLayout journal cover', () => {
   it('keeps form fields keyboard accessible and submits through the original form', async () => {
+    document.body.dataset.themePreset = 'clover-journal'
     const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault())
     const user = userEvent.setup()
     render(
@@ -100,12 +118,44 @@ describe('AuthLayout journal cover', () => {
     )
 
     const welcome = document.querySelector(
-      '[data-slot="auth-welcome-note"] [aria-hidden="true"]'
+      '[data-slot="auth-welcome-note"] .journal-hand'
     )
     expect(welcome).toBeInTheDocument()
     expect(welcome).toHaveClass('journal-hand', 'pointer-events-none')
     expect(
       screen.getByRole('form', { name: 'Sign up form' })
     ).toBeInTheDocument()
+  })
+
+  it('loads the decorative artwork only for the journal preset and keeps the form available when presets change', () => {
+    const { container } = render(
+      <AuthLayout>
+        <form aria-label='Sign in form' />
+      </AuthLayout>
+    )
+    const artwork = container.querySelector<HTMLElement>(
+      '[data-slot="auth-illustration"]'
+    )
+    const marker = container.querySelector<HTMLElement>(
+      '[data-slot="auth-paper-marker"]'
+    )
+    expect(artwork).toBeInTheDocument()
+    expect(marker).toBeInTheDocument()
+    if (!artwork || !marker) throw new Error('Journal decorations are missing')
+
+    expect(getComputedStyle(artwork).backgroundImage).not.toContain('url(')
+    expect(getComputedStyle(marker).display).toBe('none')
+
+    document.body.dataset.themePreset = 'clover-journal'
+    expect(getComputedStyle(artwork).backgroundImage).toContain('url(')
+    expect(getComputedStyle(artwork).aspectRatio).toBe('1 / 1')
+    expect(getComputedStyle(marker).display).not.toBe('none')
+    expect(screen.getByRole('form', { name: 'Sign in form' })).toBeVisible()
+    expect(screen.getAllByRole('img')).toHaveLength(1)
+
+    document.body.dataset.themePreset = 'lucky-clover'
+    expect(getComputedStyle(artwork).backgroundImage).not.toContain('url(')
+    expect(getComputedStyle(marker).display).toBe('none')
+    expect(screen.getByRole('form', { name: 'Sign in form' })).toBeVisible()
   })
 })

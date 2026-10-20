@@ -41,6 +41,7 @@ import { useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { CloverDoodle } from '@/components/clover-journal'
 import { SectionPageLayout } from '@/components/layout'
 import {
   CardStaggerContainer,
@@ -425,11 +426,15 @@ function QuickActionItem(props: { action: QuickAction }) {
 
   return (
     <Button
+      data-journal-slot='quick-action'
       variant='outline'
       className='h-auto justify-start rounded-xl px-3 py-3 text-left'
       render={<Link to={props.action.to} />}
     >
-      <span className='bg-muted flex size-9 shrink-0 items-center justify-center rounded-lg'>
+      <span
+        data-journal-slot='quick-action-icon'
+        className='bg-muted flex size-9 shrink-0 items-center justify-center rounded-lg'
+      >
         <Icon className='size-4' aria-hidden='true' />
       </span>
       <span className='flex min-w-0 flex-1 flex-col gap-0.5'>
@@ -440,6 +445,11 @@ function QuickActionItem(props: { action: QuickAction }) {
           {props.action.description}
         </span>
       </span>
+      <ArrowRight
+        data-journal-slot='quick-action-arrow'
+        aria-hidden='true'
+        className='size-4 shrink-0'
+      />
     </Button>
   )
 }
@@ -714,9 +724,20 @@ export function OverviewDashboard() {
                   </div>
                 </CardStaggerItem>
 
-                <CardStaggerItem className='bg-card h-full rounded-2xl border p-4 shadow-xs sm:p-5'>
+                <CardStaggerItem
+                  data-slot='overview-actions-panel'
+                  className='bg-card relative h-full rounded-2xl border p-4 shadow-xs sm:p-5'
+                >
+                  <CloverDoodle
+                    variant='sprig'
+                    size='lg'
+                    className='absolute top-4 right-4 hidden size-9 -rotate-12 sm:block'
+                  />
                   <div className='flex h-full flex-col gap-4'>
-                    <div className='flex flex-col gap-1'>
+                    <div
+                      data-slot='overview-actions-heading'
+                      className='flex flex-col gap-1'
+                    >
                       <div className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
                         {t('Recommended actions')}
                       </div>

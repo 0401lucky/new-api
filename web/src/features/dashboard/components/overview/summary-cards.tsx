@@ -22,11 +22,7 @@ import { ArrowRight, Flame, ShieldCheck, TrendingDown } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import {
-  HandNote,
-  PaperClip,
-  WashiTape,
-} from '@/components/clover-journal'
+import { HandNote, PaperClip, WashiTape } from '@/components/clover-journal'
 import { StaggerContainer, StaggerItem } from '@/components/page-transition'
 import { Button } from '@/components/ui/button'
 import { getUserQuotaDates } from '@/features/dashboard/api'
@@ -268,10 +264,13 @@ export function SummaryCards() {
         rotation={-2}
         className='top-0 left-1/2 hidden -translate-x-1/2 sm:block'
       />
-      <PaperClip className='absolute top-2 left-3 rotate-[10deg]' />
+      <PaperClip size='sm' className='absolute top-1 right-3' rotation={10} />
       <div className='grid xl:grid-cols-[minmax(0,1fr)_19rem]'>
         <div className='flex flex-col gap-2.5 p-3 sm:gap-3 sm:p-5'>
-          <div className='flex flex-wrap items-start justify-between gap-3'>
+          <div
+            data-slot='overview-summary-heading'
+            className='flex flex-wrap items-start justify-between gap-3'
+          >
             <div className='flex flex-col gap-1'>
               <h3 className='text-sm font-semibold sm:text-base'>
                 {t('Usage at a glance')}
@@ -280,7 +279,7 @@ export function SummaryCards() {
                 {t('Monitor balance, usage, and request volume')}
               </p>
             </div>
-            <HandNote className='mt-1 hidden text-sm sm:inline-block'>
+            <HandNote className='mt-1 mr-5 hidden text-sm sm:inline-block'>
               {t('Steady progress, keep going!')}
             </HandNote>
           </div>

@@ -24,7 +24,11 @@ import {
   type ReactNode,
 } from 'react'
 
-import type { JournalLevel } from '@/components/clover-journal'
+import {
+  CloverDoodle,
+  WashiTape,
+  type JournalLevel,
+} from '@/components/clover-journal'
 
 import { Main } from './main'
 import { PageFooterProvider } from './page-footer'
@@ -99,12 +103,36 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
                   : 'min-w-0 flex-1'
               }
             >
-              <h2
-                data-slot='section-page-title'
-                className='truncate text-base font-bold tracking-tight sm:text-lg'
+              <div
+                data-slot='section-page-heading'
+                className='relative min-w-0'
               >
-                {title}
-              </h2>
+                {props.journalLevel === 'immersive' && (
+                  <span
+                    aria-hidden='true'
+                    data-slot='section-page-decoration'
+                    className='pointer-events-none absolute inset-0'
+                  >
+                    <WashiTape
+                      tone='gingham'
+                      width='3.25rem'
+                      height='0.7rem'
+                      rotation={-12}
+                      className='-top-1 left-3'
+                    />
+                    <CloverDoodle
+                      variant='four-leaf'
+                      className='absolute top-1/2 right-2 size-5 -translate-y-1/2 -rotate-12'
+                    />
+                  </span>
+                )}
+                <h2
+                  data-slot='section-page-title'
+                  className='truncate text-base font-bold tracking-tight sm:text-lg'
+                >
+                  {title}
+                </h2>
+              </div>
             </div>
             {actions != null && (
               <div
