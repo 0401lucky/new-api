@@ -23,12 +23,17 @@ import { SectionPageLayout } from '@/components/layout'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 import { BlackroomDialogs } from './components/blackroom-dialogs'
+import { BlackroomDistributionTable } from './components/blackroom-distribution-table'
 import { BlackroomIPAuditTable } from './components/blackroom-ip-audit-table'
 import { BlackroomPrimaryButtons } from './components/blackroom-primary-buttons'
 import { BlackroomProvider } from './components/blackroom-provider'
 import { BlackroomStatusBanner } from './components/blackroom-status-banner'
 import { BlackroomTable } from './components/blackroom-table'
-import { BLACKROOM_DEFAULT_TAB, BLACKROOM_TAB_IP_AUDIT } from './constants'
+import {
+  BLACKROOM_DEFAULT_TAB,
+  BLACKROOM_TAB_DISTRIBUTION,
+  BLACKROOM_TAB_IP_AUDIT,
+} from './constants'
 
 const route = getRouteApi('/_authenticated/blackroom/')
 
@@ -43,7 +48,10 @@ export function Blackroom() {
       search: (previous) => ({
         ...previous,
         tab:
-          value === BLACKROOM_TAB_IP_AUDIT ? BLACKROOM_TAB_IP_AUDIT : undefined,
+          value === BLACKROOM_TAB_IP_AUDIT ||
+          value === BLACKROOM_TAB_DISTRIBUTION
+            ? value
+            : undefined,
       }),
     })
   }
@@ -81,6 +89,9 @@ export function Blackroom() {
               <TabsTrigger value={BLACKROOM_TAB_IP_AUDIT}>
                 {t('IP audit')}
               </TabsTrigger>
+              <TabsTrigger value={BLACKROOM_TAB_DISTRIBUTION}>
+                {t('Redistribution watchlist')}
+              </TabsTrigger>
             </TabsList>
             <TabsContent
               value={BLACKROOM_DEFAULT_TAB}
@@ -90,6 +101,16 @@ export function Blackroom() {
               <div className='min-h-0 flex-1'>
                 <BlackroomTable />
               </div>
+            </TabsContent>
+            <TabsContent
+              value={BLACKROOM_TAB_DISTRIBUTION}
+              className='min-h-0 flex-1'
+            >
+              <BlackroomDistributionTable
+                search={search}
+                navigate={navigate}
+                onSelectUser={showUserBans}
+              />
             </TabsContent>
             <TabsContent
               value={BLACKROOM_TAB_IP_AUDIT}

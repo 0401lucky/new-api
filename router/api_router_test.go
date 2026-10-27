@@ -19,6 +19,7 @@ func TestSetApiRouterRegisters(t *testing.T) {
 	}
 
 	expectedRoutes := []string{
+		http.MethodGet + " /api/blackroom/distribution",
 		http.MethodGet + " /api/authz/catalog",
 		http.MethodGet + " /api/user/by_linuxdo",
 		http.MethodPost + " /api/user/temporary_quota",

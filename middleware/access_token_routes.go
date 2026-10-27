@@ -89,6 +89,7 @@ var accessTokenRouteRules = map[string]accessTokenRouteRule{
 	"PUT /api/blackroom/setting":                       accessTokenScopeRule("user:write"),
 	"GET /api/blackroom/status":                        accessTokenScopeRule("user:read"),
 	"GET /api/blackroom/ip-audit":                      accessTokenScopeRule("user:read"),
+	"GET /api/blackroom/distribution":                  accessTokenScopeRule("user:read"),
 	"GET /api/blackroom/events":                        accessTokenScopeRule("user:read"),
 	"POST /api/blackroom/manual-ban":                   accessTokenScopeRule("user:write"),
 	"POST /api/blackroom/external-ban":                 accessTokenScopeRule("user:write"),

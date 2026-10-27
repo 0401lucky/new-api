@@ -52,6 +52,9 @@ export const blackroomSearchSchema = z.object({
   /** Unix 秒；0 与缺省同义，表示不设下界/上界。 */
   ipStart: z.number().int().nonnegative().optional().catch(0),
   ipEnd: z.number().int().nonnegative().optional().catch(0),
+  distPage: z.number().int().min(1).optional().catch(1),
+  distPageSize: z.number().int().min(1).max(100).optional().catch(20),
+  distFilter: z.string().max(128).optional().catch(''),
 })
 
 export type BlackroomSearch = z.infer<typeof blackroomSearchSchema>

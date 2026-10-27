@@ -21,6 +21,37 @@ import { assert, describe, test } from 'vitest'
 import { blackroomSearchSchema } from '../blackroom-search'
 
 describe('blackroom URL search schema', () => {
+  test('keeps watchlist parameters separate from ban and IP audit filters', () => {
+    assert.deepEqual(
+      blackroomSearchSchema.parse({
+        tab: 'distribution',
+        distPage: 2,
+        distPageSize: 10,
+        distFilter: 'alice',
+        ipFilter: '8.8.8.8',
+        filter: '42',
+      }),
+      {
+        tab: 'distribution',
+        distPage: 2,
+        distPageSize: 10,
+        distFilter: 'alice',
+        ipFilter: '8.8.8.8',
+        filter: '42',
+      }
+    )
+  })
+
+  test('falls back safely for invalid watchlist pagination and oversized filters', () => {
+    assert.deepEqual(
+      blackroomSearchSchema.parse({
+        distPage: -1,
+        distPageSize: 1000,
+        distFilter: 'a'.repeat(129),
+      }),
+      { distPage: 1, distPageSize: 20, distFilter: '' }
+    )
+  })
   test('keeps absent IP audit parameters absent so the URL stays clean', () => {
     assert.deepEqual(blackroomSearchSchema.parse({}), {})
   })

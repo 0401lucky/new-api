@@ -214,6 +214,67 @@ export interface GetBlackroomEventsParams {
   limit?: number
 }
 
+export interface BlackroomPromptSummary {
+  sample_count: number
+  unique_count: number
+  dominant_share: number
+}
+
+export interface BlackroomDistributionToken {
+  token_id: number
+  token_name: string
+  request_count: number
+  default_go_count: number
+  hosting_go_count: number
+  geo_sample_count: number
+  system_prompt: BlackroomPromptSummary
+  first_user_prompt: BlackroomPromptSummary
+  subnets: string[]
+  countries: string[]
+  asns: number[]
+  prompt_limited: boolean
+  network_limited: boolean
+  score: number
+  reasons: string[]
+  first_seen_at: number
+  last_seen_at: number
+}
+
+export interface BlackroomDistributionItem {
+  user_id: number
+  username: string
+  score: number
+  request_count: number
+  last_seen_at: number
+  reasons: string[]
+  tokens: BlackroomDistributionToken[]
+}
+
+export interface BlackroomDistributionResult {
+  available: boolean
+  unavailable_reason?: string
+  window_seconds: number
+  prompt_window_seconds: number
+  observed_at: number
+  scope_limited: boolean
+  total: number
+  page: number
+  page_size: number
+  items: BlackroomDistributionItem[]
+}
+
+export type BlackroomDistributionSearchParams = {
+  distPage?: number
+  distPageSize?: number
+  distFilter?: string
+}
+
+export interface GetBlackroomDistributionParams {
+  p?: number
+  page_size?: number
+  filter?: string
+}
+
 export type BlackroomDialogType =
   | 'manual-ban'
   | 'setting'

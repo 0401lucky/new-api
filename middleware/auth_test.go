@@ -298,6 +298,10 @@ func TestUserAuthAppliesAccessTokenRouteRules(t *testing.T) {
 	profile, _ := createMiddlewareScopedToken(t, admin.Id, 0, "profile:read")
 	modelRead, _ := createMiddlewareScopedToken(t, admin.Id, 0, "model:read")
 	adminOptions, _ := createMiddlewareScopedToken(t, admin.Id, 0, "option:write")
+	userRead, _ := createMiddlewareScopedToken(t, admin.Id, 0, "user:read")
+	expiredUserRead, _ := createMiddlewareScopedToken(t, admin.Id, time.Now().Unix()-1, "user:read")
+	ordinary := createMiddlewarePATUser(t, "watchlist-user", "middleware-watchlist-user")
+	ordinaryUserRead, _ := createMiddlewareScopedToken(t, ordinary.Id, 0, "user:read")
 	root := createMiddlewarePATUser(t, "route-rule-root", "middleware-root-token")
 	require.NoError(t, model.DB.Model(root).Update("role", common.RoleRootUser).Error)
 	rootOptions, _ := createMiddlewareScopedToken(t, root.Id, 0, "option:write")
@@ -310,6 +314,7 @@ func TestUserAuthAppliesAccessTokenRouteRules(t *testing.T) {
 	router := gin.New()
 	router.GET("/api/user/self", UserAuth(), ok)
 	router.GET("/api/user/self/rate_limit", UserAuth(), ok)
+	router.GET("/api/blackroom/distribution", AdminAuth(), ok)
 	router.GET("/api/dynamic_ratio/groups", UserAuth(), ok)
 	router.GET("/api/dynamic_ratio/policies", AdminAuth(), ok)
 	router.PUT("/api/dynamic_ratio/policies", RootAuth(), ok)
@@ -324,6 +329,10 @@ func TestUserAuthAppliesAccessTokenRouteRules(t *testing.T) {
 		status                                  int
 	}{
 		{name: "granted scope on a never expiring token", path: "/api/user/self", token: profile, status: http.StatusOK},
+		{name: "watchlist with admin read scope", path: "/api/blackroom/distribution", token: userRead, status: http.StatusOK},
+		{name: "watchlist without read scope", path: "/api/blackroom/distribution", token: profile, status: http.StatusForbidden, code: "ACCESS_TOKEN_SCOPE_DENIED", reason: "scope_denied"},
+		{name: "watchlist scope cannot grant admin role", path: "/api/blackroom/distribution", token: ordinaryUserRead, status: http.StatusForbidden, code: "AUTH_INSUFFICIENT_PRIVILEGE"},
+		{name: "watchlist expired credential", path: "/api/blackroom/distribution", token: expiredUserRead, status: http.StatusUnauthorized, code: "ACCESS_TOKEN_EXPIRED", reason: "expired"},
 		{name: "rate limit with profile scope", path: "/api/user/self/rate_limit", token: profile, status: http.StatusOK},
 		{name: "rate limit without profile scope", path: "/api/user/self/rate_limit", token: channel, status: http.StatusForbidden, code: "ACCESS_TOKEN_SCOPE_DENIED", reason: "scope_denied"},
 		{name: "group multipliers with profile scope", path: "/api/dynamic_ratio/groups", token: profile, status: http.StatusOK},

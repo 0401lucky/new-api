@@ -2,6 +2,7 @@ package controller
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -153,6 +154,16 @@ func GetBlackroomIPAudit(c *gin.Context) {
 	})
 	if err != nil {
 		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, result)
+}
+
+func GetBlackroomDistribution(c *gin.Context) {
+	pageInfo := common.GetPageQuery(c)
+	result, err := service.ListBlackroomDistribution(c.Request.Context(), c.Query("filter"), pageInfo.GetPage(), pageInfo.GetPageSize(), time.Now().Unix())
+	if err != nil {
+		common.ApiErrorMsg(c, "暂时无法读取分发观测数据，请稍后重试")
 		return
 	}
 	common.ApiSuccess(c, result)

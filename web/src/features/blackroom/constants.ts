@@ -18,11 +18,17 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import type { TFunction } from 'i18next'
 
-export const BLACKROOM_TAB_VALUES = ['bans', 'ip-audit'] as const
+export const BLACKROOM_TAB_VALUES = [
+  'bans',
+  'ip-audit',
+  'distribution',
+] as const
 
 export const BLACKROOM_DEFAULT_TAB = 'bans'
 
 export const BLACKROOM_TAB_IP_AUDIT = 'ip-audit'
+
+export const BLACKROOM_TAB_DISTRIBUTION = 'distribution'
 
 /** IP 审计默认每页条数。 */
 export const BLACKROOM_IP_AUDIT_DEFAULT_PAGE_SIZE = 20
@@ -119,4 +125,26 @@ export function resolveBlackroomDisplayStatus(
 export function normalizeBlackroomSource(value: unknown): string {
   const normalized = String(value ?? 'auto').toLowerCase()
   return normalized
+}
+
+export function getBlackroomDistributionReasonLabel(
+  reason: string,
+  t: TFunction
+): string {
+  switch (reason) {
+    case 'first_prompt_diversity':
+      return t('Varied first user prompts')
+    case 'system_prompt_diversity':
+      return t('Varied system prompts')
+    case 'subnet_diversity':
+      return t('Multiple network prefixes')
+    case 'geo_asn_diversity':
+      return t('Multiple countries and ASNs')
+    case 'default_go_client':
+      return t('Default Go client')
+    case 'hosting_go_client':
+      return t('Hosting ASN with default Go client')
+    default:
+      return t('Unrecognized signal')
+  }
 }

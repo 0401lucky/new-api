@@ -17,14 +17,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
+
 import type {
   ApiResponse,
   BlackroomBanEvent,
+  BlackroomDistributionResult,
   BlackroomEntry,
   BlackroomIPAuditResult,
   BlackroomSetting,
   BlackroomStatusSummary,
   GetBlackroomEventsParams,
+  GetBlackroomDistributionParams,
   GetBlackroomIPAuditParams,
   GetBlackroomParams,
   ManualBanPayload,
@@ -90,6 +93,19 @@ export async function getBlackroomEvents(
   if (params.limit) queryParams.set('limit', String(params.limit))
 
   const res = await api.get(`/api/blackroom/events?${queryParams.toString()}`)
+  return res.data
+}
+
+export async function getBlackroomDistribution(
+  params: GetBlackroomDistributionParams = {}
+): Promise<ApiResponse<BlackroomDistributionResult>> {
+  const queryParams = new URLSearchParams()
+  queryParams.set('p', String(params.p ?? 1))
+  queryParams.set('page_size', String(params.page_size ?? 20))
+  if (params.filter) queryParams.set('filter', params.filter)
+  const res = await api.get(
+    `/api/blackroom/distribution?${queryParams.toString()}`
+  )
   return res.data
 }
 
