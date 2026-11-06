@@ -45,8 +45,8 @@ func newCodexWhamContext(channelId int) (*codexWhamContext, error) {
 
 	oauthKey, err := codex.ParseOAuthKey(strings.TrimSpace(ch.Key))
 	if err != nil {
-		common.SysError("failed to parse oauth key: " + err.Error())
-		return nil, fmt.Errorf("解析凭证失败，请检查渠道配置")
+		common.SysError(common.LogText("failed to parse oauth key: %s", err.Error()))
+		return nil, common.NewMessage("Failed to parse credentials. Please check the channel configuration")
 	}
 	accessToken := strings.TrimSpace(oauthKey.AccessToken)
 	accountID := strings.TrimSpace(oauthKey.AccountID)
@@ -57,7 +57,8 @@ func newCodexWhamContext(channelId int) (*codexWhamContext, error) {
 		return nil, fmt.Errorf("codex channel: account_id is required")
 	}
 
-	client, err := service.GetHttpClientWithProxy(ch.GetSetting().Proxy)
+	setting := ch.GetSetting()
+	client, err := service.GetHttpClientWithProxySettings(setting.Proxy, setting)
 	if err != nil {
 		return nil, err
 	}

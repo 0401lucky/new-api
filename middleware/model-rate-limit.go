@@ -264,12 +264,12 @@ func redisRateLimitHandler(duration int64, layers []rateLimitLayer) gin.HandlerF
 			successKey := layer.successRedisKey()
 			allowed, err := checkRedisRateLimit(ctx, rdb, successKey, layer.successMaxCount, duration)
 			if err != nil {
-				fmt.Println("检查成功请求数限制失败:", err.Error())
+				fmt.Println(common.LogText("failed to check the successful request limit: %s", err.Error()))
 				abortWithOpenAiMessage(c, http.StatusInternalServerError, "rate_limit_check_failed")
 				return
 			}
 			if !allowed {
-				abortWithOpenAiMessage(c, http.StatusTooManyRequests, fmt.Sprintf("您已达到请求数限制：%d分钟内最多请求%d次", setting.ModelRequestRateLimitDurationMinutes, layer.successMaxCount))
+				abortWithOpenAiMessage(c, http.StatusTooManyRequests, i18n.T(c, i18n.MsgRateLimitReached, map[string]any{"Minutes": setting.ModelRequestRateLimitDurationMinutes, "Max": layer.successMaxCount}))
 				return
 			}
 

@@ -17,24 +17,28 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { ColumnDef } from '@tanstack/react-table'
-import { Plus } from 'lucide-react'
+import { Plus, Undo2 } from 'lucide-react'
 
 import { DataTableColumnHeader } from '@/components/data-table/core/column-header'
 import { StaticRowActions } from '@/components/data-table/static/static-row-actions'
 import { StatusBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { cn } from '@/lib/utils'
 
 import {
   getModeLabel,
-  getModeVariant,
+  getPriceChangeKind,
   getPriceDetail,
   getPriceSummary,
   type ChannelModelStatus,
   type ModelRow,
 } from './model-pricing-snapshots'
+import { PriceChangeBadge, PriceChangeSummary } from './price-change-diff'
+import { PRICING_ISSUE_REASONS, type ModelPricingIssue } from './pricing-issues'
 
 export const TASK_PRICING_MODE_FILTER = 'tiered_expr_task'
+export const PRICE_ATTENTION_FILTER = 'needs-attention'
 
 const filterBySelectedValues = (
   rowValue: unknown,
@@ -55,19 +59,25 @@ const CHANNEL_STATUS_META: Record<
 
 type BuildModelRatioColumnsOptions = {
   onDelete: (name: string) => void
+  /** Puts a pending deletion's saved price back into the draft. */
+  onRestore: (name: string) => void
   onEdit: (model: ModelRow) => void
   showChannelStatus: boolean
   deleteDisabled?: boolean
   taskModelNames?: Set<string>
-  t: (key: string) => string
+  /** Task model prices the gateway reports a plugin cannot charge, by model. */
+  pricingIssues?: Map<string, ModelPricingIssue[]>
+  t: (key: string, options?: Record<string, unknown>) => string
 }
 
 export function buildModelRatioColumns({
   onDelete,
+  onRestore,
   onEdit,
   showChannelStatus,
   deleteDisabled,
   taskModelNames,
+  pricingIssues,
   t,
 }: BuildModelRatioColumnsOptions): ColumnDef<ModelRow>[] {
   return [
@@ -101,54 +111,85 @@ export function buildModelRatioColumns({
         <DataTableColumnHeader column={column} title={t('Model name')} />
       ),
       cell: ({ row }) => {
+        const issues = pricingIssues?.get(row.original.name)
         const isTaskModel = Boolean(taskModelNames?.has(row.original.name))
         const hasConfiguredTaskPricing =
           row.original.billingMode === 'tiered_expr' &&
           Boolean(row.original.billingExpr)
-        const showTaskPricingBadge = isTaskModel && hasConfiguredTaskPricing
+        // A price that needs attention must not look configured.
+        const showTaskPricingBadge =
+          !issues && isTaskModel && hasConfiguredTaskPricing
         const showTieredBadge =
-          row.original.billingMode === 'tiered_expr' && !isTaskModel
-        const showUnconfiguredTaskBadge =
-          isTaskModel && !hasConfiguredTaskPricing
+          !issues && row.original.billingMode === 'tiered_expr' && !isTaskModel
+        const issueText = issues
+          ?.map((issue) =>
+            t('{{name}}: {{reason}}', {
+              name: issue.plugin_name,
+              reason: t(PRICING_ISSUE_REASONS[issue.reason]),
+            })
+          )
+          .join(' · ')
+        const changeKind = getPriceChangeKind(row.original)
 
         return (
-          <div className='flex min-w-0 items-center gap-2 font-medium'>
-            <span className='min-w-0 truncate'>{row.getValue('name')}</span>
-            {showTieredBadge ? (
-              <StatusBadge
-                label={t('Tiered')}
-                variant='info'
-                copyable={false}
-                className='shrink-0'
-              />
+          <div className='flex min-w-0 flex-col gap-0.5'>
+            <div className='flex min-w-0 items-center gap-2 font-medium'>
+              <span
+                className={cn(
+                  'min-w-0 truncate',
+                  row.original.isDraftDeleted && 'line-through'
+                )}
+              >
+                {row.getValue('name')}
+              </span>
+              {changeKind && <PriceChangeBadge kind={changeKind} />}
+              {showTieredBadge && !row.original.isDraftDeleted ? (
+                <StatusBadge
+                  label={t('Tiered')}
+                  copyable={false}
+                  className='bg-muted text-foreground shrink-0 px-2 font-normal'
+                />
+              ) : null}
+              {showTaskPricingBadge && !row.original.isDraftDeleted ? (
+                <StatusBadge
+                  label={t('Task pricing')}
+                  copyable={false}
+                  className='bg-muted text-foreground shrink-0 px-2 font-normal'
+                />
+              ) : null}
+              {row.original.hasConflict && (
+                <StatusBadge
+                  label={t('Conflict')}
+                  variant='danger'
+                  copyable={false}
+                  className='shrink-0'
+                />
+              )}
+              {issues ? (
+                <StatusBadge
+                  label={t('Price needs attention')}
+                  variant='warning'
+                  copyable={false}
+                  className='shrink-0'
+                />
+              ) : null}
+            </div>
+            {changeKind === 'modified' ? (
+              <PriceChangeSummary row={row.original} />
             ) : null}
-            {showTaskPricingBadge ? (
-              <StatusBadge
-                label={t('Task pricing')}
-                variant='info'
-                copyable={false}
-                className='shrink-0'
-              />
-            ) : null}
-            {row.original.hasConflict && (
-              <StatusBadge
-                label={t('Conflict')}
-                variant='danger'
-                copyable={false}
-                className='shrink-0'
-              />
-            )}
-            {showUnconfiguredTaskBadge ? (
-              <StatusBadge
-                label={t('Task pricing not configured')}
-                variant='warning'
-                copyable={false}
-                className='shrink-0'
-              />
+            {issueText ? (
+              <span
+                className='text-muted-foreground truncate text-xs'
+                title={issueText}
+              >
+                {issueText}
+              </span>
             ) : null}
           </div>
         )
       },
+      // The only option is PRICE_ATTENTION_FILTER.
+      filterFn: (row) => Boolean(pricingIssues?.has(row.original.name)),
       enableHiding: false,
     },
     {
@@ -160,7 +201,6 @@ export function buildModelRatioColumns({
         row.original.isUnpriced ? null : (
           <StatusBadge
             label={t(getModeLabel(row.original.billingMode))}
-            variant={getModeVariant(row.original.billingMode)}
             copyable={false}
             showDot={false}
             className='-ml-1.5 px-0'
@@ -214,11 +254,17 @@ export function buildModelRatioColumns({
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t('Price summary')} />
       ),
-      cell: ({ row }) =>
-        row.original.isUnpriced ? (
-          <span className='text-muted-foreground'>—</span>
-        ) : (
-          <div className='flex min-w-0 flex-col gap-1'>
+      cell: ({ row }) => {
+        if (row.original.isUnpriced) {
+          return <span className='text-muted-foreground'>—</span>
+        }
+        return (
+          <div
+            className={cn(
+              'flex min-w-0 flex-col gap-1',
+              row.original.isDraftDeleted && 'line-through'
+            )}
+          >
             <span className='truncate font-medium'>
               {getPriceSummary(row.original, t)}
             </span>
@@ -226,7 +272,8 @@ export function buildModelRatioColumns({
               {getPriceDetail(row.original, t)}
             </span>
           </div>
-        ),
+        )
+      },
       sortingFn: (rowA, rowB) =>
         getPriceSummary(rowA.original, t).localeCompare(
           getPriceSummary(rowB.original, t)
@@ -236,26 +283,47 @@ export function buildModelRatioColumns({
     {
       id: 'actions',
       header: () => <div>{t('Actions')}</div>,
-      cell: ({ row }) =>
-        row.original.isUnpriced ? (
-          <Button
-            variant='outline'
-            size='sm'
-            onClick={() => onEdit(row.original)}
-          >
-            <Plus data-icon='inline-start' />
-            {t('Add pricing')}
-          </Button>
-        ) : (
+      cell: ({ row }) => {
+        if (row.original.isDraftDeleted) {
+          return (
+            <div className='flex justify-end'>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => onRestore(row.original.name)}
+              >
+                <Undo2 data-icon='inline-start' />
+                {t('Undo')}
+              </Button>
+            </div>
+          )
+        }
+        if (row.original.isUnpriced && !pricingIssues?.has(row.original.name)) {
+          return (
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => onEdit(row.original)}
+            >
+              <Plus data-icon='inline-start' />
+              {t('Add pricing')}
+            </Button>
+          )
+        }
+        return (
           <StaticRowActions
             editLabel={t('Edit')}
             deleteLabel={t('Delete')}
             menuLabel={t('Open menu')}
             onEdit={() => onEdit(row.original)}
-            onDelete={() => onDelete(row.original.name)}
+            // Only a saved price can be removed; an unpriced row has none.
+            onDelete={
+              row.original.saved ? () => onDelete(row.original.name) : undefined
+            }
             deleteDisabled={deleteDisabled}
           />
-        ),
+        )
+      },
       enableHiding: false,
     },
   ]

@@ -93,8 +93,8 @@ func AddInvitationCode(c *gin.Context) {
 		common.ApiErrorMsg(c, "单次最多创建 100000 个邀请码")
 		return
 	}
-	if valid, msg := validateExpiredTime(c, req.ExpiredTime); !valid {
-		c.JSON(http.StatusOK, gin.H{"success": false, "message": msg})
+	if err := validateExpiredTime(req.ExpiredTime); err != nil {
+		common.ApiError(c, err)
 		return
 	}
 	keyPrefix := strings.TrimSpace(req.KeyPrefix)
@@ -164,8 +164,8 @@ func UpdateInvitationCode(c *gin.Context) {
 		return
 	}
 	if statusOnly == "" {
-		if valid, msg := validateExpiredTime(c, code.ExpiredTime); !valid {
-			c.JSON(http.StatusOK, gin.H{"success": false, "message": msg})
+		if err := validateExpiredTime(code.ExpiredTime); err != nil {
+			common.ApiError(c, err)
 			return
 		}
 		cleanCode.Name = code.Name

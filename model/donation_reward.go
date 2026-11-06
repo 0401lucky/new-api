@@ -3,7 +3,6 @@ package model
 import (
 	"context"
 	"errors"
-	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -539,7 +538,7 @@ func (s *DonationStore) CreditDonationReward(ctx context.Context, itemID string)
 		// Cache misses hydrate later; replay never overwrites outstanding reserves.
 		syncCreditUserQuotaCache(reward.UserID, reward.Quota, "donation reward")
 		if LOG_DB != nil {
-			RecordLog(reward.UserID, LogTypeSystem, fmt.Sprintf("Donation reward %s: permanent quota +%d (item %s)", reward.ID, reward.Quota, reward.ItemID))
+			RecordLog(reward.UserID, LogTypeSystem, common.NewMessage("Donation reward {{reward_id}}: permanent quota +{{quota}} (item {{item_id}})", map[string]any{"reward_id": reward.ID, "quota": reward.Quota, "item_id": reward.ItemID}))
 		}
 	}
 	return credited, nil

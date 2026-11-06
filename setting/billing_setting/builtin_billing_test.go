@@ -37,20 +37,24 @@ func TestGPT6AstraBuiltinBilling(t *testing.T) {
 	require.True(t, ok)
 
 	for _, tc := range []struct {
-		name                           string
-		input, output, cached, written int
-		request                        string
-		quota                          int
+		name                                       string
+		input, output, cached, written, written12h int
+		request                                    string
+		quota                                      int
 	}{
-		{"standard", 1000, 100, 0, 0, `{}`, 7500},
-		{"client flex cannot discount standard pricing", 1000, 100, 0, 0, `{"service_tier":"flex"}`, 7500},
-		{"cache at context boundary", 272000, 1000, 200000, 20000, `{}`, 510000},
-		{"whole request above boundary", 272001, 1000, 200000, 20000, `{}`, 1007510},
+		{"standard", 1000, 100, 0, 0, 0, `{}`, 7500},
+		{"client flex cannot discount standard pricing", 1000, 100, 0, 0, 0, `{"service_tier":"flex"}`, 7500},
+		{"cache at context boundary", 272000, 1000, 200000, 20000, 0, `{}`, 510000},
+		{"whole request above boundary", 272001, 1000, 200000, 20000, 0, `{}`, 1007510},
+		// The prompt caching guide example: 4000 of the 7000 writes are 12h.
+		{"12h cache writes", 12000, 0, 4000, 7000, 4000, `{}`, 75750},
+		{"12h cache writes above boundary", 300000, 0, 200000, 20000, 10000, `{}`, 1375000},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			usage := &dto.Usage{
 				PromptTokens: tc.input, CompletionTokens: tc.output,
-				PromptTokensDetails: dto.InputTokenDetails{CachedTokens: tc.cached, CacheWriteTokens: tc.written},
+				PromptTokensDetails: dto.InputTokenDetails{CachedTokens: tc.cached, CacheWriteTokens: tc.written,
+					CacheWriteTokensDetails: &dto.CacheWriteTokenDetails{TTL30mTokens: tc.written - tc.written12h, TTL12hTokens: tc.written12h}},
 			}
 			params := service.BuildTieredTokenParams(usage, false, billingexpr.UsedVars(expression))
 			result, err := billingexpr.ComputeTieredQuotaWithRequest(&billingexpr.BillingSnapshot{
@@ -146,5 +150,37 @@ func TestImageModelBuiltinPricesAndOverrides(t *testing.T) {
 			require.True(t, ok)
 			assert.Equal(t, settings.BillingExpr[name], actual)
 		})
+	}
+}
+
+// Search/Fetch routing names cost $0.75 per 1,000 successful requests.
+// Their request price does not depend on response token counters.
+func TestDeepSeekToolsBuiltinBilling(t *testing.T) {
+	settings := config.GlobalConfig.Get("billing_setting").(*billing_setting.BillingSetting)
+	saved := *settings
+	savedRatios, savedPrices := ratio_setting.ModelRatio2JSONString(), ratio_setting.ModelPrice2JSONString()
+	t.Cleanup(func() {
+		*settings = saved
+		require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(savedRatios))
+		require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(savedPrices))
+	})
+	*settings = billing_setting.BillingSetting{BillingMode: map[string]string{}, BillingExpr: map[string]string{}}
+	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(`{}`))
+	require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(`{}`))
+
+	quota := func(expression string, usage *dto.Usage) billingexpr.TieredResult {
+		params := service.BuildTieredTokenParams(usage, usage.UsageSemantic == "anthropic", billingexpr.UsedVars(expression))
+		result, err := billingexpr.ComputeTieredQuota(&billingexpr.BillingSnapshot{
+			ExprString: expression, ExprHash: billingexpr.ExprHashString(expression), GroupRatio: 1, QuotaPerUnit: 500000,
+		}, params)
+		require.NoError(t, err)
+		return result
+	}
+	for _, model := range []string{"deepseek-search", "deepseek-fetch"} {
+		expression, ok := billing_setting.GetBillingExpr(model)
+		require.True(t, ok, model)
+		result := quota(expression, &dto.Usage{})
+		assert.Equal(t, billingexpr.BillingUnitRequest, result.BillingUnit, model)
+		assert.Equal(t, 375, result.ActualQuotaAfterGroup, model)
 	}
 }

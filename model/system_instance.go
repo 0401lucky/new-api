@@ -14,11 +14,10 @@ const (
 	SystemInstanceStaleAfterSeconds int64 = 90
 )
 
-// SystemInstance 保留历史 ID 主键，避免现有 SQLite/MySQL/PostgreSQL 表在
-// 升级时切换主键；node_name 唯一索引仍可用于跨节点 upsert。
+// NodeName is the upsert identity. Existing fork tables may also retain an
+// auto-generated id primary key; AutoMigrate does not remove that column.
 type SystemInstance struct {
-	ID         int64  `json:"id" gorm:"primaryKey"`
-	NodeName   string `json:"node_name" gorm:"type:varchar(191);uniqueIndex;not null"`
+	NodeName   string `json:"node_name" gorm:"type:varchar(191);primaryKey"`
 	Info       string `json:"info" gorm:"type:text"`
 	StartedAt  int64  `json:"started_at" gorm:"bigint;index"`
 	LastSeenAt int64  `json:"last_seen_at" gorm:"bigint;index"`

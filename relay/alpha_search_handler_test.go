@@ -58,6 +58,20 @@ func TestBuildAlphaSearchRequestBodyNoMappingKeepsRawBytes(t *testing.T) {
 	assert.Equal(t, raw, out)
 }
 
+func TestBuildAlphaSearchRequestBodyRewritesModel(t *testing.T) {
+	tests := []struct{ name, raw, want string }{
+		{"single model keeps its place", `{"model":"gpt-5.1","input":[]}`, `{"model":"gpt-5.1-mapped","input":[]}`},
+		{"repeated model collapses", `{"model":"gpt-5.1","input":[],"model":"gpt-5.5-pro"}`, `{"input":[],"model":"gpt-5.1-mapped"}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, err := buildAlphaSearchRequestBody([]byte(tt.raw), "gpt-5.1", "gpt-5.1-mapped")
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, string(out))
+		})
+	}
+}
+
 type recordedSettlement struct {
 	settled  []int
 	refunded bool

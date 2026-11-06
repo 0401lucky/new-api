@@ -143,7 +143,7 @@ func TestSubscriptionPurchaseLimit(t *testing.T) {
 							return err
 						})
 						if tc.blocked {
-							require.EqualError(t, err, "已达到该套餐购买上限")
+							require.EqualError(t, err, "Purchase limit for this plan has been reached")
 							assert.EqualValues(t, tc.copies, countUserPlanSubs(t, user.Id, plan.Id))
 							return
 						}
@@ -169,13 +169,13 @@ func TestSubscriptionPurchaseLimit(t *testing.T) {
 				_, err = AdminBindSubscription(user.Id, plan.Id, "test")
 				require.NoError(t, err)
 				_, err = AdminBindSubscription(user.Id, plan.Id, "test")
-				require.EqualError(t, err, "已达到该套餐购买上限")
+				require.EqualError(t, err, "Purchase limit for this plan has been reached")
 			})
 
 			t.Run("balance_renewal_and_limit_rollback", func(t *testing.T) {
 				user, plan := seedSubscriptionPurchase(t, 1)
 				require.NoError(t, PurchaseSubscriptionWithBalance(user.Id, plan.Id))
-				require.EqualError(t, PurchaseSubscriptionWithBalance(user.Id, plan.Id), "已达到该套餐购买上限")
+				require.EqualError(t, PurchaseSubscriptionWithBalance(user.Id, plan.Id), "Purchase limit for this plan has been reached")
 				var updated User
 				require.NoError(t, DB.First(&updated, user.Id).Error)
 				assert.Equal(t, 4000000, updated.Quota)
@@ -206,7 +206,7 @@ func TestSubscriptionPurchaseLimit(t *testing.T) {
 				require.NoError(t, CompleteSubscriptionOrder(firstTrade, "", PaymentProviderStripe, ""))
 				require.NoError(t, CompleteSubscriptionOrder(firstTrade, "", PaymentProviderStripe, ""))
 				assert.EqualValues(t, 1, countUserPlanSubs(t, user.Id, plan.Id))
-				require.EqualError(t, CompleteSubscriptionOrder(secondTrade, "", PaymentProviderStripe, ""), "已达到该套餐购买上限")
+				require.EqualError(t, CompleteSubscriptionOrder(secondTrade, "", PaymentProviderStripe, ""), "Purchase limit for this plan has been reached")
 				pending := GetSubscriptionOrderByTradeNo(secondTrade)
 				require.NotNil(t, pending)
 				assert.Equal(t, common.TopUpStatusPending, pending.Status)

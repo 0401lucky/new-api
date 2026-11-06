@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/QuantumNous/new-api/common"
@@ -16,7 +15,7 @@ import (
 func GetCheckinStatus(c *gin.Context) {
 	setting := operation_setting.GetCheckinSetting()
 	if !setting.Enabled {
-		common.ApiErrorMsg(c, "签到功能未启用")
+		common.ApiErrorT(c, "Check-in feature is not enabled")
 		return
 	}
 	userId := c.GetInt("id")
@@ -25,10 +24,7 @@ func GetCheckinStatus(c *gin.Context) {
 
 	stats, err := model.GetUserCheckinStats(userId, month)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"success": false,
-			"message": err.Error(),
-		})
+		common.ApiError(c, err)
 		return
 	}
 
@@ -82,7 +78,7 @@ func GetCheckinStatus(c *gin.Context) {
 func DoCheckin(c *gin.Context) {
 	setting := operation_setting.GetCheckinSetting()
 	if !setting.Enabled {
-		common.ApiErrorMsg(c, "签到功能未启用")
+		common.ApiErrorT(c, "Check-in feature is not enabled")
 		return
 	}
 
@@ -90,10 +86,7 @@ func DoCheckin(c *gin.Context) {
 
 	checkin, err := model.UserCheckin(userId)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"success": false,
-			"message": err.Error(),
-		})
+		common.ApiError(c, err)
 		return
 	}
 
@@ -101,7 +94,7 @@ func DoCheckin(c *gin.Context) {
 	if checkin.IsTemporary() {
 		quotaType = "temporary"
 	}
-	model.RecordLog(userId, model.LogTypeSystem, fmt.Sprintf("用户签到，获得额度 %s", logger.LogQuota(checkin.QuotaAwarded)))
+	model.RecordLog(userId, model.LogTypeSystem, common.NewMessage("Daily check-in, received {{quota}}", map[string]any{"quota": logger.FormatQuota(checkin.QuotaAwarded)}))
 
 	data := gin.H{
 		"quota_awarded": checkin.QuotaAwarded,
@@ -112,9 +105,5 @@ func DoCheckin(c *gin.Context) {
 		data["temporary_quota"] = checkin.QuotaRemaining
 		data["temporary_quota_expires_at"] = checkin.QuotaExpiresAt
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "签到成功",
-		"data":    data,
-	})
+	common.ApiSuccessT(c, "Check-in successful", data)
 }

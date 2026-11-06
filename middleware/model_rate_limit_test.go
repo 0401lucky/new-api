@@ -228,7 +228,7 @@ func TestModelRateLimitStreamFailuresDoNotConsumeSuccessLimit(t *testing.T) {
 					handler = redisRateLimitHandler(60, layers)
 				}
 				router := gin.New()
-				router.GET("/:outcome", func(c *gin.Context) { c.Set("id", userID) }, handler, func(c *gin.Context) {
+				router.GET("/:outcome", handler, func(c *gin.Context) {
 					status := relaycommon.NewStreamStatus()
 					if c.Param("outcome") == "failed" {
 						status.MarkFailed("server_error", "", 0)

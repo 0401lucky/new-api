@@ -2,7 +2,6 @@ package dify
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/MoeForge/moego/base64"
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
@@ -38,14 +38,14 @@ func uploadDifyFile(c *gin.Context, info *relaycommon.RelayInfo, user string, me
 		// Decode base64 string
 		decodedData, err := base64.StdEncoding.DecodeString(base64Data)
 		if err != nil {
-			common.SysLog("failed to decode base64: " + err.Error())
+			common.SysLog(common.LogText("failed to decode base64: %s", err.Error()))
 			return nil
 		}
 
 		// Create temporary file
 		tempFile, err := os.CreateTemp("", "dify-upload-*")
 		if err != nil {
-			common.SysLog("failed to create temp file: " + err.Error())
+			common.SysLog(common.LogText("failed to create temp file: %s", err.Error()))
 			return nil
 		}
 		defer tempFile.Close()
@@ -53,7 +53,7 @@ func uploadDifyFile(c *gin.Context, info *relaycommon.RelayInfo, user string, me
 
 		// Write decoded data to temp file
 		if _, err := tempFile.Write(decodedData); err != nil {
-			common.SysLog("failed to write to temp file: " + err.Error())
+			common.SysLog(common.LogText("failed to write to temp file: %s", err.Error()))
 			return nil
 		}
 
@@ -63,7 +63,7 @@ func uploadDifyFile(c *gin.Context, info *relaycommon.RelayInfo, user string, me
 
 		// Add user field
 		if err := writer.WriteField("user", user); err != nil {
-			common.SysLog("failed to add user field: " + err.Error())
+			common.SysLog(common.LogText("failed to add user field: %s", err.Error()))
 			return nil
 		}
 
@@ -76,13 +76,13 @@ func uploadDifyFile(c *gin.Context, info *relaycommon.RelayInfo, user string, me
 		// Create form file
 		part, err := writer.CreateFormFile("file", fmt.Sprintf("image.%s", strings.TrimPrefix(mimeType, "image/")))
 		if err != nil {
-			common.SysLog("failed to create form file: " + err.Error())
+			common.SysLog(common.LogText("failed to create form file: %s", err.Error()))
 			return nil
 		}
 
 		// Copy file content to form
 		if _, err = io.Copy(part, bytes.NewReader(decodedData)); err != nil {
-			common.SysLog("failed to copy file content: " + err.Error())
+			common.SysLog(common.LogText("failed to copy file content: %s", err.Error()))
 			return nil
 		}
 		writer.Close()
@@ -90,7 +90,7 @@ func uploadDifyFile(c *gin.Context, info *relaycommon.RelayInfo, user string, me
 		// Create HTTP request
 		req, err := http.NewRequest("POST", uploadUrl, body)
 		if err != nil {
-			common.SysLog("failed to create request: " + err.Error())
+			common.SysLog(common.LogText("failed to create request: %s", err.Error()))
 			return nil
 		}
 
@@ -101,7 +101,7 @@ func uploadDifyFile(c *gin.Context, info *relaycommon.RelayInfo, user string, me
 		client := service.GetHttpClient()
 		resp, err := client.Do(req)
 		if err != nil {
-			common.SysLog("failed to send request: " + err.Error())
+			common.SysLog(common.LogText("failed to send request: %s", err.Error()))
 			return nil
 		}
 		defer resp.Body.Close()
@@ -110,8 +110,8 @@ func uploadDifyFile(c *gin.Context, info *relaycommon.RelayInfo, user string, me
 		var result struct {
 			Id string `json:"id"`
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			common.SysLog("failed to decode response: " + err.Error())
+		if err := common.DecodeJson(resp.Body, &result); err != nil {
+			common.SysLog(common.LogText("failed to decode response: %s", err.Error()))
 			return nil
 		}
 
@@ -135,9 +135,9 @@ func requestOpenAI2Dify(c *gin.Context, info *relaycommon.RelayInfo, request dto
 		user = json.RawMessage(helper.GetResponseID(c))
 	}
 	var stringUser string
-	err := json.Unmarshal(user, &stringUser)
+	err := common.Unmarshal(user, &stringUser)
 	if err != nil {
-		common.SysLog("failed to unmarshal user: " + err.Error())
+		common.SysLog(common.LogText("failed to unmarshal user: %s", err.Error()))
 		stringUser = helper.GetResponseID(c)
 	}
 	difyReq.User = stringUser
@@ -228,8 +228,8 @@ func difyStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 	helper.SetEventStreamHeaders(c)
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
 		var difyResponse DifyChunkChatCompletionResponse
-		if err := json.Unmarshal([]byte(data), &difyResponse); err != nil {
-			common.SysLog("error unmarshalling stream response: " + err.Error())
+		if err := common.Unmarshal([]byte(data), &difyResponse); err != nil {
+			common.SysLog(common.LogText("error unmarshalling stream response: %s", err.Error()))
 			sr.Error(err)
 			return
 		}
@@ -269,7 +269,7 @@ func difyHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respons
 		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
 	}
 	service.CloseResponseBodyGracefully(resp)
-	err = json.Unmarshal(responseBody, &difyResponse)
+	err = common.Unmarshal(responseBody, &difyResponse)
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
 	}
@@ -288,7 +288,7 @@ func difyHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respons
 		FinishReason: "stop",
 	}
 	fullTextResponse.Choices = append(fullTextResponse.Choices, choice)
-	jsonResponse, err := json.Marshal(fullTextResponse)
+	jsonResponse, err := common.Marshal(fullTextResponse)
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
 	}

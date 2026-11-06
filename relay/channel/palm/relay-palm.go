@@ -1,7 +1,6 @@
 package palm
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 
@@ -59,15 +58,15 @@ func palmStreamHandler(c *gin.Context, resp *http.Response) (*types.NewAPIError,
 	go func() {
 		responseBody, err := io.ReadAll(resp.Body)
 		if err != nil {
-			common.SysLog("error reading stream response: " + err.Error())
+			common.SysLog(common.LogText("error reading stream response: %s", err.Error()))
 			stopChan <- true
 			return
 		}
 		service.CloseResponseBodyGracefully(resp)
 		var palmResponse PaLMChatResponse
-		err = json.Unmarshal(responseBody, &palmResponse)
+		err = common.Unmarshal(responseBody, &palmResponse)
 		if err != nil {
-			common.SysLog("error unmarshalling stream response: " + err.Error())
+			common.SysLog(common.LogText("error unmarshalling stream response: %s", err.Error()))
 			stopChan <- true
 			return
 		}
@@ -77,9 +76,9 @@ func palmStreamHandler(c *gin.Context, resp *http.Response) (*types.NewAPIError,
 		if len(palmResponse.Candidates) > 0 {
 			responseText = palmResponse.Candidates[0].Content
 		}
-		jsonResponse, err := json.Marshal(fullTextResponse)
+		jsonResponse, err := common.Marshal(fullTextResponse)
 		if err != nil {
-			common.SysLog("error marshalling stream response: " + err.Error())
+			common.SysLog(common.LogText("error marshalling stream response: %s", err.Error()))
 			stopChan <- true
 			return
 		}
@@ -108,7 +107,7 @@ func palmHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respons
 	}
 	service.CloseResponseBodyGracefully(resp)
 	var palmResponse PaLMChatResponse
-	err = json.Unmarshal(responseBody, &palmResponse)
+	err = common.Unmarshal(responseBody, &palmResponse)
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}

@@ -1,12 +1,12 @@
 package controller
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
@@ -171,7 +171,7 @@ func exportLogs(c *gin.Context, all bool) {
 	userId := c.GetInt("id")
 	release, ok, err := service.AcquireLogExportLock(userId)
 	if err != nil {
-		common.SysError(fmt.Sprintf("failed to lock log export: %s", err.Error()))
+		common.SysError(common.LogText("failed to lock log export: %s", err.Error()))
 		common.ApiErrorT(c, "Failed to export logs")
 		return
 	}
@@ -209,7 +209,7 @@ func exportLogs(c *gin.Context, all bool) {
 	}
 	// The status is already sent, so the result object becomes the last line.
 	if err != nil {
-		common.SysError(fmt.Sprintf("failed to export logs: %s", err.Error()))
+		common.SysError(common.LogText("failed to export logs: %s", err.Error()))
 		common.ApiErrorT(c, "Failed to export logs")
 		return
 	}
@@ -218,27 +218,18 @@ func exportLogs(c *gin.Context, all bool) {
 
 // Deprecated: SearchAllLogs 已废弃，前端未使用该接口。
 func SearchAllLogs(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"success": false,
-		"message": "该接口已废弃",
-	})
+	common.ApiErrorT(c, "This API is deprecated")
 }
 
 // Deprecated: SearchUserLogs 已废弃，前端未使用该接口。
 func SearchUserLogs(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"success": false,
-		"message": "该接口已废弃",
-	})
+	common.ApiErrorT(c, "This API is deprecated")
 }
 
 func GetLogByKey(c *gin.Context) {
 	tokenId := c.GetInt("token_id")
 	if tokenId == 0 {
-		c.JSON(200, gin.H{
-			"success": false,
-			"message": "无效的令牌",
-		})
+		common.ApiErrorI18n(c, i18n.MsgTokenInvalid)
 		return
 	}
 	logs, err := model.GetLogByTokenId(tokenId)
